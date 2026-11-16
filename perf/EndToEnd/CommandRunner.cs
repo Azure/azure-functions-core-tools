@@ -1,12 +1,15 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
 
-namespace Func.Performance;
+namespace Azure.Functions.Cli.Performance.EndToEnd;
 
 internal class CommandRunner(TimeSpan timeout)
 {
     internal virtual async Task RunAsync(ProcessStartInfo startInfo, CommandCase command, CancellationToken cancellation)
     {
-        using var process = new Process { StartInfo = startInfo };
+        using Process process = new() { StartInfo = startInfo };
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(timeout);
         if (!process.Start())

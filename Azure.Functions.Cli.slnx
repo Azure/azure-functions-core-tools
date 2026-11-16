@@ -4,8 +4,11 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Folder Name="/perf/">
-    <Project Path="perf/Func.Performance.csproj" />
+  <Folder Name="/perf/EndToEnd/">
+    <Project Path="perf/EndToEnd/Performance.EndToEnd.csproj" />
+  </Folder>
+  <Folder Name="/perf/Microbenchmarks/">
+    <Project Path="perf/Microbenchmarks/Performance.Microbenchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />

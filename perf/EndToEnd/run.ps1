@@ -7,12 +7,13 @@ param(
     [string] $Job = 'short',
     [string] $OutputDirectory,
     [ValidateRange(1024, 65535)]
-    [int] $Port = 5010
+    [int] $Port = 5010,
+    [switch] $Force
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
-$repo = Split-Path $PSScriptRoot -Parent
+$repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if (-not $Runtime) {
     $Runtime = if ($IsWindows) { 'win-x64' } elseif ($IsLinux) { 'linux-x64' } else {
         throw 'Unsupported OS. Run on Windows or Linux x64, or pass -Runtime.'
@@ -27,14 +28,22 @@ if (-not $OutputDirectory) {
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $inputDirectory = Join-Path $OutputDirectory 'input'
 $results = Join-Path $OutputDirectory 'results'
-$cliDirectory = Join-Path $inputDirectory 'cli'
+$harnessDirectory = Join-Path $inputDirectory 'perf/EndToEnd'
+$cliDirectory = Join-Path $harnessDirectory 'cli'
 # Crank's SDK installer does not quote its internal paths; keep its workspace separate from user output paths.
 $agentWork = Join-Path ([IO.Path]::GetTempPath()) ("func-perf-agent-" + [Guid]::NewGuid().ToString('N'))
 if ($agentWork.Contains(' ')) {
     throw "Crank requires a temporary directory without spaces. Set TEMP/TMP to a suitable directory before running."
 }
 if (Test-Path -LiteralPath $inputDirectory) {
-    throw "Benchmark inputs already exist in '$OutputDirectory'. Choose a fresh output directory."
+    if (-not $Force) {
+        throw "Benchmark inputs already exist in '$OutputDirectory'. Pass -Force to replace them or choose a fresh output directory."
+    }
+    foreach ($stale in $inputDirectory, $results) {
+        if (Test-Path -LiteralPath $stale) {
+            Remove-Item -LiteralPath $stale -Recurse -Force
+        }
+    }
 }
 New-Item -ItemType Directory -Path $cliDirectory, $results -Force | Out-Null
 
@@ -45,19 +54,25 @@ try {
     dotnet publish src/Func/Func.csproj -c release -r $Runtime --self-contained true --no-restore `
         -p:PublishSingleFile=true -o $cliDirectory
 
-    foreach ($file in 'Func.Performance.csproj', 'Program.cs', 'CommandCase.cs', 'CommandRunner.cs',
-        'BenchmarkEnvironment.cs', 'CommandBenchmarks.cs', 'Directory.Build.props',
-        'Directory.Build.targets', 'Directory.Packages.props', 'NuGet.Config') {
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $inputDirectory
+    foreach ($file in 'Performance.EndToEnd.csproj', 'Program.cs', 'CommandCase.cs', 'CommandLineColumn.cs', 'CommandRunner.cs',
+        'BenchmarkEnvironment.cs', 'CommandBenchmarks.cs', 'README.md') {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $harnessDirectory
     }
-    # The agent builds the uploaded harness with the same SDK as the product build.
-    Copy-Item -LiteralPath (Join-Path $repo 'global.json') -Destination $inputDirectory
+    # Preserve the repository layout so the agent imports the same build and package settings.
+    foreach ($file in 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props',
+        'NuGet.Config', 'global.json', '.editorconfig', 'stylecop.json') {
+        Copy-Item -LiteralPath (Join-Path $repo $file) -Destination $inputDirectory
+    }
+    $engineeringDirectory = New-Item -ItemType Directory -Path (Join-Path $inputDirectory 'eng')
+    foreach ($directory in 'build', 'res') {
+        Copy-Item -LiteralPath (Join-Path $repo "eng/$directory") -Destination $engineeringDirectory.FullName -Recurse
+    }
     dotnet tool restore --tool-manifest (Join-Path $PSScriptRoot '.config/dotnet-tools.json') `
-        --configfile (Join-Path $PSScriptRoot 'NuGet.Config')
+        --configfile (Join-Path $repo 'NuGet.Config')
 
     $executable = Join-Path $cliDirectory $(if ($IsWindows) { 'func.exe' } else { 'func' })
-    dotnet build perf/Func.Performance.csproj -c release
-    $allCommands = @(dotnet run --project perf/Func.Performance.csproj -c release --no-build -- --list-commands |
+    dotnet build perf/EndToEnd/Performance.EndToEnd.csproj -c release
+    $allCommands = @(dotnet run --project perf/EndToEnd/Performance.EndToEnd.csproj -c release --no-build -- --list-commands |
         ConvertFrom-Json)
     $expected = @($allCommands | Where-Object { $Command -eq 'all' -or $_ -eq $Command })
     if ($expected.Count -eq 0) {

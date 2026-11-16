@@ -14,11 +14,11 @@ if ($benchmarks.Count -ne $ExpectedCommands.Count) {
 }
 
 foreach ($command in $ExpectedCommands) {
-    $matches = @($benchmarks | Where-Object { $_.Parameters -eq "Command=$command" })
-    if ($matches.Count -ne 1) {
+    $commandResults = @($benchmarks | Where-Object { $_.Parameters -eq "Command=$command" })
+    if ($commandResults.Count -ne 1) {
         throw "Missing or duplicate result for command '$command'."
     }
-    $statistics = $matches[0].Statistics
+    $statistics = $commandResults[0].Statistics
     if ($null -eq $statistics -or $statistics.N -lt 1 -or
         $null -eq $statistics.Mean -or $statistics.Mean -le 0 -or
         [double]::IsNaN($statistics.Mean) -or [double]::IsInfinity($statistics.Mean)) {

@@ -1,7 +1,10 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
 using BenchmarkDotNet.Attributes;
 
-namespace Func.Performance;
+namespace Azure.Functions.Cli.Performance.EndToEnd;
 
 // BenchmarkDotNet requires public benchmark types and parameter members for discovery.
 public class CommandBenchmarks
@@ -11,10 +14,7 @@ public class CommandBenchmarks
     private ProcessStartInfo? _startInfo;
     private CommandCase? _case;
 
-    [ParamsSource(nameof(Commands))]
-    public string Command { get; set; } = "";
-
-    public IEnumerable<string> Commands
+    public static IEnumerable<string> Commands
     {
         get
         {
@@ -25,6 +25,9 @@ public class CommandBenchmarks
         }
     }
 
+    [ParamsSource(nameof(Commands))]
+    public string Command { get; set; } = "";
+
     [GlobalSetup]
     public async Task SetupAsync()
     {
@@ -34,7 +37,7 @@ public class CommandBenchmarks
         await _runner.RunAsync(_startInfo, _case, CancellationToken.None);
     }
 
-    [Benchmark]
+    [Benchmark(Description = "Run CLI command")]
     public Task ExecuteAsync() => _runner.RunAsync(
         _startInfo ?? throw new InvalidOperationException("Benchmark setup has not run."),
         _case ?? throw new InvalidOperationException("Benchmark setup has not run."),

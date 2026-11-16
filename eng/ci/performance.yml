@@ -36,7 +36,7 @@ extends:
     - stage: Performance
       jobs:
       - job: commands_linux_x64
-        displayName: CLI command latency (linux-x64)
+        displayName: End-to-end CLI command latency (linux-x64)
         timeoutInMinutes: 45
         variables:
         - template: /eng/ci/templates/variables/build.yml@self
@@ -53,5 +53,5 @@ extends:
           parameters:
             sign: false
         - pwsh: |
-            & ./perf/run.ps1 -Runtime linux-x64 -OutputDirectory "$(Build.ArtifactStagingDirectory)/perf"
+            & ./perf/EndToEnd/run.ps1 -Runtime linux-x64 -OutputDirectory "$(Build.ArtifactStagingDirectory)/perf"
           displayName: Benchmark self-contained func commands with Crank

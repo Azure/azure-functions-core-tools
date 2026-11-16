@@ -1,6 +1,9 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
 
-namespace Func.Performance;
+namespace Azure.Functions.Cli.Performance.EndToEnd;
 
 internal class BenchmarkEnvironment : IDisposable
 {
@@ -29,7 +32,7 @@ internal class BenchmarkEnvironment : IDisposable
         // Keep the existing update advisory path offline without changing product behavior.
         File.WriteAllText(Path.Combine(home, ".version-check"), "0.0.0");
 
-        var startInfo = new ProcessStartInfo(executable)
+        ProcessStartInfo startInfo = new(executable)
         {
             WorkingDirectory = work,
             UseShellExecute = false,

@@ -5,8 +5,8 @@ jobs:
   commands:
     sources:
       benchmarks:
-        localFolder: ../out/perf/input
-    project: benchmarks/Func.Performance.csproj
+        localFolder: ../../out/perf/input
+    project: benchmarks/perf/EndToEnd/Performance.EndToEnd.csproj
     framework: net10.0
     sdkVersion: 10.0.403
     variables:
