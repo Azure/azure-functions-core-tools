@@ -1,0 +1,36 @@
+variables:
+  agentUrl: http://127.0.0.1:5010
+
+jobs:
+  commands:
+    sources:
+      benchmarks:
+        localFolder: ../out/perf/input
+    project: benchmarks/Func.Performance.csproj
+    framework: net10.0
+    sdkVersion: 10.0.403
+    variables:
+      command: all
+      benchmarkJob: short
+    arguments: --job {{benchmarkJob}} --filter *CommandBenchmarks*
+    environmentVariables:
+      FUNC_PERF_COMMAND: '{{command}}'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    options:
+      benchmarkDotNet: true
+      downloadBuildLog: true
+      downloadOutput: true
+      downloadFiles:
+        - BenchmarkDotNet.Artifacts/results/*
+
+scenarios:
+  commands:
+    application:
+      job: commands
+
+profiles:
+  local:
+    jobs:
+      application:
+        endpoints:
+          - '{{agentUrl}}'

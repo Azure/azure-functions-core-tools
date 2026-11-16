@@ -4,6 +4,9 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Folder Name="/perf/">
+    <Project Path="perf/Func.Performance.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
