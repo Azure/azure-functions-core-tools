@@ -529,9 +529,10 @@ namespace Azure.Functions.Cli.Kubernetes
                     if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true)
                     {
                         // Some providers (e.g. Docker Desktop) only populate the hostname, and the ingress entry may be empty at first.
-                        var ingress = service.Status?.LoadBalancer?.Ingress?.FirstOrDefault();
-                        var address = !string.IsNullOrWhiteSpace(ingress?.Ip) ? ingress.Ip : ingress?.Hostname;
-                        if (!string.IsNullOrWhiteSpace(address))
+                        var address = service.Status?.LoadBalancer?.Ingress?
+                            .Select(i => !string.IsNullOrWhiteSpace(i?.Ip) ? i.Ip : i?.Hostname)
+                            .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a));
+                        if (address != null)
                         {
                             return address;
                         }

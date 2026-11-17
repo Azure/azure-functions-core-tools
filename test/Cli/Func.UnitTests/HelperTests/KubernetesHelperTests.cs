@@ -14,6 +14,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
+    [Collection("NativeWorkerRuntimeTests")]
     public class KubernetesHelperTests
     {
         [Theory]
@@ -69,6 +70,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{""ip"":""192.0.2.1""}]}}}", "192.0.2.1")]
         [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{""hostname"":""localhost""}]}}}", "localhost")]
         [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{""ip"":""192.0.2.1"",""hostname"":""example.test""}]}}}", "192.0.2.1")]
+        [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{},{""hostname"":""localhost""}]}}}", "localhost")]
         public async Task GetServiceIpReturnsIpOrHostname(string status, string expected)
         {
             var calls = 0;
