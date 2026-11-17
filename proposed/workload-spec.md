@@ -552,8 +552,9 @@ The metadata the CLI needs is split between two sources:
      `"content"`, or `"meta"`. Determines whether the loader
      activates the package.
    - `entryPoint.assemblyPath` → path to the assembly relative to
-     `tools/any/`. Must not be absolute or contain `..` segments;
-     the install pipeline rejects either. **Required** for
+     the package root, with a legacy `tools/any/` fallback. Must not
+     be absolute or contain `..` segments; the install pipeline
+     rejects either. **Required** for
      `kind: workload`; **forbidden** for `kind: content` and
      `kind: meta` (the install pipeline rejects packages that
      declare an `entryPoint` for a non-workload kind).
@@ -571,21 +572,30 @@ The metadata the CLI needs is split between two sources:
    ```
    <package-root>/
      workload.json              ← required, at the package root
-     tools/any/
-       <Workload>.dll           ← entryPoint.assemblyPath is resolved
-       <dependencies>.dll          relative to tools/any/
+     tools/<rid-or-any>/        ← conventional payload location
+       <Workload>.dll
+       <dependencies>.dll
        ...
    ```
 
-   `tools/any/` is the content directory the install pipeline extracts
-   and from which `entryPoint.assemblyPath` is resolved. The `tools/`
-   prefix mirrors the .NET CLI's `dotnet tool` package convention
-   (which uses `tools/<TFM>/any/`); workloads use a single `any`
-   subdirectory because the CLI loads them in-process via
-   `AssemblyLoadContext` rather than launching a separate runtime.
+   Placing assemblies under `tools/<rid>/` or `tools/any/` is a
+   convention, not a requirement. It follows the `dotnet tool`
+   convention of placing tool payloads under `tools/`.
+
+   The loader resolves `entryPoint.assemblyPath` relative to the
+   package root first, then falls back to `tools/any/` if the file
+   is absent. It does **not** currently try `tools/<rid>/`
+   automatically, even when `runtimeIdentifier` is supplied.
+   For that layout, use a package-relative path such as
+   `tools/win-x64/Example.dll`.
+
+   The install pipeline extracts the entire package payload,
+   preserving package-relative paths except for NuGet bookkeeping,
+   as specified in
+   [Workload Package Layout §5.2](workload-package-layout.md#52-install-time-payload-resolution).
 
    `content` packages follow the same package layout but have no
-   `entryPoint` constraint on `tools/any/`. The author lays out
+   `entryPoint` constraint. The author lays out
    whatever files the consuming command expects; the install
    pipeline extracts them verbatim. The host workload, for example,
    ships its runtime binaries under `tools/any/` and `func start`

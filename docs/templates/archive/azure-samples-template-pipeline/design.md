@@ -84,25 +84,49 @@ The exact release snapshot owns synthesis metadata in `.github/azure-functions-t
 schemaVersion: 1
 
 identity: Azure.Functions.Templates.PythonOpenAIChat
-shortName: functions-python-openai-chat
-name: Azure Functions Python OpenAI Chat
 description: Create an Azure Functions application using Azure OpenAI.
 
 projects:
-  - root: .
+  - name: Azure Functions Python OpenAI Chat
+    shortName: functions-python-openai-chat
+    root: .
     stack: python
     language: Python
 ```
 
-Every field other than `schemaVersion` belongs to the template definition rather than onboarding. The descriptor requires non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Each project declares:
+The descriptor requires `schemaVersion: 1`, non-empty top-level `identity` and `description`, and a non-empty `projects` array. Top-level `name` and `shortName` are not valid. `identity` is a stable namespace for generated template identities, not the NuGet package ID; onboarding still owns `packageId`. `description` supplies the package description and the shared description of each synthesized template. Each project entry defines one independently selectable template, not one project in a combined template, and requires:
 
 ```text
-root      repository-relative Functions project root
-stack     canonical func stack identifier
-language  canonical language recognized by that stack
+name       non-empty template display name
+shortName  non-empty template short name, unique case-insensitively in the descriptor
+root       repository-relative template content and Functions project root
+stack      canonical func stack identifier
+language   canonical language recognized by that stack
 ```
 
-The root project uses `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. The staged release must contain a regular `host.json` directly under every declared root.
+For example, a monorepo can keep independent templates in disjoint subdirectories:
+
+```yaml
+schemaVersion: 1
+identity: Azure.Functions.Templates.OpenAIExamples
+description: Azure Functions applications using Azure OpenAI.
+
+projects:
+  - name: Azure Functions Python OpenAI Chat
+    shortName: functions-python-openai-chat
+    root: samples/python-chat
+    stack: python
+    language: Python
+  - name: Azure Functions Node OpenAI Chat
+    shortName: functions-node-openai-chat
+    root: samples/node-chat
+    stack: node
+    language: JavaScript
+```
+
+Each generated TemplateEngine identity is `<identity>.<shortName>`; the example produces `Azure.Functions.Templates.OpenAIExamples.functions-python-openai-chat` and `Azure.Functions.Templates.OpenAIExamples.functions-node-openai-chat`. Identities do not depend on array order, display name, root path, or release version. Changing `identity` or a project's `shortName` changes its template identity. Packaging rejects duplicate short names or generated identities case-insensitively.
+
+The root project uses `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. Consequently, `root: .` is valid only for a single-entry descriptor. The staged release must contain a regular `host.json` directly under every declared root.
 
 The onboarding JSON Schema owns control-plane structure and rejects unknown fields. A separate centrally owned descriptor schema validates `.github/azure-functions-template.yaml`. Repository-wide onboarding validation owns central identity collisions, GitHub slug restrictions, SemVer validation, package-prefix policy, and license policy. Release packaging owns descriptor metadata, project path safety, canonical stack/language pairs, and TemplateEngine validation against the exact tagged content.
 
@@ -116,7 +140,7 @@ Files are scanned non-recursively in ordinal filename order. The order exists on
 
 The onboarding `id` is an internal operational key. `packageId` is explicitly reviewed and must use the reserved `Azure.Functions.Templates.` prefix. Neither is derived from mutable GitHub metadata.
 
-Repository, package ID, and onboarding ID are unique case-insensitively. Repository uniqueness intentionally limits one package to one repository in the initial design. A future need for multiple packaging scopes requires an explicit schema revision rather than duplicate entries.
+Repository, package ID, and onboarding ID are unique case-insensitively. Each eligible repository release produces one package containing all its templates at the same release-derived version. Monorepo project entries do not create extra onboarding entries, package IDs, or independently versioned releases. A future need for multiple packages per repository requires an explicit schema revision rather than duplicate onboarding entries.
 
 **Alternative considered:** derive package ID from repository name. Repository renames, normalization collisions, and NuGet namespace ownership would make package identity unstable. It is rejected.
 
@@ -198,7 +222,7 @@ neither present
   -> fail: no template can be generated
 ```
 
-Both locations are fixed conventions; onboarding does not point to arbitrary template configuration or descriptor paths. Supporting lists of paths would imply multiple templates per package and ambiguous content roots, which are outside the initial design.
+Both locations are fixed conventions; onboarding does not point to arbitrary template configuration or descriptor paths. Authored mode retains one root template. Synthesized mode supports one independent template per descriptor project entry, with each entry's `root` defining its content boundary. Additional authored template discovery is not introduced.
 
 A root authored configuration is preserved byte-for-byte. The central validator loads and dry-runs it through Microsoft.TemplateEngine and requires:
 
@@ -212,15 +236,16 @@ A root authored configuration is preserved byte-for-byte. The central validator 
 
 The authored file owns template metadata, project topology, parameters, conditions, primary outputs, and post-actions. The synthesis descriptor MUST NOT coexist with it. An invalid authored configuration fails packaging and is never rewritten or replaced with synthesis.
 
-When the authored file is absent, `.github/azure-functions-template.yaml` supplies the complete synthesized template metadata and project topology. For each project, the packager:
+When the authored file is absent, `.github/azure-functions-template.yaml` supplies the metadata and disjoint roots for independently selectable synthesized templates. For each project entry, the packager:
 
 1. Requires `<root>/host.json` in the filtered release snapshot.
-2. Adds `<root>/host.json` as a primary output.
-3. Adds one mandatory trusted configuration finalization action referencing that primary output and carrying the declared canonical stack and language.
+2. Uses only that root's filtered subtree as the template's content, rebasing it so `<root>/host.json` becomes `host.json` at the generated output root. It does not copy sibling templates or other repository content outside that root, except for the required repository license.
+3. Generates one `.template.config/template.json` for that content root, with identity `<identity>.<shortName>`, the entry's `shortName` and `name`, and the descriptor's shared `description`.
+4. Adds `host.json` as the template's primary output and one mandatory trusted configuration finalization action referencing that output and carrying the entry's canonical stack and language.
 
-The generated template uses the descriptor's identity, short name, name, and description, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
+Each generated template sets `tags.type` to `project` and emits its entry's canonical language tag. It defines no parameter symbols, replacements, or ordinary post-actions. Content and output-path validation also rejects links that would import content from outside the entry's root; being inside repository staging is not sufficient. Package inspection verifies exactly the expected generated template inventory and dry-runs each template separately to confirm content isolation.
 
-The packager also adds one workload constraint per declared project stack, in the form `template-engine-constraints` defines. The descriptor has no workload field, so requirements always follow the declared projects.
+The packager adds one workload constraint for that entry's stack, in the form `template-engine-constraints` defines. Sibling entries do not add workload requirements to one another. The descriptor has no workload field. A single template that generates multiple Functions projects, or uses parameterized or conditional topology, still requires authored configuration rather than multiple descriptor entries.
 
 Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation during release packaging. Onboarding PR validation does not acquire source releases or validate repository-owned template definitions.
 
@@ -241,7 +266,7 @@ reviewed YAML licenseExpression
   -> fail
 ```
 
-An override handles recognized license text that GitHub cannot classify, but a root license file is still required. The package uses a NuGet license expression and retains the source license as template content.
+An override handles recognized license text that GitHub cannot classify, but a root license file is still required. The package uses a NuGet license expression and retains the source license as template content. In synthesis mode, each independent template retains the repository root license even when its content root is a subdirectory; this exception does not include other repository-level content.
 
 Default-branch license metadata is not authoritative because it may differ from the packaged release.
 
@@ -256,7 +281,7 @@ The central packager generates package metadata:
 | ID | onboarding `packageId` |
 | Version | release tag without `v` |
 | Package type | `FuncTemplate` |
-| Description | effective authored or synthesized template description |
+| Description | authored template description, or descriptor top-level `description` in synthesis mode |
 | License | effective SPDX expression |
 | Project URL | canonical GitHub repository URL |
 | Repository type | `git` |

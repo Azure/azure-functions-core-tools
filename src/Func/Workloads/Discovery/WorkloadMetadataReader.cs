@@ -86,6 +86,8 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 + "Check for spelling or try updating the CLI to the latest version.");
         }
 
+        ValidateTemplateRoot(metadata, metadataPath, packageDirectory);
+
         switch (metadata.Kind)
         {
             case WorkloadKind.Workload:
@@ -128,6 +130,30 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         }
     }
 
+    private static void ValidateTemplateRoot(WorkloadMetadata metadata, string metadataPath, string packageDirectory)
+    {
+        if (metadata.TemplateRoot is null)
+        {
+            return;
+        }
+
+        if (metadata.Kind != WorkloadKind.Workload)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' defines templateRoot, which is only supported for kind 'workload'.");
+        }
+
+        try
+        {
+            metadata.TemplateRoot = WorkloadMetadata.NormalizePackagePath(metadata.TemplateRoot, packageDirectory);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' has invalid templateRoot '{metadata.TemplateRoot}': {ex.Message}", ex);
+        }
+    }
+
     private static void ValidateNoEntryPoint(WorkloadMetadata metadata, string metadataPath)
     {
         if (metadata.EntryPoint is not null)
@@ -164,7 +190,9 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' declares kind 'rid-pointer' but does not define a non-empty packages map.");
         }
 
+#pragma warning disable IDE0028 // '[with(args)]' is preview
         HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
+#pragma warning restore IDE0028
         foreach ((string runtimeIdentifier, string packageId) in metadata.Packages)
         {
             if (!IsNormalizedRuntimeIdentifier(runtimeIdentifier))
@@ -214,6 +242,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' is missing entryPoint.type.");
         }
 
+        // TODO: Use WorkloadMetadata.NormalizePackagePath for EntryPointSpec.AssemblyPath validation after reviewing the no-'..' contract.
         // Reject anything that would let a package escape its content root:
         // absolute paths or `..` segments. Defense-in-depth — the loader
         // also checks.

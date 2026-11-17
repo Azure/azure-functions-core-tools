@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -65,6 +66,8 @@ internal static class FuncTemplateComponents
         {
             ArgumentNullException.ThrowIfNull(services);
             services.TryAddSingleton<ITemplaterFactory, TemplaterFactory>();
+            services.TryAddSingleton<IWorkloadTemplateSource, WorkloadTemplateSource>();
+            services.AddTemplateComponent<ITemplatePackageProviderFactory, WorkloadTemplatePackageProviderFactory>();
             return services;
         }
     }

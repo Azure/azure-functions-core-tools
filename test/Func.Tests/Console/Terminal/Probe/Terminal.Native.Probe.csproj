@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Azure.Functions.Cli.Tests.TerminalProbe</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(DefineConstants);TERMINAL_NATIVE_PROBE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="TerminalProbe.cs" />
+    <Compile Include="UnixTerminalProbe.cs" />
+    <Compile Include="$(SrcRoot)Func/IPlatform.cs" Link="Product/IPlatform.cs" />
+    <Compile Include="$(SrcRoot)Func/Console/Terminal/*.cs" Link="Product/%(Filename)%(Extension)" />
+    <Reference Include="Spectre.Console">
+      <HintPath>$(SpectreAssemblyPath)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

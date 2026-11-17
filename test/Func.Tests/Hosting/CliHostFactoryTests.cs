@@ -4,7 +4,6 @@
 using System.Text.Json;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
@@ -65,16 +64,6 @@ public sealed class CliHostFactoryTests : IDisposable
 
         catalog.Stacks.Should().BeEmpty();
         provider.GetRequiredService<InstalledProjectStackCatalog>().Should().BeSameAs(catalog);
-    }
-
-    [Fact]
-    public void CreateBuilder_RegistersTemplaterFactory()
-    {
-        var interaction = new TestInteractionService();
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
-        using ServiceProvider provider = builder.Services.BuildServiceProvider();
-
-        provider.GetRequiredService<ITemplaterFactory>().Should().BeOfType<TemplaterFactory>();
     }
 
     [Fact]

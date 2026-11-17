@@ -5,7 +5,7 @@
 - [x] 1.1 Update the pending `func-init-execution` proposal, design, and specification to use template-first selection, whole-template filters, and action-owned multi-project configuration.
 - [x] 1.2 Finalize the `template-engine-constraints` result contract for unavailable summaries, diagnostics, and customer calls to action consumed by `func init`.
 - [ ] 1.3 Finalize the `template-engine-post-actions` contract for trusted project configuration actions, catalog projection, resolved primary-output references, dry-run metadata, and mandatory execution.
-- [x] 1.4 Update the Azure-Samples pipeline artifacts so synthesized templates declare one configuration action per static project and parameterized or conditional topology requires authored configuration.
+- [x] 1.4 Update the Azure-Samples pipeline artifacts so each synthesis-descriptor project entry defines an independent, content-scoped template with its own name, short name, configuration action, and stack workload constraint in one repository-release package; a single template generating multiple projects or parameterized or conditional topology requires authored configuration.
 
 ## 2. Project Topology Metadata
 

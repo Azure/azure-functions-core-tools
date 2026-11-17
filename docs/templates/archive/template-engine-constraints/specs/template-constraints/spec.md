@@ -306,11 +306,13 @@ Every template that isn't eligible SHALL have a short summary, derived from its 
 - **THEN** its summary is `uses an unsupported constraint`
 
 ### Requirement: Azure-Samples workload declarations
-Azure-Samples project templates SHALL declare `func-workload` constraints that require every stack their configuration actions declare. A synthesized template SHALL receive one constraint per distinct declared stack, named by the canonical stack and without a version range. Packaging SHALL reject constraint entries that aren't objects with a `type`, repeated constraint labels, invalid func arguments, stacks no constraint requires, and `func-bundle` constraints. Packaging SHALL NOT evaluate constraints against installed workloads.
+Azure-Samples project templates SHALL declare `func-workload` constraints that require every stack their configuration actions declare. Each synthesized template SHALL receive one constraint for its own descriptor project entry's stack, named by the canonical stack and without a version range; sibling entries SHALL NOT add requirements to that template. Packaging SHALL reject constraint entries that aren't objects with a `type`, repeated constraint labels, invalid func arguments, stacks no constraint requires, and `func-bundle` constraints. Packaging SHALL NOT evaluate constraints against installed workloads.
 
-#### Scenario: Synthesized template uses mixed stacks
-- **WHEN** a descriptor declares Node and Python projects
-- **THEN** the synthesized template requires the `node` and `python` workloads in separate constraints
+#### Scenario: Synthesized package contains templates for different stacks
+- **WHEN** a descriptor declares independent Node and Python project entries
+- **THEN** the Node template requires only the `node` workload
+- **AND** the Python template requires only the `python` workload
+- **AND** both templates ship in the same repository-release package
 
 #### Scenario: Authored template omits a stack workload
 - **WHEN** an authored template's configuration actions declare a stack that no workload constraint requires

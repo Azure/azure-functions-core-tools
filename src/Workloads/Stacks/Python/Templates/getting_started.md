@@ -28,7 +28,7 @@ where functions are decorated on a `FunctionApp` instance in
    ```
 3. Start the host:
    ```bash
-   func start
+   func run
    ```
 
 ## Add a function

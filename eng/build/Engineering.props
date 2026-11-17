@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>14</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>

@@ -177,7 +177,7 @@ When a constraint lists alternatives and none is satisfied, the message gives ea
 
 ### Azure-Samples packages declare their stack workloads
 
-An authored quickstart declares one `func-workload` entry for every stack its configuration actions declare. A synthesized quickstart receives one entry per distinct declared stack, named by the canonical stack, with no version range:
+An authored quickstart declares one `func-workload` entry for every stack its configuration actions declare. Each synthesized quickstart receives one entry for its own synthesis-descriptor project entry's stack, named by the canonical stack, with no version range. Sibling templates in the same repository-release package do not add workload requirements to one another. The following illustrates an authored template that generates both Node and Python projects:
 
 ```json
 "constraints": {

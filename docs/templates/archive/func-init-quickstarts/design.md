@@ -273,9 +273,9 @@ The Azure-Samples packaging pipeline must produce templates that include:
 - one trusted configuration action per Functions project;
 - canonical stack and language action values.
 
-For a repository lacking authored template configuration, the repository-owned `.github/azure-functions-template.yaml` synthesis descriptor can declare one or more static Functions project roots with canonical stack and language. The packager uses each root `host.json` as a primary output and adds the corresponding configuration action.
+For a repository lacking authored template configuration, the repository-owned `.github/azure-functions-template.yaml` synthesis descriptor declares a `projects` array of independent templates. Each entry owns `name`, `shortName`, `root`, `stack`, and `language`. The packager generates one selectable template per entry with identity `<identity>.<shortName>`, using the descriptor's top-level identity namespace and shared description. Content is scoped to the entry's filtered root subtree plus the repository license, rebased so its `host.json` is at the output root, and receives one corresponding configuration action and stack workload constraint. All entries ship in one package at the repository release version; sibling entries do not become projects or workload requirements of the selected template.
 
-Parameterized or conditional project topology cannot be expressed by the synthesis descriptor and requires authored template configuration and project actions. Authored root `.template.config/template.json` and `.github/azure-functions-template.yaml` are mutually exclusive. The packaging pipeline loads and dry-runs either resulting template through the same validation path.
+A single template generating multiple Functions projects, or using parameterized or conditional topology, requires authored template configuration and project actions rather than multiple descriptor entries. Authored root `.template.config/template.json` and `.github/azure-functions-template.yaml` are mutually exclusive. The packaging pipeline loads and dry-runs every resulting template through the same validation path.
 
 ## Risks / Trade-offs
 
@@ -286,7 +286,7 @@ Parameterized or conditional project topology cannot be expressed by the synthes
 - **[Finalization can fail after files are generated]** -> Preflight every declaration and path, use atomic writes, skip ordinary actions, and report partial initialization without destructive rollback.
 - **[Restricted picker entries can overwhelm the prompt]** -> Show concise summaries in the picker and render detailed calls to action separately.
 - **[Browse URL destination is not yet designed]** -> Use a Functions-owned redirect so the CLI contract remains stable.
-- **[Synthesized quickstarts require reviewed project topology]** -> Require static project roots, stacks, and languages in the repository-owned synthesis descriptor and use authored template configuration for parameterized or conditional topology.
+- **[Synthesized quickstarts require reviewed content boundaries]** -> Require disjoint static template roots, per-entry names, stacks, and languages in the repository-owned synthesis descriptor; use authored configuration for one template generating multiple projects or parameterized or conditional topology.
 
 ## Migration Plan
 

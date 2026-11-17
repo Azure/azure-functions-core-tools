@@ -45,10 +45,7 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {
-#pragma warning disable IDE0028 // '[with(args)]' is a preview feature in net10 SDK.
-        // TODO: revisit when updating to .net11 SDK.
         Dictionary<string, string> defaults = new(StringComparer.Ordinal);
-#pragma warning restore IDE0028
 
         if (context.Project is { } project)
         {

@@ -47,30 +47,30 @@
 
 - [ ] 6.1 Implement license resolution from reviewed YAML override, GitHub repository-license API at the release commit, and root release license-file inspection.
 - [ ] 6.2 Allow only SPDX `MIT` and `Apache-2.0`, and require a root license file even when an override is supplied.
-- [ ] 6.3 Preserve the root license file as template content and project the effective expression into package metadata.
+- [ ] 6.3 Preserve the repository root license file as template content (in each synthesized template, including subdirectory-rooted templates) and project the effective expression into package metadata.
 - [ ] 6.4 Add tests for both allowed licenses, GitHub detection, file fallback, valid override, missing file, unknown detection, and unsupported expressions.
 
 ## 7. Template Configuration
 
 - [ ] 7.1 Detect only root `.template.config/template.json` and `.github/azure-functions-template.yaml` as template sources.
 - [ ] 7.2 Reject releases containing both recognized sources or neither source, without allowing onboarding to select a mode or alternate path.
-- [ ] 7.3 Author the strict centrally owned schema for `.github/azure-functions-template.yaml`, requiring schema version, identity, short name, name, description, and non-empty projects.
+- [ ] 7.3 Author the strict centrally owned schema for `.github/azure-functions-template.yaml`, requiring top-level `schemaVersion: 1`, `identity`, `description`, and a non-empty `projects` array whose entries require `name`, `shortName`, `root`, `stack`, and `language`; reject top-level `name` and `shortName`.
 - [ ] 7.4 Preserve authored configuration byte-for-byte and validate TemplateEngine loading, dry-run, identity, short names, project type, workload constraints covering every action stack, required configuration finalization actions, resolved primary outputs, and safety policy.
-- [ ] 7.5 Parse the synthesis descriptor before filtering `.github`, then validate each project root for normalized relative syntax, case-insensitive uniqueness, non-overlap, excluded paths, and a regular direct-child `host.json`.
+- [ ] 7.5 Parse the synthesis descriptor before filtering `.github`, then validate each project root for normalized relative syntax, case-insensitive uniqueness, non-overlap, excluded paths, and a regular direct-child `host.json`; `.` is valid only for a single-entry descriptor.
 - [ ] 7.6 Validate canonical stack and language compatibility for every synthesized project.
-- [ ] 7.7 Synthesize project `template.json` from descriptor metadata, adding each project `host.json` as a primary output, one mandatory trusted configuration finalization action per project, and one workload constraint per declared stack.
-- [ ] 7.8 Omit parameter symbols, replacements, and ordinary post-actions from synthesized configuration; emit a singular language tag only for homogeneous project topology.
+- [ ] 7.7 Synthesize one independent `template.json` per project entry using identity `<identity>.<shortName>`, entry-level name and short name, and the shared descriptor description; reject case-insensitive duplicate short names or generated identities. Scope content to that entry's filtered subtree plus the repository license, rebase its `host.json` to the output root, and add one primary output, mandatory trusted configuration finalization action, and workload constraint for that entry's stack.
+- [ ] 7.8 Omit parameter symbols, replacements, and ordinary post-actions from synthesized configuration; emit each entry's language tag without aggregating sibling languages or stacks. Reject links that cross template content boundaries.
 - [ ] 7.9 Validate synthesized configuration through the same TemplateEngine load, dry-run, action, output-path, and safety path as authored configuration.
-- [ ] 7.10 Add tests for valid authored configuration, byte preservation, dual and missing ownership, malformed descriptors, invalid actions, missing or incomplete workload constraints, unsafe authored behavior, root and nested synthesized projects, path attacks, overlapping roots, missing host files, mixed stacks and languages, descriptor metadata, filtering, and dry-run failures.
+- [ ] 7.10 Add tests for valid authored configuration, byte preservation, dual and missing ownership, malformed descriptors, rejected top-level names, empty projects, duplicate short names and generated identities, identity stability across reordering and root moves, invalid actions, missing or incomplete workload constraints, unsafe authored behavior, root and nested synthesized templates, path attacks, overlapping roots, missing host files, independent mixed-stack/language entries, content isolation including cross-root links, descriptor metadata, filtering, and dry-run failures.
 
 ## 8. NuGet Package Construction and Validation
 
-- [ ] 8.1 Generate package metadata for explicit ID, release-derived version, `FuncTemplate` package type, description, license, project URL, Git repository URL, commit SHA, and GitHub release-notes link.
-- [ ] 8.2 Pack the filtered source and effective template configuration without adding Azure Pipeline definition or run metadata.
+- [ ] 8.1 Generate package metadata for explicit ID, release-derived version, `FuncTemplate` package type, authored or descriptor-level description, license, project URL, Git repository URL, commit SHA, and GitHub release-notes link.
+- [ ] 8.2 Pack all independently scoped synthesized templates into one package per repository release (or preserve the single authored root template) without adding Azure Pipeline definition or run metadata.
 - [ ] 8.3 Inspect the completed `.nupkg` and verify package identity, version, type, metadata, source commit, release URL, content, and exclusions.
 - [ ] 8.4 Load and dry-run templates from the completed package through Microsoft.TemplateEngine and require valid project type, configuration finalization actions, and resolved primary outputs.
 - [ ] 8.5 Produce deterministic package hashes for staging and promotion verification.
-- [ ] 8.6 Add package-level tests for authored and synthesized single- and multi-project templates, configuration actions, dry-run effects, metadata provenance, license inclusion, exclusions, invalid archives, and TemplateEngine discovery.
+- [ ] 8.6 Add package-level tests for authored single- and multi-project templates and synthesized single- and multi-template packages, exact generated template inventory, distinct identities, separate instantiation without sibling content or workload requirements, configuration actions, dry-run effects, metadata provenance, per-template license inclusion, exclusions, and invalid archives.
 
 ## 9. Feed State and Staging
 
@@ -102,7 +102,7 @@
 
 ## 12. Deployment and Documentation
 
-- [ ] 12.1 Document mutually exclusive authored and synthesized source modes, `.github/azure-functions-template.yaml`, generated actions, release conventions, license policy, and publication diagnostics.
+- [ ] 12.1 Document mutually exclusive authored and synthesized source modes, `.github/azure-functions-template.yaml` with single-template and monorepo examples, per-entry names and identities, isolated content roots, one package/version per repository release, generated actions, release conventions, license policy, and publication diagnostics.
 - [ ] 12.2 Document publication states, the shared approval gate, manual recovery, immutable conflicts, and central operational ownership.
 - [ ] 12.3 Provision GitHub read access, Azure Artifacts staging, NuGet.org prefix ownership and credentials, concurrency controls, approval environment, and notifications with least privilege.
 - [ ] 12.4 Run a no-publication canary against representative authored and synthesized repositories and inspect the resulting packages.
