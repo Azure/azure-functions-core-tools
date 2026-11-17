@@ -157,6 +157,30 @@ The `Native macOS terminal tests` GitHub Actions workflow runs this command
 on both ARM64 and Intel hosted Macs, verifies the actual .NET process
 architecture, and preserves native JSON and test-result artifacts.
 
+Migration to Azure Pipelines is staged in `eng/ci/public-build.yml`. To qualify
+the replacement, manually queue the public pipeline from the migration branch
+and select `macosTerminalArchitecture` (`X64`, `Arm64`, or `Both`; `None` by default).
+It runs the same native probe and focused
+tests on Intel (`Azure Pipelines`, `macOS-15`) and Apple Silicon
+(`GitHub-hosted Agents`, `macos-26-arm64`), checks the actual process architecture,
+publishes TRX results, and retains per-architecture `terminal-macos-*` evidence
+artifacts even on failure. Apple Silicon requires the pay-as-you-go
+GitHub-hosted Agents pool to be enabled and authorized for the pipeline.
+The inspected 1ES macOS pre-job requires non-1ES-hosted pools other than
+`Azure Pipelines` to be allowlisted as
+`<azfunc-organization-id>/GitHub-hosted Agents`; this pool name was not on the
+allowlist when the migration was prepared. Confirm the pre-job behavior in a
+hosted run and, if needed, request approval through
+[1ES PT support](https://aka.ms/1esptsupport). Qualify `X64` independently in
+the meantime. The standard macOS 15 ARM64 preview is not generally available
+to new organizations.
+
+The jobs remain opt-in during migration. Keep the GitHub Actions workflow active
+until both ADO architectures pass, then default `macosTerminalArchitecture` to
+`Both`, remove the workflow, and update any required branch-protection
+checks. The public ADO pipeline currently runs for PRs and nightly builds, not
+every push.
+
 This builds the candidate and runs it in a private PTY with a real foreground
 process group. It checks mouse input, Unicode, paste isolation, resize,
 suspend/resume, restored terminal attributes, and that Ctrl+C input does not
@@ -188,9 +212,10 @@ manual checks. A successful OSC 52 write means the request was sent, not that
 the terminal accepted it.
 
 The separate `FUNC_CLIPBOARD_NATIVE_TESTS=1` opt-in enables real `pbcopy`/`pbpaste`
-round-trip tests on disposable macOS desktops. The macOS CI workflow enables it
-only on its hosted VMs. Unlike `FUNC_TERMINAL_NATIVE_TESTS`, this replaces the
-desktop clipboard and must not be enabled in ordinary developer test runs.
+round-trip tests on disposable macOS desktops. The macOS CI workflow and opt-in
+ADO jobs enable it only on their hosted VMs. Unlike `FUNC_TERMINAL_NATIVE_TESTS`,
+this replaces the desktop clipboard and must not be enabled in ordinary developer
+test runs.
 
 #### CLI Process Smoke Tests
 

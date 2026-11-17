@@ -1,3 +1,14 @@
+parameters:
+- name: macosTerminalArchitecture
+  displayName: macOS terminal migration architectures
+  type: string
+  default: None
+  values:
+  - None
+  - X64
+  - Arm64
+  - Both
+
 schedules:
 - cron: "0 7 * * *"   # 11pm PST
   displayName: Nightly Build
@@ -55,6 +66,23 @@ extends:
           parameters:
             projects: Azure.Functions.Cli.slnx
             sign: false
+        - ${{ if in(parameters.macosTerminalArchitecture, 'X64', 'Both') }}:
+          - template: /eng/ci/templates/jobs/terminal-macos.yml@self
+            parameters:
+              architecture: X64
+              pool:
+                name: Azure Pipelines
+                vmImage: macOS-15
+                os: macOS
+        - ${{ if in(parameters.macosTerminalArchitecture, 'Arm64', 'Both') }}:
+          - template: /eng/ci/templates/jobs/terminal-macos.yml@self
+            parameters:
+              architecture: Arm64
+              pool:
+                name: GitHub-hosted Agents
+                vmImage: macos-26-arm64
+                os: macOS
+                hostArchitecture: arm64
         - job: terminal_windows
           displayName: Windows terminal qualification
           pool:

@@ -1,0 +1,95 @@
+parameters:
+- name: architecture
+  type: string
+  values:
+  - Arm64
+  - X64
+- name: pool
+  type: object
+
+jobs:
+- job: terminal_macos_${{ parameters.architecture }}
+  displayName: macOS terminal qualification (${{ parameters.architecture }})
+  timeoutInMinutes: 20
+  pool: ${{ parameters.pool }}
+  variables:
+    CI: 'true'
+    DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  templateContext:
+    outputs:
+    - output: pipelineArtifact
+      displayName: Preserve native macOS evidence
+      condition: always()
+      path: $(Build.ArtifactStagingDirectory)/terminal-macos
+      artifact: terminal-macos-${{ parameters.architecture }}
+  steps:
+  - checkout: self
+    persistCredentials: false
+  - bash: |
+      set -euo pipefail
+      mkdir -p "$EVIDENCE_DIRECTORY/test-results"
+      git rev-parse HEAD > "$EVIDENCE_DIRECTORY/source-revision.txt"
+      sw_vers
+    displayName: Record candidate and macOS version
+    env:
+      EVIDENCE_DIRECTORY: $(Build.ArtifactStagingDirectory)/terminal-macos
+  - template: /eng/ci/templates/steps/setup-dependencies.yml@self
+    parameters:
+      sign: false
+  - bash: |
+      set -euo pipefail
+      dotnet --info
+      python3 --version
+    displayName: Record SDK and Python environment
+  - bash: |
+      set -euo pipefail
+      python3 test/Func.Tests/Console/Terminal/Probe/run_unix_probe.py --build \
+        --report "$EVIDENCE_DIRECTORY/tui-native-results.json"
+    displayName: Build and qualify the native Unix adapter
+    env:
+      EVIDENCE_DIRECTORY: $(Build.ArtifactStagingDirectory)/terminal-macos
+  - bash: |
+      set -euo pipefail
+      python3 - <<'PY'
+      import json
+      import os
+      with open(os.path.join(os.environ["EVIDENCE_DIRECTORY"], "tui-native-results.json"), encoding="utf-8") as source:
+          report = json.load(source)
+      expected = os.environ["EXPECTED_ARCHITECTURE"]
+      if report["process_architecture"] != expected:
+          raise SystemExit(f"Expected {expected}, got {report['process_architecture']}")
+      PY
+    displayName: Require the intended process architecture
+    env:
+      EVIDENCE_DIRECTORY: $(Build.ArtifactStagingDirectory)/terminal-macos
+      EXPECTED_ARCHITECTURE: ${{ parameters.architecture }}
+  - task: DotNetCoreCLI@2
+    displayName: Restore terminal tests
+    inputs:
+      command: custom
+      custom: restore
+      projects: test/Func.Tests/Func.Tests.csproj
+  - task: DotNetCoreCLI@2
+    displayName: Qualify dashboard, input, interruption, and local clipboard
+    inputs:
+      command: test
+      projects: test/Func.Tests/Func.Tests.csproj
+      publishTestResults: false
+      arguments: >-
+        -c Release --no-restore -p:CI=true --verbosity quiet
+        --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
+        --logger "trx;LogFileName=terminal-tests.trx"
+        --results-directory "$(Build.ArtifactStagingDirectory)/terminal-macos/test-results"
+    env:
+      FUNC_TERMINAL_NATIVE_TESTS: '1'
+      FUNC_CLIPBOARD_NATIVE_TESTS: '1'
+  - task: PublishTestResults@2
+    displayName: Publish macOS terminal test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: VSTest
+      testResultsFiles: '**/*.trx'
+      searchFolder: $(Build.ArtifactStagingDirectory)/terminal-macos/test-results
+      testRunTitle: macOS terminal (${{ parameters.architecture }})
+      failTaskOnFailedTests: true
+      failTaskOnMissingResultsFile: true
