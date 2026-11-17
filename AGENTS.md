@@ -3,7 +3,7 @@
 ## Repository Overview
 
 Azure Functions Core Tools v5 CLI — rebuilt with **System.CommandLine**,
-**Spectre.Console**, and **.NET 10** using a workload-based extensibility model
+**Spectre.Console**, and **.NET 11** using a workload-based extensibility model
 (similar to `dotnet` CLI workloads).
 
 **This repo ships a CLI.** The user's terminal is the only entry point: design
