@@ -193,7 +193,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         if (remainingReferences <= 0)
         {
             registry.Workloads.RemoveAt(index);
-            return new WorkloadOwnershipRemovalResult(true, true, null);
+            return new WorkloadOwnershipRemovalResult(true, true, current);
         }
 
         WorkloadEntry updated = CopyWithOwnership(
@@ -272,6 +272,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         {
             PackageId = entry.PackageId,
             PackageVersion = entry.PackageVersion,
+            PackageRoot = entry.PackageRoot,
             Kind = entry.Kind,
             Aliases = entry.Aliases,
             DisplayName = entry.DisplayName,
@@ -320,6 +321,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                     isUserError: true);
             }
 
+            HydratePackageRoots(registry);
             return registry;
         }
         catch (JsonException ex)
@@ -332,6 +334,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
     private async Task WriteRegistryAsync(WorkloadRegistry registry, CancellationToken cancellationToken)
     {
+        HydratePackageRoots(registry);
+
         string path = _paths.WorkloadRegistryPath;
         string directory = Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
@@ -357,6 +361,19 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         {
             TryDelete(tempPath);
             throw;
+        }
+    }
+
+    private void HydratePackageRoots(WorkloadRegistry registry)
+    {
+        foreach (WorkloadEntry entry in registry.Workloads)
+        {
+            if (entry.PackageId is null || entry.PackageVersion is null)
+            {
+                continue;
+            }
+
+            entry.PackageRoot = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         }
     }
 

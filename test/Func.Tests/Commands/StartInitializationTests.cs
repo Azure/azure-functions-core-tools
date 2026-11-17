@@ -1230,7 +1230,6 @@ public class StartInitializationTests : IDisposable
         interaction.ConfirmAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(true);
         hostProcessRunner ??= CreateSuccessfulHostProcessRunner();
-        IWorkloadPaths workloadPaths = CreateWorkloadPaths();
         IExtensionBundleResolver bundleResolver = Substitute.For<IExtensionBundleResolver>();
         var bundleSectionReader = new HostJsonBundleSectionReader();
 
@@ -1245,7 +1244,6 @@ public class StartInitializationTests : IDisposable
             workloadInstaller,
             interaction,
             new LocalSettingsProvider(),
-            workloadPaths,
             hostProcessRunner,
             new ProcessEnvironment(),
             CreateDisabledAzuriteOrchestrator(),
@@ -1290,14 +1288,6 @@ public class StartInitializationTests : IDisposable
         runner.StartAsync(Arg.Any<HostProcessStartContext>(), Arg.Any<CancellationToken>())
             .Returns(eventStream);
         return runner;
-    }
-
-    private static IWorkloadPaths CreateWorkloadPaths()
-    {
-        IWorkloadPaths workloadPaths = Substitute.For<IWorkloadPaths>();
-        workloadPaths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(callInfo => Path.Combine(Path.GetTempPath(), "workloads", (string)callInfo[0], (string)callInfo[1]));
-        return workloadPaths;
     }
 
     private static IWorkloadInstaller CreateSuccessfulInstaller()
@@ -1399,6 +1389,7 @@ public class StartInitializationTests : IDisposable
         {
             PackageId = HostWorkloadPackage.CurrentPackageId,
             PackageVersion = packageVersion,
+            PackageRoot = Path.Combine(Path.GetTempPath(), "workloads", HostWorkloadPackage.CurrentPackageId, packageVersion),
             Kind = WorkloadKind.Content,
             Aliases = ["host"],
             DisplayName = "Azure Functions host",
@@ -1410,6 +1401,7 @@ public class StartInitializationTests : IDisposable
         {
             PackageId = packageId,
             PackageVersion = packageVersion,
+            PackageRoot = Path.Combine(Path.GetTempPath(), "workloads", packageId, packageVersion),
             Kind = WorkloadKind.Content,
             Aliases = packageId.EndsWith("-worker", StringComparison.OrdinalIgnoreCase) ? [packageId] : [],
             DisplayName = packageId,

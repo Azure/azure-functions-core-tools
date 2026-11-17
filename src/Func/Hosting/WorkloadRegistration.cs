@@ -82,7 +82,7 @@ internal static class WorkloadRegistration
     {
         var store = new WorkloadStore(paths);
         var runtimeIdentifierProvider = new WorkloadRuntimeIdentifierProvider();
-        var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
+        var loader = new WorkloadLoader(runtimeIdentifierProvider);
 
         IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<WorkloadEntry> compatibleEntries = SelectRuntimeCompatibleEntries(
@@ -90,7 +90,7 @@ internal static class WorkloadRegistration
             runtimeIdentifierProvider.Current,
             interaction);
         IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveRuntimeEntries(compatibleEntries);
-        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(compatibleEntries, paths);
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(compatibleEntries);
 
         var runtimeWorkloads = new List<RuntimeWorkloadInfo>(liveEntries.Count);
         foreach (WorkloadEntry entry in liveEntries)
@@ -191,19 +191,18 @@ internal static class WorkloadRegistration
                 .First())];
     }
 
-    private static IReadOnlyList<ContentWorkloadInfo> CreateContentWorkloads(IReadOnlyList<WorkloadEntry> entries, IWorkloadPaths paths)
+    private static IReadOnlyList<ContentWorkloadInfo> CreateContentWorkloads(IReadOnlyList<WorkloadEntry> entries)
     {
         return [.. entries
             .Where(e => e.Kind == WorkloadKind.Content)
             .Select(e =>
             {
-                string installDirectory = paths.GetInstallDirectory(e.PackageId, e.PackageVersion);
                 return new ContentWorkloadInfo(
                     e.PackageId,
                     e.PackageVersion,
                     e.Aliases,
-                    installDirectory,
-                    WorkloadPackageLayout.GetContentRoot(installDirectory, e.RuntimeIdentifier),
+                    e.PackageRoot,
+                    WorkloadPackageLayout.GetContentRoot(e.PackageRoot, e.RuntimeIdentifier),
                     GetDisplayName(e),
                     e.Description ?? string.Empty);
             })];

@@ -12,17 +12,12 @@ namespace Azure.Functions.Cli.Workloads.Loading;
 /// collectible <see cref="WorkloadLoadContext"/> so dependency versions
 /// don't collide across workloads.
 /// </summary>
-internal sealed class WorkloadLoader(
-    IWorkloadPaths paths,
-    IWorkloadRuntimeIdentifierProvider runtimeIdentifierProvider) : IWorkloadLoader
+internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeIdentifierProvider) : IWorkloadLoader
 {
-    private readonly IWorkloadPaths _paths = paths
-        ?? throw new ArgumentNullException(nameof(paths));
     private readonly IWorkloadRuntimeIdentifierProvider _runtimeIdentifierProvider = runtimeIdentifierProvider
         ?? throw new ArgumentNullException(nameof(runtimeIdentifierProvider));
 
-    public WorkloadLoader(IWorkloadPaths paths)
-        : this(paths, new WorkloadRuntimeIdentifierProvider())
+    public WorkloadLoader() : this(new WorkloadRuntimeIdentifierProvider())
     {
     }
 
@@ -73,7 +68,12 @@ internal sealed class WorkloadLoader(
                 $"[{entry.PackageId}] WorkloadLoader was invoked for a runtime entry without an EntryPoint. " +
                 "Only kind=workload entries should reach the loader. This is a CLI bug.");
 
-        string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string installPath = entry.PackageRoot;
+        if (string.IsNullOrWhiteSpace(installPath))
+        {
+            throw new InvalidWorkloadException($"[{entry.PackageId}] Could not load workload: package root is missing.");
+        }
+
         string assemblyPath = ResolveAssemblyPath(installPath, entryPoint.AssemblyPath, entry.PackageId);
         string contentRoot = Path.GetDirectoryName(assemblyPath)!;
 

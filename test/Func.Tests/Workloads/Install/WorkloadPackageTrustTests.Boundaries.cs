@@ -77,6 +77,7 @@ public sealed partial class WorkloadPackageTrustTests
         {
             PackageId = implementationId,
             PackageVersion = "1.0.0",
+            PackageRoot = Paths.GetInstallDirectory(implementationId, "1.0.0"),
             InstallRefCount = 1,
             LogicalPackage = new LogicalPackage { PackageId = id, PackageVersion = "1.0.0", Source = "https://example/v3/index.json" },
             RuntimeIdentifier = "win-x64",
@@ -247,6 +248,7 @@ public sealed partial class WorkloadPackageTrustTests
         {
             PackageId = implementationId,
             PackageVersion = "1.1.0",
+            PackageRoot = Paths.GetInstallDirectory(implementationId, "1.1.0"),
             RuntimeIdentifier = "win-x64",
             Source = "https://other.test/v3/index.json",
         };
@@ -254,6 +256,7 @@ public sealed partial class WorkloadPackageTrustTests
         {
             PackageId = implementationId,
             PackageVersion = "1.0.0",
+            PackageRoot = Paths.GetInstallDirectory(implementationId, "1.0.0"),
             RuntimeIdentifier = "win-x64",
             LogicalPackage = new LogicalPackage { PackageId = id, PackageVersion = "1.0.0", Source = "https://example/v3/index.json" },
         };

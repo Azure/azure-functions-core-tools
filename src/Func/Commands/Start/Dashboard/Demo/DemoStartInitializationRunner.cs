@@ -13,7 +13,6 @@ using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads.Install;
-using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -32,7 +31,6 @@ internal sealed class DemoStartInitializationRunner(
     IWorkloadInstaller workloadInstaller,
     IInteractionService interaction,
     ILocalSettingsProvider localSettingsProvider,
-    IWorkloadPaths workloadPaths,
     IHostProcessRunner hostProcessRunner,
     IProcessEnvironment processEnvironment,
     IManagedAzuriteOrchestrator managedAzuriteOrchestrator,
@@ -67,9 +65,6 @@ internal sealed class DemoStartInitializationRunner(
 
     private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider
         ?? throw new ArgumentNullException(nameof(localSettingsProvider));
-
-    private readonly IWorkloadPaths _workloadPaths = workloadPaths
-        ?? throw new ArgumentNullException(nameof(workloadPaths));
 
     private readonly IHostProcessRunner _hostProcessRunner = hostProcessRunner
         ?? throw new ArgumentNullException(nameof(hostProcessRunner));
@@ -126,7 +121,7 @@ internal sealed class DemoStartInitializationRunner(
         [
             new ResolveProfileInitializationStep(_profileResolver),
             new ResolveConstraintsInitializationStep(),
-            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller, _workloadPaths, _processEnvironment),
+            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller, _processEnvironment),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
             new ResolveFunctionsWorkerInitializationStep(
                 _workerResolverFactory,

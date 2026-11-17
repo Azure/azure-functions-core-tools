@@ -5,6 +5,7 @@ using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
@@ -46,6 +47,70 @@ public class WorkloadStoreTests : IDisposable
         var installed = workloads.Should().ContainSingle().Subject;
         installed.PackageId.Should().Be("Azure.Functions.Cli.Workloads.Dotnet");
         installed.PackageVersion.Should().Be("1.0.0");
+    }
+
+    [Fact]
+    public async Task GetWorkloadsAsync_HydratesPackageRootsFromCurrentPaths_IgnoringSerializedRoots()
+    {
+        Directory.CreateDirectory(_tempHome);
+        await File.WriteAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                { "packageId": "pkg", "packageVersion": "1.0.0", "packageRoot": "untrusted-root" },
+                { "packageId": "pkg", "packageVersion": "2.0.0" },
+                { "packageId": "content.pkg", "packageVersion": "1.0.0", "kind": "content", "packageRoot": null }
+              ]
+            }
+            """);
+        IWorkloadPaths paths = Substitute.For<IWorkloadPaths>();
+        paths.WorkloadRegistryPath.Returns(_paths.WorkloadRegistryPath);
+        paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(call => Path.Combine(_tempHome, "current-home", call.ArgAt<string>(0), call.ArgAt<string>(1)));
+        WorkloadStore store = new(paths);
+
+        IReadOnlyList<WorkloadEntry> entries = await store.GetWorkloadsAsync();
+
+        entries.Should().HaveCount(3);
+        foreach (WorkloadEntry entry in entries)
+        {
+            entry.PackageRoot.Should().Be(Path.Combine(_tempHome, "current-home", entry.PackageId, entry.PackageVersion));
+            Directory.Exists(entry.PackageRoot).Should().BeFalse();
+            paths.Received(1).GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        }
+    }
+
+    [Fact]
+    public async Task SaveWorkloadAsync_BindsPackageRootWithoutPersistingIt()
+    {
+        WorkloadEntry entry = new()
+        {
+            PackageId = "pkg",
+            PackageVersion = "1.0.0",
+            PackageRoot = "stale-root",
+        };
+
+        await _store.SaveWorkloadAsync(entry);
+
+        entry.PackageRoot.Should().Be(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(_paths.WorkloadRegistryPath));
+        document.RootElement.GetProperty("workloads")[0].TryGetProperty("packageRoot", out _).Should().BeFalse();
+        (await _store.GetWorkloadsAsync()).Should().ContainSingle().Which.PackageRoot.Should().Be(entry.PackageRoot);
+    }
+
+    [Fact]
+    public async Task RemoveOwnershipAsync_FinalOwner_ReturnsRemovedEntryWithPackageRoot()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0"));
+
+        WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync("pkg", "1.0.0", WorkloadOwnershipKind.Explicit);
+
+        result.EntryRemoved.Should().BeTrue();
+        result.Entry.Should().NotBeNull();
+        result.Entry!.PackageRoot.Should().Be(_paths.GetInstallDirectory("pkg", "1.0.0"));
+        (await _store.GetWorkloadsAsync()).Should().BeEmpty();
     }
 
     [Fact]
@@ -131,6 +196,7 @@ public class WorkloadStoreTests : IDisposable
 
         actual.PackageId.Should().Be(entry.PackageId);
         actual.PackageVersion.Should().Be(entry.PackageVersion);
+        actual.PackageRoot.Should().Be(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
         actual.Aliases.Should().Equal(entry.Aliases);
         actual.RuntimeIdentifier.Should().Be("linux-x64");
         actual.TemplateRoot.Should().Be("templates/dotnet");
@@ -160,6 +226,7 @@ public class WorkloadStoreTests : IDisposable
         {
             element.TryGetProperty("packageId", out _).Should().BeTrue();
             element.TryGetProperty("packageVersion", out _).Should().BeTrue();
+            element.TryGetProperty("packageRoot", out _).Should().BeFalse();
         }
     }
 
@@ -242,6 +309,7 @@ public class WorkloadStoreTests : IDisposable
         entry.LogicalPackage.Should().BeNull();
         entry.RuntimeIdentifier.Should().BeNull();
         entry.TemplateRoot.Should().BeNull();
+        entry.PackageRoot.Should().Be(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
     }
 
     [Fact]
@@ -298,7 +366,7 @@ public class WorkloadStoreTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OwnershipChanges_PreserveTemplateRoot(bool logicalOwnership)
+    public async Task OwnershipChanges_PreserveTemplateRootAndBindPackageRoot(bool logicalOwnership)
     {
         WorkloadOwnershipKind ownership = logicalOwnership ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
         LogicalPackage logical = new() { PackageId = "pkg", PackageVersion = "1.0.0" };
@@ -330,12 +398,14 @@ public class WorkloadStoreTests : IDisposable
         merged.InstallRefCount.Should().Be(2);
         removal.Entry!.TemplateRoot.Should().Be(incoming.TemplateRoot);
         (await _store.GetWorkloadsAsync()).Should().ContainSingle().Which.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        merged.PackageRoot.Should().Be(_paths.GetInstallDirectory(incoming.PackageId, incoming.PackageVersion));
+        removal.Entry!.PackageRoot.Should().Be(merged.PackageRoot);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OwnershipMoves_PreserveOldAndNewTemplateRoots(bool logicalOwnership)
+    public async Task OwnershipMoves_PreserveTemplateRootsAndBindPackageRoots(bool logicalOwnership)
     {
         WorkloadOwnershipKind ownership = logicalOwnership ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
         LogicalPackage logical = new() { PackageId = "pkg", PackageVersion = "1.0.0" };
@@ -365,6 +435,10 @@ public class WorkloadStoreTests : IDisposable
         IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
         entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Which.TemplateRoot.Should().Be(original.TemplateRoot);
         entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0").Which.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        moved.Entry.PackageRoot.Should().Be(_paths.GetInstallDirectory(incoming.PackageId, incoming.PackageVersion));
+        entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Which.PackageRoot.Should().Be(
+            _paths.GetInstallDirectory(original.PackageId, original.PackageVersion));
+        entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0").Which.PackageRoot.Should().Be(moved.Entry.PackageRoot);
     }
 
     [Fact]
