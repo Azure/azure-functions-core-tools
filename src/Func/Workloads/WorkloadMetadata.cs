@@ -56,31 +56,4 @@ internal sealed class WorkloadMetadata
     /// One-line workload description for inventory and list output.
     /// </summary>
     public string Description { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Normalizes a relative directory path and verifies it resolves inside the package root.
-    /// </summary>
-    public static string NormalizePackagePath(string path, string packageDirectory)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        ArgumentException.ThrowIfNullOrWhiteSpace(packageDirectory);
-
-        string relativePath = path.Replace('\\', '/');
-        if (Path.IsPathRooted(relativePath))
-        {
-            throw new ArgumentException("The path must be relative to the package root.", nameof(path));
-        }
-
-        string packageRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(packageDirectory));
-        string resolvedPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(packageRoot, relativePath)));
-        string packageRootPrefix = Path.EndsInDirectorySeparator(packageRoot) ? packageRoot : packageRoot + Path.DirectorySeparatorChar;
-        StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (!resolvedPath.StartsWith(packageRootPrefix, comparison)
-            || string.Equals(resolvedPath, packageRoot, comparison))
-        {
-            throw new ArgumentException("The path must resolve to a directory inside the package root.", nameof(path));
-        }
-
-        return Path.GetRelativePath(packageRoot, resolvedPath).Replace('\\', '/');
-    }
 }
