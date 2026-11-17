@@ -81,6 +81,8 @@ Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a 
 
 The system SHALL enforce case-insensitive uniqueness across all onboarding files for onboarding ID, repository slug, and package ID. Moving an unchanged entry between files MUST NOT change its effective values.
 
+Each eligible repository release SHALL produce one package at the release-derived version. Multiple descriptor project entries SHALL produce independent templates within that package, not additional onboarding entries, package IDs, or independent releases.
+
 #### Scenario: Duplicate value exists in another file
 
 - **WHEN** two entries resolve to the same globally unique value ignoring case
@@ -244,12 +246,36 @@ When the release snapshot contains root `.template.config/template.json` and no 
 
 ### Requirement: Synthesized project declarations are safe and complete
 
-The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion: 1`, reject unknown properties, and require non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Each project SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
+The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion: 1`, reject unknown properties at every level, and require non-empty top-level `identity` and `description` strings and a non-empty `projects` array. Top-level `name` and `shortName` SHALL be rejected. Each project entry SHALL define one independent template and require non-empty strings for `name`, `shortName`, `root`, `stack`, and `language`. The top-level `identity` SHALL serve as a stable template identity namespace, not as the NuGet package ID; onboarding SHALL continue to own package identity. The top-level `description` SHALL supply the NuGet package description and each synthesized template's description.
+
+Each generated TemplateEngine identity SHALL be `<identity>.<shortName>`. The pipeline SHALL reject case-insensitive duplicate project short names or generated identities within the descriptor. Array order, display name, root path, and release version MUST NOT contribute to the generated identity; changing the namespace or short name changes template identity.
+
+`root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. Therefore `root: .` SHALL be accepted only in a single-entry descriptor. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
 
 #### Scenario: Descriptor metadata is incomplete
 
 - **WHEN** the synthesis descriptor omits required template metadata or contains an unknown property
 - **THEN** package generation fails and identifies the descriptor property
+
+#### Scenario: Names remain at the descriptor root
+
+- **WHEN** a descriptor supplies top-level `name` or `shortName` instead of placing them in each project entry
+- **THEN** descriptor validation fails
+
+#### Scenario: Project array is empty
+
+- **WHEN** a descriptor supplies `projects: []`
+- **THEN** descriptor validation fails
+
+#### Scenario: Project short names collide
+
+- **WHEN** two entries declare short names that differ only by case
+- **THEN** package generation fails before creating duplicate template identities
+
+#### Scenario: Project entries move or are reordered
+
+- **WHEN** an entry changes its root, display name, or array position without changing the descriptor identity or its short name
+- **THEN** its generated template identity remains unchanged
 
 #### Scenario: Root project is declared
 
@@ -259,7 +285,8 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 #### Scenario: Nested project is declared
 
 - **WHEN** a project uses `root: src/api`
-- **THEN** the pipeline resolves its primary-output anchor as `src/api/host.json`
+- **THEN** the pipeline reads `src/api/host.json` as its source anchor
+- **AND** the independent template exposes that anchor as output-root `host.json`
 
 #### Scenario: Project roots overlap
 
@@ -278,34 +305,46 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 
 ### Requirement: Source descriptor is synthesized into template configuration
 
-When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add one workload constraint, in the form defined by `template-engine-constraints`, for each distinct declared project stack.
+When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize one independent project template per `projects` entry. Each template SHALL use identity `<identity>.<shortName>`, the entry's short name and name, and the descriptor's shared description.
+
+Each generated template SHALL have its own `.template.config/template.json` and SHALL use only the entry's filtered root subtree as content, rebased to the template output root, plus the required repository root license file. Sibling template content and other files outside that subtree MUST NOT be included. Links that resolve outside the entry's content root SHALL be rejected even when their targets remain inside repository staging. Final package inspection SHALL verify exactly the expected generated template inventory.
+
+Each template SHALL add output-root `host.json` as a primary output and one mandatory trusted Functions project configuration finalization action referencing that output and supplying the entry's canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add one workload constraint, in the form defined by `template-engine-constraints`, for that entry's stack, not for sibling entries. A single template generating multiple Functions projects or using parameterized or conditional topology SHALL require authored configuration; the descriptor's array SHALL NOT combine entries into one template.
 
 #### Scenario: Repository has no template configuration
 
 - **WHEN** the release snapshot lacks root `.template.config/template.json`
 - **AND** the release snapshot contains a valid `.github/azure-functions-template.yaml`
-- **THEN** the pipeline adds a minimal synthesized project template to staging
+- **THEN** the pipeline adds one minimal synthesized project template per descriptor entry to staging
 
 #### Scenario: Synthesized template is validated
 
 - **WHEN** template configuration has been synthesized
-- **THEN** the same TemplateEngine load, dry-run, action, output-path, and safety validation used for authored configuration succeeds before packing
+- **THEN** every generated template independently passes the same TemplateEngine load, dry-run, action, output-path, and safety validation used for authored configuration before packing
 
-#### Scenario: Synthesized projects share one language
+#### Scenario: Monorepo entries are independent templates
 
-- **WHEN** every declared project uses the same canonical language
-- **THEN** the synthesized template may expose that singular TemplateEngine language tag
+- **WHEN** the descriptor declares two projects with disjoint roots and distinct short names
+- **THEN** the release produces one package containing two independently selectable templates with distinct generated identities
+- **AND** dry-running either template produces only its own root subtree plus the repository license
+- **AND** the source root path is not reproduced as an enclosing output directory
 
-#### Scenario: Synthesized projects use mixed languages
+#### Scenario: Synthesized projects use mixed languages and stacks
 
-- **WHEN** declared projects use different canonical languages
-- **THEN** the synthesized template omits a singular language tag
-- **AND** preserves per-project languages in configuration actions
+- **WHEN** descriptor entries declare different canonical languages or stacks
+- **THEN** each generated template exposes its own entry's language tag and configuration action
+- **AND** each template requires only its own entry's stack workload
 
-#### Scenario: Synthesized projects use mixed stacks
+#### Scenario: Link crosses a template boundary
 
-- **WHEN** declared projects use different canonical stacks
-- **THEN** the synthesized template has a workload constraint for every declared stack
+- **WHEN** a link under one project root resolves to a sibling template or other content outside that root
+- **THEN** package generation fails rather than importing that content
+
+#### Scenario: One monorepo entry is invalid
+
+- **WHEN** any descriptor entry fails template validation
+- **THEN** the repository release fails packaging before staging
+- **AND** the pipeline does not publish a partial package containing only the valid entries
 
 ### Requirement: Package licensing is release-specific and allowlisted
 
@@ -330,7 +369,7 @@ The pipeline SHALL determine licensing from the exact release commit. It SHALL f
 
 ### Requirement: NuGet packages have func template identity and provenance
 
-Each generated package SHALL use the explicit package ID, the release-derived package version, and package type `FuncTemplate`. NuGet metadata SHALL include the effective description and license, a project URL for the GitHub repository, repository type `git`, the canonical repository URL, the resolved commit SHA, and a release-notes link to the corresponding GitHub release. The root license file SHALL remain in template content.
+Each generated package SHALL use the explicit package ID, the release-derived package version, and package type `FuncTemplate`. NuGet metadata SHALL include the authored template description or synthesis descriptor's top-level `description`, the effective license, a project URL for the GitHub repository, repository type `git`, the canonical repository URL, the resolved commit SHA, and a release-notes link to the corresponding GitHub release. The repository root license file SHALL remain in template content, including each independent synthesized template whose root is a subdirectory.
 
 #### Scenario: Package metadata is inspected
 
