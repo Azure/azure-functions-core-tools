@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.TemplateEngine.Edge" />
+    <PackageReference Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="$(SrcRoot)Workloads/Templates/DotNet/*/**/*"
+             Exclude="$(SrcRoot)Workloads/Templates/DotNet/**/bin/**;$(SrcRoot)Workloads/Templates/DotNet/**/obj/**"
+             Link="DotNetTemplates/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -17,10 +17,4 @@
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="Templates/**/*.cs" />
-    <None Include="Templates/**/*.cs" />
-    <None Include="Templates/**/*.csproj" />
-  </ItemGroup>
-
 </Project>

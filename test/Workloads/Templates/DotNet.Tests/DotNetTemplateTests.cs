@@ -10,7 +10,7 @@ using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
 
-namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
+namespace Azure.Functions.Cli.Workloads.Templates.DotNet.Tests;
 
 public sealed class DotNetTemplateTests : IDisposable
 {
