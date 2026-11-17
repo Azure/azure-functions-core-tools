@@ -277,7 +277,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
     private static ResolvedProfile CreateProfileWithBundleRange(string bundleRange)
     {
         var source = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
-        Dictionary<string, VersionRange> workerVersionRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerVersionRanges = [with(StringComparer.OrdinalIgnoreCase)];
 
         return new ResolvedProfile(
             "flex",

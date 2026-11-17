@@ -1,9 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Hosting.Events;
 using System.Globalization;
 using System.Text.Json;
+using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
@@ -12,7 +12,7 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
 {
     private const string ConsoleLogContinuationPrefix = "      ";
     private readonly object _consoleLogLock = new();
-    private readonly Dictionary<string, ConsoleLogContext> _consoleLogContexts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ConsoleLogContext> _consoleLogContexts = [with(StringComparer.Ordinal)];
 
     public HostLogEntry ParseLine(string streamName, string line, DateTimeOffset timestamp)
     {
@@ -197,7 +197,7 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
                 Dictionary<string, object?> attributes = root.TryGetProperty("attributes", out JsonElement attributesElement)
                     && attributesElement.ValueKind == JsonValueKind.Object
                         ? ReadAttributes(attributesElement)
-                        : new Dictionary<string, object?>(StringComparer.Ordinal);
+                        : [with(StringComparer.Ordinal)];
 
                 attributes[HostLogAttributeKeys.Stream] = streamName;
                 EnrichFromCategory(category, attributes);

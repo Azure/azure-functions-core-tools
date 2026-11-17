@@ -65,7 +65,7 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
             return LocalSettingsSnapshot.Empty.Values;
         }
 
-        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> result = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (JsonProperty property in values.EnumerateObject())
         {
             if (property.Value.ValueKind == JsonValueKind.String)

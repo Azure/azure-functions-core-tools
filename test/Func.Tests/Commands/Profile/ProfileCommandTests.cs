@@ -375,7 +375,7 @@ public sealed class ProfileCommandTests : IDisposable
 
     private sealed class FakeProfileFileSystem : IFileSystem
     {
-        private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _files = [with(StringComparer.OrdinalIgnoreCase)];
 
         public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
         {
@@ -438,7 +438,7 @@ public sealed class ProfileCommandTests : IDisposable
         public Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Dictionary<string, ProfileDefinition> profiles = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ProfileDefinition> profiles = [with(StringComparer.OrdinalIgnoreCase)];
             foreach ((string name, ProfileDefinition definition) in _profiles)
             {
                 profiles.Add(name, definition);

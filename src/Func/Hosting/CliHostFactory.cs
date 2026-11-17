@@ -2,17 +2,17 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Bundles;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Clipboard;
 using Azure.Functions.Cli.Console.Terminal;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Http;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates.Engine;

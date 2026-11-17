@@ -258,7 +258,7 @@ public class ClipboardWriterTests
             Writer = new ClipboardWriter(platform, environment, Runner, Native);
         }
 
-        public Dictionary<string, string?> Variables { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, string?> Variables { get; } = [with(StringComparer.Ordinal)];
 
         public IProcessRunner Runner { get; } = Substitute.For<IProcessRunner>();
 

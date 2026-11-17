@@ -1268,9 +1268,9 @@ public sealed class SetupRunnerTests : IDisposable
     private sealed class FakeCatalog : IWorkloadCatalog
     {
         private readonly PackageSource _source = new("https://example.test/v3/index.json");
-        private readonly Dictionary<string, CatalogSearchResult> _aliases = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, NuGetVersion> _latest = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, List<NuGetVersion>> _versions = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, CatalogSearchResult> _aliases = [with(StringComparer.OrdinalIgnoreCase)];
+        private readonly Dictionary<string, NuGetVersion> _latest = [with(StringComparer.OrdinalIgnoreCase)];
+        private readonly Dictionary<string, List<NuGetVersion>> _versions = [with(StringComparer.OrdinalIgnoreCase)];
 
         public int ResolveLatestCallCount { get; private set; }
 
@@ -1480,7 +1480,7 @@ public sealed class SetupRunnerTests : IDisposable
         public Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Dictionary<string, ProfileDefinition> definitions = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ProfileDefinition> definitions = [with(StringComparer.OrdinalIgnoreCase)];
             foreach ((string name, ProfileDefinition definition) in profiles)
             {
                 definitions.Add(name, definition);

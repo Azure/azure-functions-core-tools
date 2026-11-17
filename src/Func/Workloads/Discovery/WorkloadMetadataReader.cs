@@ -190,9 +190,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' declares kind 'rid-pointer' but does not define a non-empty packages map.");
         }
 
-#pragma warning disable IDE0028 // '[with(args)]' is preview
-        HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
-#pragma warning restore IDE0028
+        HashSet<string> runtimeIdentifiers = [with(StringComparer.OrdinalIgnoreCase)];
         foreach ((string runtimeIdentifier, string packageId) in metadata.Packages)
         {
             if (!IsNormalizedRuntimeIdentifier(runtimeIdentifier))

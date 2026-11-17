@@ -22,7 +22,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
     private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IReadOnlyDictionary<string, VersionRange> _activeWorkerConstraints =
         activeWorkerConstraints is null
-            ? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase)
+            ? [with(StringComparer.OrdinalIgnoreCase)]
             : new Dictionary<string, VersionRange>(activeWorkerConstraints, StringComparer.OrdinalIgnoreCase);
 
     public Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerId workerId, CancellationToken cancellationToken)

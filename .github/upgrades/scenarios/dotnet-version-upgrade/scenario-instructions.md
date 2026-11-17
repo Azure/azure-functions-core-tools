@@ -28,6 +28,8 @@
 - Commit after each task; every commit message must include the trailer: `Co-authored-by: Copilot App <223556219+Copilot@users.noreply.github.com>`
 - Do NOT push and do NOT create a PR.
 - Branch sync disabled (source and working branch are the same).
+- Accepted (task 02): NuGet.Packaging/Protocol/Versioning 6.13.2 → 8.0.0 and new central pin NuGet.Credentials 8.0.0 — forced by Microsoft.TemplateEngine.* 11.0.100 dependency.
+- Accepted (task 02): removed Microsoft.Extensions.DependencyInjection.Abstractions PackageReference from Abstractions.csproj (NU1510: now in-box with net11).
 - System.CommandLine: stay on 2.0.x (3.0.0 is a major bump affecting the public Abstractions package and is not required for net11).
 - Workloads.Sdk stays netstandard2.0 (MSBuild task library). Do not bump packages it consumes (System.Text.Json, System.Reflection.MetadataLoadContext) beyond what the MSBuild host provides; if central pins are shared, keep Workloads.Sdk's effective versions unchanged.
 - LangVersion: bump 14 → 15 in eng/build/Engineering.props (the C# version paired with .NET 11); fix any resulting warnings at source.

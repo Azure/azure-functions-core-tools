@@ -25,8 +25,8 @@ namespace Azure.Functions.Cli.Hosting.Dashboard;
 internal sealed class DashboardState
 {
     private readonly object _lock = new();
-    private readonly Dictionary<string, FunctionEntry> _functions = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ActiveInvocation> _active = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FunctionEntry> _functions = [with(StringComparer.Ordinal)];
+    private readonly Dictionary<string, ActiveInvocation> _active = [with(StringComparer.Ordinal)];
 
     private string? _hostVersion;
     private string? _listenUri;

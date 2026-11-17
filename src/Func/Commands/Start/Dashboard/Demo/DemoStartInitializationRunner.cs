@@ -4,8 +4,8 @@
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
-using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Commands.Start.Host;
+using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;

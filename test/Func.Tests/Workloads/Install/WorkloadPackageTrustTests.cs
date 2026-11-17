@@ -8,10 +8,10 @@ using System.Security.Cryptography.X509Certificates;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
-using NuGet.Versioning;
+using NSubstitute;
 using NuGet.Packaging;
 using NuGet.Packaging.Signing;
-using NSubstitute;
+using NuGet.Versioning;
 using Xunit.Abstractions;
 using HashAlgorithmName = System.Security.Cryptography.HashAlgorithmName;
 using Rfc3161TimestampTokenInfo = System.Security.Cryptography.Pkcs.Rfc3161TimestampTokenInfo;
@@ -344,7 +344,9 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, repository: true);
         using (PackageArchiveReader reader = new(signed))
         {
-            (await reader.GetPrimarySignatureAsync(CancellationToken.None)).Type.Should().Be(SignatureType.Repository);
+            PrimarySignature? signature = await reader.GetPrimarySignatureAsync(CancellationToken.None);
+            signature.Should().NotBeNull();
+            signature!.Type.Should().Be(SignatureType.Repository);
         }
 
         Func<Task> act = async () =>
