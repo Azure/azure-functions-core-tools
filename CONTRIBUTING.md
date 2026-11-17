@@ -166,6 +166,9 @@ tests on Intel (`Azure Pipelines`, `macOS-15`) and Apple Silicon
 publishes TRX results, and retains per-architecture `terminal-macos-*` evidence
 artifacts even on failure. Apple Silicon requires the pay-as-you-go
 GitHub-hosted Agents pool to be enabled and authorized for the pipeline.
+In public build 317339, the ARM64 job failed to find an agent in that pool
+before the 1ES pre-job ran. Check the organization's GitHub-hosted agent
+billing and pool availability before retrying.
 The inspected 1ES macOS pre-job requires non-1ES-hosted pools other than
 `Azure Pipelines` to be allowlisted as
 `<azfunc-organization-id>/GitHub-hosted Agents`; this pool name was not on the
