@@ -2,7 +2,7 @@
 
 This package ships the Azure Functions extension bundle payload for the
 `func` CLI. It is a content workload: the package carries files only,
-with no entry-point assembly and no runtime services. `func start`
+with no entry-point assembly and no runtime services. `func run`
 resolves the install directory by package id and reads the bundle
 layout directly.
 

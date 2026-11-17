@@ -333,7 +333,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
     private static string BuildAzuriteResetGuidance(AzuriteManagedPaths paths)
         => $"Managed Azurite returned a 500 (Internal Server Error), which usually means its data directory is "
-            + $"corrupted or in a bad state. Delete '{paths.DataDirectory}' to reset Azurite, then run 'func start' again. "
+            + $"corrupted or in a bad state. Delete '{paths.DataDirectory}' to reset Azurite, then run 'func run' again. "
             + $"Azurite debug log: '{paths.LogFilePath}'.";
 
     private HostStartupOptions GetHostStartupOptions(DirectoryInfo projectDirectory)
