@@ -108,6 +108,7 @@ public class WorkloadStoreTests : IDisposable
             PackageVersion = "1.0.0",
             Aliases = ["dotnet", "dotnet-isolated"],
             RuntimeIdentifier = "linux-x64",
+            TemplateRoot = "templates/dotnet",
             IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
@@ -132,6 +133,7 @@ public class WorkloadStoreTests : IDisposable
         actual.PackageVersion.Should().Be(entry.PackageVersion);
         actual.Aliases.Should().Equal(entry.Aliases);
         actual.RuntimeIdentifier.Should().Be("linux-x64");
+        actual.TemplateRoot.Should().Be("templates/dotnet");
         actual.IsImplicitlyInstalled.Should().BeTrue();
         actual.LogicalPackage!.PackageId.Should().Be(entry.LogicalPackage.PackageId);
         actual.LogicalPackage.Source.Should().Be(entry.LogicalPackage.Source);
@@ -239,6 +241,7 @@ public class WorkloadStoreTests : IDisposable
         entry.IsImplicitlyInstalled.Should().BeFalse();
         entry.LogicalPackage.Should().BeNull();
         entry.RuntimeIdentifier.Should().BeNull();
+        entry.TemplateRoot.Should().BeNull();
     }
 
     [Fact]
@@ -290,6 +293,78 @@ public class WorkloadStoreTests : IDisposable
 
         await FluentActions.Awaiting(() => _store.AddOwnershipAsync(conflicting, WorkloadOwnershipKind.Logical))
             .Should().ThrowExactlyAsync<InvalidOperationException>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnershipChanges_PreserveTemplateRoot(bool logicalOwnership)
+    {
+        WorkloadOwnershipKind ownership = logicalOwnership ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+        LogicalPackage logical = new() { PackageId = "pkg", PackageVersion = "1.0.0" };
+        WorkloadEntry original = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            TemplateRoot = "templates/original",
+            IsImplicitlyInstalled = ownership == WorkloadOwnershipKind.Explicit,
+            LogicalPackage = ownership == WorkloadOwnershipKind.Explicit ? logical : null,
+        };
+        WorkloadOwnershipKind originalOwnership = ownership == WorkloadOwnershipKind.Explicit
+            ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+        WorkloadEntry added = await _store.AddOwnershipAsync(original, originalOwnership);
+        added.TemplateRoot.Should().Be(original.TemplateRoot);
+        WorkloadEntry incoming = new()
+        {
+            PackageId = original.PackageId,
+            PackageVersion = original.PackageVersion,
+            TemplateRoot = "templates/replaced",
+            LogicalPackage = logical,
+            IsImplicitlyInstalled = ownership == WorkloadOwnershipKind.Logical,
+        };
+
+        WorkloadEntry merged = await _store.AddOwnershipAsync(incoming, ownership);
+        WorkloadOwnershipRemovalResult removal = await _store.RemoveOwnershipAsync(original.PackageId, original.PackageVersion, ownership);
+
+        merged.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        merged.InstallRefCount.Should().Be(2);
+        removal.Entry!.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        (await _store.GetWorkloadsAsync()).Should().ContainSingle().Which.TemplateRoot.Should().Be(incoming.TemplateRoot);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnershipMoves_PreserveOldAndNewTemplateRoots(bool logicalOwnership)
+    {
+        WorkloadOwnershipKind ownership = logicalOwnership ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+        LogicalPackage logical = new() { PackageId = "pkg", PackageVersion = "1.0.0" };
+        WorkloadEntry original = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            TemplateRoot = "templates/old",
+            LogicalPackage = logical,
+            InstallRefCount = 2,
+        };
+        WorkloadEntry incoming = new()
+        {
+            PackageId = original.PackageId,
+            PackageVersion = "2.0.0",
+            TemplateRoot = "templates/new",
+            LogicalPackage = ownership == WorkloadOwnershipKind.Logical ? logical : null,
+            IsImplicitlyInstalled = ownership == WorkloadOwnershipKind.Logical,
+        };
+        await _store.SaveWorkloadAsync(original);
+
+        WorkloadOwnershipMoveResult moved = ownership == WorkloadOwnershipKind.Logical
+            ? await _store.MoveLogicalOwnershipAsync(original.PackageId, original.PackageVersion, incoming)
+            : await _store.MoveExplicitOwnershipAsync(original.PackageId, original.PackageVersion, incoming);
+
+        moved.Entry.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Which.TemplateRoot.Should().Be(original.TemplateRoot);
+        entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0").Which.TemplateRoot.Should().Be(incoming.TemplateRoot);
     }
 
     [Fact]
