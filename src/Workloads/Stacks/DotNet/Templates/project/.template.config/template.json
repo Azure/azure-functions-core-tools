@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Cloud" ],
+  "identity": "Azure.Functions.Cli.DotNet.Project.CSharp",
+  "name": "Azure Functions C# project",
+  "description": "An isolated-worker Azure Functions project with optional HTTP and OpenTelemetry support.",
+  "shortName": "func-dotnet",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "FunctionsProject",
+  "preferNameDirectory": true,
+  "symbols": {
+    "Framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "The target framework for the project.",
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10" },
+        { "choice": "net11.0", "description": ".NET 11" }
+      ]
+    },
+    "NoHttp": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the HTTP function and ASP.NET Core integration."
+    },
+    "NoTelemetry": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit OpenTelemetry and Azure Monitor export."
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": [ ".template.config/**" ],
+      "modifiers": [
+        {
+          "condition": "NoHttp",
+          "exclude": [ "HelloWorld.cs" ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "FunctionsProject.csproj" }
+  ]
+}

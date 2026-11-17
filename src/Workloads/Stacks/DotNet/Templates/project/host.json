@@ -1,0 +1,6 @@
+{
+  //#if (!NoTelemetry)
+  "telemetryMode": "OpenTelemetry",
+  //#endif
+  "version": "2.0"
+}
