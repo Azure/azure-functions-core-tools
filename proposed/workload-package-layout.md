@@ -944,8 +944,8 @@ A workload is binary-compatible with a CLI when **both** of these hold:
    workload's resolved reference must bind to that version. The
    workload's TFM is recorded in its assembly's
    `TargetFrameworkAttribute` and `.deps.json`; the .NET runtime's
-   standard load rules handle TFM compatibility    (a `net11.0`
-      workload runs on a CLI on a `net11.0`-or-newer runtime without
+   standard load rules handle TFM compatibility (a `net11.0`
+   workload runs on a CLI on a `net11.0`-or-newer runtime without
    further intervention).
 2. **Shared frameworks:** the workload may **not** depend on any
    shared framework (`Microsoft.NETCore.App`, `Microsoft.AspNetCore.App`,
