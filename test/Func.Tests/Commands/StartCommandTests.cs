@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start;
+using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -17,6 +18,7 @@ using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -297,6 +299,46 @@ public class StartCommandTests : IDisposable
                 && context.Options.CorsCredentials),
             Arg.Any<IStartInitializationRenderer>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartCommand_ManagedAzuriteReturns500_SuggestsRunCommand()
+    {
+        InMemoryHostEventStream source = new();
+        source.Write(new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Host.Process",
+            LogLevel.Information,
+            default,
+            "Status: 500 (Internal Server Error) Server: Azurite-Blob/3.35.0",
+            Exception: null,
+            HostLogEntry.EmptyAttributes));
+        source.Complete();
+        StartInitializationResult initializationResult = CreateInitializationResult(source) with
+        {
+            AzuritePaths = new AzuriteManagedPaths("azurite-data", "azurite.log")
+        };
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, services =>
+        {
+            services.AddSingleton(_cliVersionProvider);
+            services.AddSingleton(_initializationRunner);
+        });
+        var root = Parser.CreateCommand(services);
+
+        int exitCode = await root.Parse($"run \"{_tempDir}\" --format=plain")
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().Contain(line =>
+            line.Contains("Managed Azurite returned a 500", StringComparison.Ordinal)
+            && line.Contains("run 'func run' again", StringComparison.Ordinal));
+        _interaction.Lines.Should().NotContain(line => line.Contains("func start", StringComparison.Ordinal));
     }
 
     [Fact]
