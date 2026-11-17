@@ -54,7 +54,10 @@ internal sealed class ValidateExtensionBundleInitializationStep : FuncStartIniti
         }
         catch (ExtensionBundleConfigurationException ex)
         {
-            throw new GracefulException(ex.Message, isUserError: true, verboseMessage: ex.ToString());
+            throw new GracefulException(
+                $"{ex.Message} Run 'func run' again after correcting the issue.",
+                isUserError: true,
+                verboseMessage: ex.ToString());
         }
 
         if (section is null)

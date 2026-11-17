@@ -53,7 +53,7 @@ they don't recognise.
 
 ### Start initialization records
 
-Before the host event stream starts, `func start` emits structured records for
+Before the host event stream starts, `func run` emits structured records for
 profile/constraint resolution, workload validation, simulated installs, and
 host launch.
 

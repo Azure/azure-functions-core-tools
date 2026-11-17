@@ -445,7 +445,7 @@ The home is resolved as `$(FuncCliWorkloadsHome)` property, then
 By default `DeployForDebug` is **deploy-only**: it errors if no install of
 `<id>@<version>` exists at the resolved home. This is intentional. The
 install state of the home is part of what you're debugging (e.g. "what does
-`func start` do when only the stack is installed and the worker is missing?"),
+`func run` do when only the stack is installed and the worker is missing?"),
 so the target won't silently mutate it.
 
 Pass `-p:FuncCliEnsureWorkloadInstalled=true` to opt into a one-time pack +
@@ -480,7 +480,7 @@ loads.
 ### Bootstrapping richer scenarios
 
 The auto-install mode only installs the workload you picked. For end-to-end
-runs (`func start`) you also need a host and the matching language worker
+runs (`func run`) you also need a host and the matching language worker
 installed, since workload installs are not transitive today. Three recipes:
 
 - **Rebuild preinstalled workloads**: `eng/scripts/debug-workloads.ps1`

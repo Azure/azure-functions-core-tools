@@ -122,6 +122,7 @@ public class ManagedAzuriteOrchestratorTests
         var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
         failed.UserMessage.Should().Contain("cannot start this configuration automatically");
         failed.UserMessage.Should().Contain("Start Azurite");
+        AssertRunRetryGuidance(failed.UserMessage);
     }
 
     [Fact]
@@ -248,8 +249,9 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        result.Should().BeOfType<ManagedAzuriteResult.Failed>()
-            .Which.UserMessage.Should().Contain("another process is using the Azurite ports");
+        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
+        failed.UserMessage.Should().Contain("another process is using the Azurite ports");
+        AssertRunRetryGuidance(failed.UserMessage);
     }
 
     [Fact]
@@ -310,6 +312,7 @@ public class ManagedAzuriteOrchestratorTests
         failed.UserMessage.Should().Contain("Azurite is not running");
         failed.UserMessage.Should().Contain("npm install -g azurite");
         failed.UserMessage.Should().Contain("Docker Desktop");
+        AssertRunRetryGuidance(failed.UserMessage);
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -333,6 +336,7 @@ public class ManagedAzuriteOrchestratorTests
         failed.UserMessage.Should().Contain("did not become ready");
         failed.UserMessage.Should().Contain("Data directory:");
         failed.UserMessage.Should().Contain("delete the data directory");
+        AssertRunRetryGuidance(failed.UserMessage);
         fake.StopCalled.Should().BeTrue("Orchestrator must stop the process on timeout.");
     }
 
@@ -354,6 +358,7 @@ public class ManagedAzuriteOrchestratorTests
         failed.UserMessage.Should().Contain("ENOENT");
         failed.UserMessage.Should().Contain("Data directory:");
         failed.UserMessage.Should().Contain("delete the data directory");
+        AssertRunRetryGuidance(failed.UserMessage);
     }
 
     [Fact]
@@ -448,6 +453,12 @@ public class ManagedAzuriteOrchestratorTests
 
         _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>())
             .Returns(results[0], [.. results.Skip(1)]);
+    }
+
+    private static void AssertRunRetryGuidance(string message)
+    {
+        message.Should().Contain("run 'func run' again");
+        message.Should().NotContain("func start");
     }
 
     private sealed class FakeAzuriteProcess : IAzuriteProcess
