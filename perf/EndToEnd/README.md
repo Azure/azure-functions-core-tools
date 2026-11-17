@@ -7,8 +7,9 @@ operation. The initial command is `func version`, on Linux x64.
 ## Run locally
 
 Install the SDK selected by the repository's `global.json`, PowerShell 7, and
-Git. Run on an x64 machine matching the target OS. The runner restores the
-pinned Crank tools and builds the CLI; no globally installed `func` is used.
+Git. Run on an x64 machine matching the target OS. The runner separately
+publishes the CLI and harness, then uses Crank to execute the staged harness;
+no globally installed `func` is used.
 
 ```powershell
 pwsh ./perf/EndToEnd/run.ps1
@@ -29,8 +30,7 @@ defaults to the current OS (`win-x64` or `linux-x64`); pass `-Runtime` to set it
 explicitly. Only `linux-x64` is part of the initial CI matrix. Use `-Port` if the
 default loopback agent port 5010 is occupied. The agent runs only for the invocation and is terminated
 in cleanup; do not expose it to other machines. Its temporary workspace is also
-removed in cleanup. Crank's SDK installer requires a temporary path without
-spaces; set `TEMP`/`TMP` accordingly if your system's temp directory has spaces.
+removed in cleanup.
 
 ## Measurement contract
 
@@ -53,7 +53,7 @@ The `Invocation` column shows `func` and the actual arguments for each case;
 arguments requiring quoting use JSON string escaping. The `Command` column
 continues to show the case ID used by `-Command`.
 `results/provenance.json` records the commit, executable hash and size, RID,
-SDK/tool versions, selected commands, and measurement settings. Agent, build,
+SDK/tool versions, selected commands, and measurement settings. Agent,
 benchmark, and controller logs are retained for diagnosis.
 
 Do not interpret harness allocation or process counters as CLI memory usage.
@@ -72,13 +72,15 @@ different measurement contract and should not be added as finite command cases.
 
 The harness inherits the repository's root build targets, central package
 versions, and NuGet configuration. Local build outputs go under `out/bin` and
-`out/obj`, just like other repository projects. The runner stages the harness
-with the root build configuration and required engineering files in their
-repository layout so Crank imports the same settings on the agent.
+`out/obj`, just like other repository projects. `run.ps1` publishes the
+self-contained harness and single-file `func` independently, placing `func`
+under `cli` beside the harness. Crank receives the published output.
+The agent runs both staged applications; it does not build either one or
+install an SDK/runtime for the benchmark job.
 
-The published CLI is staged as harness content, uploaded without rebuilding it,
-and executed by its exact path. Linux executable permissions are restored in
-unmeasured setup after upload.
+The published CLI is staged beside the harness, uploaded without rebuilding,
+and launched by the harness from its exact path. Linux executable permissions
+are restored in unmeasured setup before the benchmark.
 
 ## CI registration
 

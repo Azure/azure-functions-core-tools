@@ -28,52 +28,43 @@ if (-not $OutputDirectory) {
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $inputDirectory = Join-Path $OutputDirectory 'input'
 $results = Join-Path $OutputDirectory 'results'
-$harnessDirectory = Join-Path $inputDirectory 'perf/EndToEnd'
-$cliDirectory = Join-Path $harnessDirectory 'cli'
-# Crank's SDK installer does not quote its internal paths; keep its workspace separate from user output paths.
+$cliDirectory = Join-Path $inputDirectory 'cli'
 $agentWork = Join-Path ([IO.Path]::GetTempPath()) ("func-perf-agent-" + [Guid]::NewGuid().ToString('N'))
-if ($agentWork.Contains(' ')) {
-    throw "Crank requires a temporary directory without spaces. Set TEMP/TMP to a suitable directory before running."
-}
-if (Test-Path -LiteralPath $inputDirectory) {
-    if (-not $Force) {
+foreach ($stale in $inputDirectory, $results) {
+    if ((Test-Path -LiteralPath $stale) -and -not $Force) {
         throw "Benchmark inputs already exist in '$OutputDirectory'. Pass -Force to replace them or choose a fresh output directory."
     }
+}
+if ($Force) {
     foreach ($stale in $inputDirectory, $results) {
         if (Test-Path -LiteralPath $stale) {
             Remove-Item -LiteralPath $stale -Recurse -Force
         }
     }
 }
-New-Item -ItemType Directory -Path $cliDirectory, $results -Force | Out-Null
+New-Item -ItemType Directory -Path $inputDirectory, $results -Force | Out-Null
 
 $agent = $null
 Push-Location $repo
 try {
+    dotnet restore perf/EndToEnd/Performance.EndToEnd.csproj -r $Runtime -p:SelfContained=true
+    dotnet publish perf/EndToEnd/Performance.EndToEnd.csproj -c release -r $Runtime `
+        --self-contained true --no-restore -o $inputDirectory
     dotnet restore src/Func/Func.csproj -r $Runtime -p:SelfContained=true
     dotnet publish src/Func/Func.csproj -c release -r $Runtime --self-contained true --no-restore `
         -p:PublishSingleFile=true -o $cliDirectory
 
-    foreach ($file in 'Performance.EndToEnd.csproj', 'Program.cs', 'CommandCase.cs', 'CommandLineColumn.cs', 'CommandRunner.cs',
-        'BenchmarkEnvironment.cs', 'CommandBenchmarks.cs', 'README.md') {
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $harnessDirectory
-    }
-    # Preserve the repository layout so the agent imports the same build and package settings.
-    foreach ($file in 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props',
-        'NuGet.Config', 'global.json', '.editorconfig', 'stylecop.json') {
-        Copy-Item -LiteralPath (Join-Path $repo $file) -Destination $inputDirectory
-    }
-    $engineeringDirectory = New-Item -ItemType Directory -Path (Join-Path $inputDirectory 'eng')
-    foreach ($directory in 'build', 'res') {
-        Copy-Item -LiteralPath (Join-Path $repo "eng/$directory") -Destination $engineeringDirectory.FullName -Recurse
-    }
     dotnet tool restore --tool-manifest (Join-Path $PSScriptRoot '.config/dotnet-tools.json') `
         --configfile (Join-Path $repo 'NuGet.Config')
 
     $executable = Join-Path $cliDirectory $(if ($IsWindows) { 'func.exe' } else { 'func' })
-    dotnet build perf/EndToEnd/Performance.EndToEnd.csproj -c release
-    $allCommands = @(dotnet run --project perf/EndToEnd/Performance.EndToEnd.csproj -c release --no-build -- --list-commands |
-        ConvertFrom-Json)
+    $harnessName = 'Azure.Functions.Cli.Performance.EndToEnd'
+    if ($IsWindows) {
+        $harnessName += '.exe'
+    }
+    $harness = Join-Path $inputDirectory $harnessName
+    $allCommandsOutput = & $harness --list-commands
+    $allCommands = @($allCommandsOutput | ConvertFrom-Json)
     $expected = @($allCommands | Where-Object { $Command -eq 'all' -or $_ -eq $Command })
     if ($expected.Count -eq 0) {
         throw "Unknown benchmark command '$Command'."
@@ -128,16 +119,27 @@ try {
             throw 'Crank agent did not become ready.'
         }
         $json = Join-Path $results 'results.json'
-        dotnet tool run crank -- --config (Join-Path $PSScriptRoot 'commands.benchmarks.yml') `
-            --scenario commands --profile local `
-            --variable "agentUrl=http://127.0.0.1:$Port" `
-            --application.sources.benchmarks.localFolder $inputDirectory `
-            --application.sdkVersion $metadata.sdk `
-            --application.variables.command $Command --application.variables.benchmarkJob $Job `
-            --application.options.downloadFilesOutput $results `
-            --application.options.downloadBuildLogOutput (Join-Path $results 'build.log') `
-            --application.options.downloadOutputOutput (Join-Path $results 'benchmark.log') `
-            --json $json 2>&1 | Tee-Object -FilePath (Join-Path $results 'controller.log')
+        $harnessExecutable = "benchmarks/$harnessName"
+        $crankArguments = @(
+            '--config', (Join-Path $PSScriptRoot 'commands.benchmarks.yml'),
+            '--scenario', 'commands',
+            '--profile', 'local',
+            '--variable', "agentUrl=http://127.0.0.1:$Port",
+            '--application.sources.benchmarks.localFolder', $inputDirectory,
+            '--application.executable', $harnessExecutable,
+            '--application.variables.command', $Command,
+            '--application.variables.benchmarkJob', $Job
+        )
+        if ($IsLinux) {
+            $crankArguments += @('--application.beforeScript', "chmod +x $harnessExecutable")
+        }
+        $crankArguments += @(
+            '--application.options.downloadFilesOutput', $results,
+            '--application.options.downloadOutputOutput', (Join-Path $results 'benchmark.log'),
+            '--json', $json
+        )
+        dotnet tool run crank -- @crankArguments 2>&1 |
+            Tee-Object -FilePath (Join-Path $results 'controller.log')
         & (Join-Path $PSScriptRoot 'validate-results.ps1') -Path $json -ExpectedCommands $expected
         $reports = @(Get-ChildItem -Path $results -Recurse -Filter '*-default.md')
         if ($reports.Count -eq 0) {

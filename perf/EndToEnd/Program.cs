@@ -4,8 +4,10 @@
 using Azure.Functions.Cli.Performance.EndToEnd;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Toolchains.InProcess.Emit;
 using System.Text.Json;
 
 if (args is ["--list-commands"])
@@ -15,6 +17,7 @@ if (args is ["--list-commands"])
 }
 
 ManualConfig config = ManualConfig.Create(DefaultConfig.Instance)
+    .AddJob(Job.Default.WithToolchain(InProcessEmitToolchain.Instance).AsMutator())
     .AddColumn(new CommandLineColumn())
     .HideColumns(TargetMethodColumn.Method);
 Summary[] summaries = [.. BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config)];

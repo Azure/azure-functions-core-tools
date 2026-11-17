@@ -6,9 +6,8 @@ jobs:
     sources:
       benchmarks:
         localFolder: ../../out/perf/input
-    project: benchmarks/perf/EndToEnd/Performance.EndToEnd.csproj
-    framework: net10.0
-    sdkVersion: 10.0.403
+    executable: dotnet
+    noBuild: true
     variables:
       command: all
       benchmarkJob: short
@@ -18,7 +17,6 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     options:
       benchmarkDotNet: true
-      downloadBuildLog: true
       downloadOutput: true
       downloadFiles:
         - BenchmarkDotNet.Artifacts/results/*
