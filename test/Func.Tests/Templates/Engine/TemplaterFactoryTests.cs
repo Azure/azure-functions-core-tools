@@ -43,9 +43,9 @@ public sealed class TemplaterFactoryTests : IDisposable
         TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), []);
 
         using Templater templater = factory.Create(Context("command"));
-        IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult result = await templater.ListAsync(CancellationToken.None);
 
-        entries.Should().Contain(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity);
+        result.Templates.Should().Contain(template => template.Identity == TemplateFixtures.ItemTemplateIdentity);
     }
 
     [Fact]
@@ -57,9 +57,9 @@ public sealed class TemplaterFactoryTests : IDisposable
         using Templater second = factory.Create(Context("second"));
 
         first.Dispose();
-        IReadOnlyList<TemplateCatalogEntry> entries = await second.ListAsync(TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult result = await second.ListAsync(CancellationToken.None);
 
-        entries.Should().Contain(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity);
+        result.Templates.Should().Contain(template => template.Identity == TemplateFixtures.ItemTemplateIdentity);
     }
 
     [Fact]
