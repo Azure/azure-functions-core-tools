@@ -82,6 +82,10 @@ jobs:
         -cliVersion "$(Build.BuildNumber)"
       displayName: 'Generate MSI files'
 
+    - pwsh: ./eng/scripts/diagnose-windows-installer.ps1
+      displayName: 'Diagnose Windows Installer service'
+      condition: always()
+
     - template: /eng/ci/templates/official/steps/sign-msi.yml@self
       parameters:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
