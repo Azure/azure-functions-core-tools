@@ -122,8 +122,35 @@ function New-PlatformMSI {
         $envVars | Sort-Object { $_.Value.Length } -Descending | Select-Object -First 10 |
             ForEach-Object { Write-Host "  $($_.Name): $($_.Value.Length) chars" }
 
-        # Link to create MSI
-        & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
+        # Reduce only the linker's environment for the ICE validation test.
+        $lightStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop).Source
+        $lightStartInfo.WorkingDirectory = (Get-Location).Path
+        $lightStartInfo.UseShellExecute = $false
+        foreach ($argument in @('-ext', 'WixUIExtension', '-out', $msiPath, '-sice:ICE61', "$masterWxsName.wixobj", "$fragmentName.wixobj")) {
+            $lightStartInfo.ArgumentList.Add($argument)
+        }
+
+        foreach ($name in @('PIP_INDEX_URL', 'THIRDPARTYBINARIESTOSIGN', 'JAVA_TOOL_OPTIONS', 'NO_PROXY')) {
+            if ($lightStartInfo.Environment.Remove($name)) {
+                Write-Host "Removed from light.exe environment: $name"
+            } else {
+                Write-Host "Not present in light.exe environment: $name"
+            }
+        }
+        $lightEnvSize = ($lightStartInfo.Environment.GetEnumerator() |
+            ForEach-Object { $_.Key.Length + $_.Value.Length + 2 } | Measure-Object -Sum).Sum + 1
+        Write-Host "light.exe environment: $($lightStartInfo.Environment.Count) vars, ~$lightEnvSize UTF-16 code units (~$($lightEnvSize * 2) bytes)"
+
+        $lightProcess = [System.Diagnostics.Process]::Start($lightStartInfo)
+        try {
+            $lightProcess.WaitForExit()
+            if ($lightProcess.ExitCode -ne 0) {
+                throw "light.exe exited with code $($lightProcess.ExitCode)."
+            }
+        } finally {
+            $lightProcess.Dispose()
+        }
 
         # Verify MSI was created
         if (-not (Test-Path -Path $msiPath)) {
