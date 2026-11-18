@@ -516,7 +516,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found package.json"));
         var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
-        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerRanges = [with(StringComparer.OrdinalIgnoreCase)];
         var profile = new ResolvedProfile(
             "flex",
             profileSource,
@@ -561,7 +561,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found requirements.txt"));
         var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
-        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerRanges = [with(StringComparer.OrdinalIgnoreCase)];
         var profile = new ResolvedProfile(
             "windows-consumption",
             profileSource,
@@ -627,7 +627,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
-        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerRanges = [with(StringComparer.OrdinalIgnoreCase)];
         var profile = new ResolvedProfile(
             "flex",
             profileSource,

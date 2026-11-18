@@ -116,7 +116,7 @@ internal sealed class ProjectProfileConfigStore(IFileSystem fileSystem) : IProje
         }
 
         List<string> profiles = [];
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (JsonNode? item in profilesArray)
         {
             if (item is not JsonValue profileValue

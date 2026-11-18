@@ -49,7 +49,7 @@ internal sealed class ProjectProfileOptionsSetup(IConfiguration configuration, I
     private static void NormalizeProfiles(ProjectProfileOptions options)
     {
         List<string> profiles = [];
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (string? profile in options.Profiles)
         {
             if (string.IsNullOrWhiteSpace(profile))

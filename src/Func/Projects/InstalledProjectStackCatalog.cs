@@ -61,9 +61,9 @@ internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> st
     {
         ArgumentNullException.ThrowIfNull(stacks);
         List<IProjectStack> installed = [.. stacks];
-        HashSet<string> stackIds = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, string> stackNames = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, string> languageNames = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> stackIds = [with(StringComparer.OrdinalIgnoreCase)];
+        Dictionary<string, string> stackNames = [with(StringComparer.OrdinalIgnoreCase)];
+        Dictionary<string, string> languageNames = [with(StringComparer.OrdinalIgnoreCase)];
 
         foreach (IProjectStack stack in installed)
         {
@@ -89,7 +89,7 @@ internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> st
                 throw new ArgumentException($"Stack '{stack.Stack}' must support at least one language.", nameof(stacks));
             }
 
-            HashSet<string> languages = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> languages = [with(StringComparer.OrdinalIgnoreCase)];
             foreach (string language in stack.SupportedLanguages)
             {
                 ValidateName(language);

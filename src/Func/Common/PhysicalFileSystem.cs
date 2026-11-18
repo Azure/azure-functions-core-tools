@@ -10,8 +10,10 @@ internal sealed class PhysicalFileSystem : IFileSystem
 {
     // ── File operations ─────────────────────────────────────────────────────
 
+    /// <inheritdoc />
     public bool FileExists(string path) => File.Exists(path);
 
+    /// <inheritdoc />
     public async Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -24,6 +26,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
         return await File.ReadAllTextAsync(path, cancellationToken);
     }
 
+    /// <inheritdoc />
     public Stream? OpenReadIfExists(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -48,6 +51,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
         }
     }
 
+    /// <inheritdoc />
     public async Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -68,20 +72,25 @@ internal sealed class PhysicalFileSystem : IFileSystem
         }
     }
 
+    /// <inheritdoc />
     public async Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken)
     {
         await using FileStream file = File.Create(filePath);
         await content.CopyToAsync(file, cancellationToken);
     }
 
+    /// <inheritdoc />
     public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) =>
         File.Move(sourcePath, destinationPath, overwrite);
 
+    /// <inheritdoc />
     public void CopyFile(string sourcePath, string destinationPath) =>
         File.Copy(sourcePath, destinationPath, overwrite: true);
 
+    /// <inheritdoc />
     public void DeleteFile(string path) => File.Delete(path);
 
+    /// <inheritdoc />
     public Task DeleteFileIfExistsAsync(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -96,10 +105,13 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     // ── Directory operations ────────────────────────────────────────────────
 
+    /// <inheritdoc />
     public bool DirectoryExists(string path) => Directory.Exists(path);
 
+    /// <inheritdoc />
     public void CreateDirectory(string path) => Directory.CreateDirectory(path);
 
+    /// <inheritdoc />
     public TempDirectory CreateTempDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -107,6 +119,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
         return new TempDirectory(path, this);
     }
 
+    /// <inheritdoc />
     public TempDirectory CreateTempDirectory(string parentDirectory)
     {
         string path = Path.Combine(parentDirectory, Path.GetRandomFileName());
@@ -114,6 +127,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
         return new TempDirectory(path, this);
     }
 
+    /// <inheritdoc />
     public void CopyDirectory(string sourcePath, string destinationPath)
     {
         DirectoryInfo source = new(sourcePath);
@@ -130,17 +144,25 @@ internal sealed class PhysicalFileSystem : IFileSystem
         }
     }
 
+    /// <inheritdoc />
     public void DeleteDirectory(string path) =>
         Directory.Delete(path, recursive: true);
 
+    /// <inheritdoc />
     public IReadOnlyList<string> GetFiles(string directoryPath) =>
         Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
 
+    /// <inheritdoc />
+    public DateTime GetLastWriteTimeUtc(string path) =>
+        Directory.Exists(path) ? Directory.GetLastWriteTimeUtc(path) : File.GetLastWriteTimeUtc(path);
+
     // ── Archive operations ──────────────────────────────────────────────────
 
+    /// <inheritdoc />
     public void ExtractZip(string zipPath, string destinationDirectory) =>
         ZipFile.ExtractToDirectory(zipPath, destinationDirectory);
 
+    /// <inheritdoc />
     public void ExtractTarGz(string tarGzPath, string destinationDirectory)
     {
         Directory.CreateDirectory(destinationDirectory);
@@ -151,6 +173,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     // ── Hash operations ─────────────────────────────────────────────────────
 
+    /// <inheritdoc />
     public async Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken)
     {
         await using FileStream stream = File.OpenRead(filePath);

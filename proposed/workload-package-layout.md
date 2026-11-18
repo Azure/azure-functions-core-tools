@@ -187,7 +187,7 @@ In layout terms:
 │       ├── <transitive managed dependencies>.dll       # As emitted by `dotnet publish`.
 │       └── runtimes/                                   # OPTIONAL. Present only if a transitive
 │           ├── win-x64/                                # dep ships native or RID-specific managed
-│           │   ├── lib/net10.0/...                     # bits. Workload-private; resolved by the
+│           │   ├── lib/net11.0/...                     # bits. Workload-private; resolved by the
 │           │   └── native/...                          # .NET runtime, not the CLI.
 │           ├── linux-x64/...
 │           └── osx-arm64/...
@@ -944,8 +944,8 @@ A workload is binary-compatible with a CLI when **both** of these hold:
    workload's resolved reference must bind to that version. The
    workload's TFM is recorded in its assembly's
    `TargetFrameworkAttribute` and `.deps.json`; the .NET runtime's
-   standard load rules handle TFM compatibility (a `net10.0`
-   workload runs on a CLI on a `net10.0`-or-newer runtime without
+   standard load rules handle TFM compatibility (a `net11.0`
+   workload runs on a CLI on a `net11.0`-or-newer runtime without
    further intervention).
 2. **Shared frameworks:** the workload may **not** depend on any
    shared framework (`Microsoft.NETCore.App`, `Microsoft.AspNetCore.App`,

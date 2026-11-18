@@ -22,10 +22,10 @@ internal sealed class WorkloadCatalogOptionsSetup(
     ICliVersionProvider cliVersionProvider) : IConfigureOptions<WorkloadCatalogOptions>
 {
     private static readonly HashSet<string> _trueEnvironmentValues =
-        new(StringComparer.OrdinalIgnoreCase) { "1", "true", "t", "y", "yes", "on" };
+        [with(StringComparer.OrdinalIgnoreCase), "1", "true", "t", "y", "yes", "on"];
 
     private static readonly HashSet<string> _falseEnvironmentValues =
-        new(StringComparer.OrdinalIgnoreCase) { "0", "false", "f", "n", "no", "off" };
+        [with(StringComparer.OrdinalIgnoreCase), "0", "false", "f", "n", "no", "off"];
 
     private readonly IProcessEnvironment _processEnvironment = processEnvironment
         ?? throw new ArgumentNullException(nameof(processEnvironment));

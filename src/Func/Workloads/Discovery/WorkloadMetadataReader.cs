@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Workloads.Discovery;
@@ -145,7 +146,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
 
         try
         {
-            metadata.TemplateRoot = WorkloadMetadata.NormalizePackagePath(metadata.TemplateRoot, packageDirectory);
+            metadata.TemplateRoot = Path.NormalizePath(metadata.TemplateRoot, packageDirectory);
         }
         catch (ArgumentException ex)
         {
@@ -190,9 +191,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' declares kind 'rid-pointer' but does not define a non-empty packages map.");
         }
 
-#pragma warning disable IDE0028 // '[with(args)]' is preview
-        HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
-#pragma warning restore IDE0028
+        HashSet<string> runtimeIdentifiers = [with(StringComparer.OrdinalIgnoreCase)];
         foreach ((string runtimeIdentifier, string packageId) in metadata.Packages)
         {
             if (!IsNormalizedRuntimeIdentifier(runtimeIdentifier))
@@ -242,7 +241,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' is missing entryPoint.type.");
         }
 
-        // TODO: Use WorkloadMetadata.NormalizePackagePath for EntryPointSpec.AssemblyPath validation after reviewing the no-'..' contract.
+        // TODO: Use Path.NormalizePath for EntryPointSpec.AssemblyPath validation after reviewing the no-'..' contract.
         // Reject anything that would let a package escape its content root:
         // absolute paths or `..` segments. Defense-in-depth — the loader
         // also checks.

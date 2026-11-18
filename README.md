@@ -104,7 +104,7 @@ The v5 CLI is a ground-up rebuild using:
 - **System.CommandLine 2.0.6** — command parsing (following the dotnet CLI model)
 - **Spectre.Console** — rich terminal output (tables, prompts, spinners)
 - **Dependency Injection** — Microsoft.Extensions.DependencyInjection
-- **.NET 10** — target framework
+- **.NET 11** — target framework
 - **Workload model** — core CLI + optional language workloads (dotnet, node, python, etc.)
 
 ## Project Structure
@@ -140,7 +140,7 @@ Azure.Functions.Cli.slnx   # Solution file
 
 ## Development
 
-**Prerequisites:** .NET 10 SDK (see `global.json` for the exact version)
+**Prerequisites:** .NET 11 SDK (see `global.json` for the exact version)
 
 ### Build
 

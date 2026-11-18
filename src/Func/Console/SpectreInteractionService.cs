@@ -1,8 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Console.Terminal;
+using Azure.Functions.Cli.Console.Theme;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 

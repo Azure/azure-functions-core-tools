@@ -8,7 +8,7 @@ The integration under `src/Func/Templates/Engine` creates command-scoped Templat
 
 The command consumes the catalog through one command-scoped `Templater`. The design keeps command context, candidate filtering, projected `func.host.json` parameter metadata, and invocation within that session. It does not define `func init`.
 
-Microsoft.TemplateEngine 10.0.301 directly supports preview through `TemplateCreator.InstantiateAsync(..., dryRun: true, ...)`. Preview returns creation effects, including file changes and post-actions, without creating the target directory or applying template content.
+Microsoft.TemplateEngine 11.0.100 directly supports preview through `TemplateCreator.InstantiateAsync(..., dryRun: true, ...)`. Preview returns creation effects, including file changes and post-actions, without creating the target directory or applying template content.
 
 ## Goals / Non-Goals
 
