@@ -1,4 +1,4 @@
-> **HISTORICAL constraint proposal, not an implemented command contract.** The previous reader/matcher/evaluator helpers were removed. Functions-specific raw validation and constraint-aware selection belong to a separate increment; the initial .NET/HTTP slice uses constraint-free content. The TODO before cached discovery marks the intended integration boundary. [Templates Architecture](../../README.md) describes the current delegation, cache, and validation flow.
+> **HISTORICAL constraint proposal, not an implemented command contract.** The previous reader/matcher/evaluator helpers were removed. Functions-specific raw validation and constraint-aware selection belong to a separate increment; the initial .NET/HTTP slice uses constraint-free content. [Templates Architecture](../../README.md) describes the current delegation, cache, and validation flow.
 
 ## Why
 

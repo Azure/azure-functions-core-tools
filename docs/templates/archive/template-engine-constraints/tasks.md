@@ -1,4 +1,4 @@
-> **HISTORICAL constraint checklist, not the current implementation backlog.** The previous validator/evaluator helpers were removed. Custom constraints are separate from the initial .NET/HTTP slice; their pre-cache validation boundary is marked in `Templater.ListAsync`. See [Templates Architecture](../../README.md) for current scope and native engine delegation. Original checkboxes are preserved as history, not instructions to recreate those helpers.
+> **HISTORICAL constraint checklist, not the current implementation backlog.** The previous validator/evaluator helpers were removed. Custom constraints are a separate increment from the initial .NET/HTTP slice. See [Templates Architecture](../../README.md) for current scope and native engine delegation. Original checkboxes are preserved as history, not instructions to recreate those helpers.
 
 ## 1. Constraint Types
 

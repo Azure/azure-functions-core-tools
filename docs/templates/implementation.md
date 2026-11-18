@@ -19,9 +19,6 @@ The current CLI includes:
 - Real-engine discovery tests cover persistent cache reuse, source addition/removal, missing roots, active-version replacement, same-version timestamp refresh, native duplicate precedence, and aggregation with a managed provider. The cache persists across commands; the workload source list is cached for each engine instance.
 
 The discovery foundation is not yet integrated with `func init` or `func new`. It does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
-
-The TODO before `Templater.ListAsync` calls `GetTemplatesAsync` marks the separate constraints work's pre-normalization boundary. That work should use engine package enumeration/scanning and mounted declarations, not attempt raw validation on the already-normalized results. No Functions-specific raw validator is implemented by this TODO.
-
 ### Existing initialization limitations
 
 The current `func init` path has known safety limitations: it can create the destination before validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail.
@@ -101,7 +98,7 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 
 - **Discovery and selection:** missing content, native duplicate-identity precedence, and ambiguous aliases between distinct identities. Constraint eligibility and richer variant selection are separate follow-ups; exact selection must not silently substitute another template.
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
-- **Content integrity:** unsupported engine features fail before destination effects; missing or unreadable selected content fails without substituting another template. Qualify concurrent replacement behavior when invocation is added.
+- **Content integrity:** unsupported engine features fail before destination effects; missing or unreadable selected content fails without substituting another template.
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
 - **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that invoking `func new` outside an initialized Functions project fails with actionable guidance to run `func init`, without initializing a project or modifying the destination.
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.

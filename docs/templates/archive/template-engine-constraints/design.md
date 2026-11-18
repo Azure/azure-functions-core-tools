@@ -1,4 +1,4 @@
-> **HISTORICAL constraint design, not current implementation.** The previous declaration/matcher/evaluator helpers were removed. Custom constraints are a separate increment after the initial constraint-free .NET/HTTP slice; `Templater.ListAsync` marks the pre-cache raw validation boundary with a TODO. Native duplicate-identity precedence remains delegated to the engine. See [Templates Architecture](../../README.md) and the [selection and validation flow](../../architecture.md#selection-and-parameters). Preserve the requirements below as historical design evidence, not first-slice prerequisites.
+> **HISTORICAL constraint design, not current implementation.** The previous declaration/matcher/evaluator helpers were removed. Custom constraints are a separate increment after the initial constraint-free .NET/HTTP slice. Native duplicate-identity precedence remains delegated to the engine. See [Templates Architecture](../../README.md) and the [selection and validation flow](../../architecture.md#selection-and-parameters). Preserve the requirements below as historical design evidence, not first-slice prerequisites.
 
 ## Context
 
