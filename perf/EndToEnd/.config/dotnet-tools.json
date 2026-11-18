@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "microsoft.crank.controller": {
+      "version": "0.2.0-alpha.26556.1",
+      "commands": ["crank"]
+    },
+    "microsoft.crank.agent": {
+      "version": "0.2.0-alpha.26556.1",
+      "commands": ["crank-agent"]
+    }
+  }
+}
