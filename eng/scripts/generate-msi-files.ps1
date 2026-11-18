@@ -115,8 +115,36 @@ function New-PlatformMSI {
         # Compile WiX sources
         & { candle -arch $Platform -dPlatform="$Platform" -dSource='.' -dProductVersion="$CliVersion" $masterWxsPath $fragmentPath }
 
-        # Link to create MSI
-        & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
+        # Link to create MSI. ICE validation runs through the Windows Installer service, which crashes
+        # when the caller's environment block exceeds ~32K UTF-16 chars. Pipeline agents can exceed that,
+        # so drop large variables light.exe doesn't need from its environment only.
+        $lightStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+        $lightStartInfo.WorkingDirectory = (Get-Location).Path
+        $lightStartInfo.UseShellExecute = $false
+        foreach ($argument in @('-ext', 'WixUIExtension', '-out', $msiPath, '-sice:ICE61', "$masterWxsName.wixobj", "$fragmentName.wixobj")) {
+            $lightStartInfo.ArgumentList.Add($argument)
+        }
+
+        foreach ($name in @('PIP_INDEX_URL', 'THIRDPARTYBINARIESTOSIGN', 'JAVA_TOOL_OPTIONS', 'NO_PROXY')) {
+            [void]$lightStartInfo.Environment.Remove($name)
+        }
+        $lightEnvSize = ($lightStartInfo.Environment.GetEnumerator() |
+            ForEach-Object { $_.Key.Length + $_.Value.Length + 2 } | Measure-Object -Sum).Sum + 1
+        Write-Host "light.exe environment size: ~$lightEnvSize UTF-16 chars"
+        if ($lightEnvSize -gt 32000) {
+            Write-Warning "light.exe environment is near or above the Windows Installer limit (~32K chars); ICE validation may fail."
+        }
+
+        $lightProcess = [System.Diagnostics.Process]::Start($lightStartInfo)
+        try {
+            $lightProcess.WaitForExit()
+            if ($lightProcess.ExitCode -ne 0) {
+                throw "light.exe exited with code $($lightProcess.ExitCode)."
+            }
+        } finally {
+            $lightProcess.Dispose()
+        }
 
         # Verify MSI was created
         if (-not (Test-Path -Path $msiPath)) {
