@@ -115,9 +115,8 @@ function New-PlatformMSI {
         # Compile WiX sources
         & { candle -arch $Platform -dPlatform="$Platform" -dSource='.' -dProductVersion="$CliVersion" $masterWxsPath $fragmentPath }
 
-        # Link to create MSI. ICE validation runs through the Windows Installer service, which crashes
-        # when the caller's environment block exceeds ~32K UTF-16 chars. Pipeline agents can exceed that,
-        # so drop large variables light.exe doesn't need from its environment only.
+        # Link to create MSI
+        # Prepare to run light.exe with a reduced environment to avoid Windows Installer crashes due to large environment blocks
         $lightStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $lightStartInfo.WorkingDirectory = (Get-Location).Path
@@ -126,6 +125,7 @@ function New-PlatformMSI {
             $lightStartInfo.ArgumentList.Add($argument)
         }
 
+        # Remove large environment variables that light.exe doesn't need
         foreach ($name in @('PIP_INDEX_URL', 'THIRDPARTYBINARIESTOSIGN', 'JAVA_TOOL_OPTIONS', 'NO_PROXY')) {
             [void]$lightStartInfo.Environment.Remove($name)
         }
@@ -136,6 +136,7 @@ function New-PlatformMSI {
             Write-Warning "light.exe environment is near or above the Windows Installer limit (~32K chars); ICE validation may fail."
         }
 
+        # Start light.exe process with the reduced environment size
         $lightProcess = [System.Diagnostics.Process]::Start($lightStartInfo)
         try {
             $lightProcess.WaitForExit()
