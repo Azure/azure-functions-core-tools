@@ -83,7 +83,7 @@ internal static class CliTelemetry
     }
 
     private static readonly HashSet<string> _optOutFalseSentinels =
-        new(StringComparer.OrdinalIgnoreCase) { "no", "n", "0", "false", "off" };
+        [with(StringComparer.OrdinalIgnoreCase), "no", "n", "0", "false", "off"];
 
     /// <summary>
     /// Returns the Azure Monitor connection string when telemetry is

@@ -295,7 +295,7 @@ public class RemoteProfileSourceTests
 
     private sealed class InMemoryProfileFileSystem : IFileSystem
     {
-        public Dictionary<string, string> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Files { get; } = [with(StringComparer.OrdinalIgnoreCase)];
 
         public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
         {

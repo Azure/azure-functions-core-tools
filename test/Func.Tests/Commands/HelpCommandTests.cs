@@ -433,7 +433,7 @@ public class HelpCommandTests
     [Fact]
     public void FindViolations_HiddenCommandHasBlankDescription_ReportsFullCommandPath()
     {
-        RootCommand root = new("Root command.");
+        RootCommand root = [with("Root command.")];
         var command = new Command("internal", string.Empty) { Hidden = true };
         root.Subcommands.Add(command);
         HelpMetadataValidator validator = new();
@@ -446,7 +446,7 @@ public class HelpCommandTests
     [Fact]
     public void FindViolations_OptionHasWhitespaceDescription_ReportsFullOptionPath()
     {
-        RootCommand root = new("Root command.");
+        RootCommand root = [with("Root command.")];
         var command = new Command("deploy", "Deploy the application.");
         command.Options.Add(new Option<bool>("--force") { Description = " " });
         root.Subcommands.Add(command);
@@ -460,7 +460,7 @@ public class HelpCommandTests
     [Fact]
     public void FindViolations_ArgumentHasMultilineDescription_ReportsFullArgumentPath()
     {
-        RootCommand root = new("Root command.");
+        RootCommand root = [with("Root command.")];
         var command = new Command("deploy", "Deploy the application.");
         command.Arguments.Add(new Argument<string>("target") { Description = "First line.\nSecond line." });
         root.Subcommands.Add(command);
@@ -474,7 +474,7 @@ public class HelpCommandTests
     [Fact]
     public void FindViolations_OptionDescriptionHasCarriageReturn_ReportsFullOptionPath()
     {
-        RootCommand root = new("Root command.");
+        RootCommand root = [with("Root command.")];
         var command = new Command("deploy", "Deploy the application.");
         command.Options.Add(new Option<bool>("--force") { Description = "First line.\rSecond line." });
         root.Subcommands.Add(command);

@@ -2,6 +2,7 @@
 
 ## 4.50.0-preview.1
 
+- Retarget the workload assembly to `net11.0` for the .NET 11-based Azure Functions CLI; extension bundle payloads are unchanged.
 - Updated the preview extension bundle payload from 4.42.0 to [4.50.0](https://github.com/Azure/azure-functions-extension-bundles/releases/tag/4.50.0-Preview).
 
 ## 4.8.0-experimental.1

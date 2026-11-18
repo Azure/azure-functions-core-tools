@@ -3,8 +3,8 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 

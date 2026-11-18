@@ -16,7 +16,7 @@ internal sealed class BuiltInProfileRegistryDocument
 
     public DateTimeOffset? GeneratedAt { get; init; }
 
-    public Dictionary<string, ProfileDefinition> Profiles { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, ProfileDefinition> Profiles { get; init; } = [with(StringComparer.OrdinalIgnoreCase)];
 }
 
 /// <summary>

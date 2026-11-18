@@ -82,7 +82,7 @@ internal sealed class InstallationMetadataReader(
             return null;
         }
 
-        HashSet<string> propertyNames = new(StringComparer.Ordinal);
+        HashSet<string> propertyNames = [with(StringComparer.Ordinal)];
         int? schemaVersion = null;
         foreach (JsonProperty property in root.EnumerateObject())
         {

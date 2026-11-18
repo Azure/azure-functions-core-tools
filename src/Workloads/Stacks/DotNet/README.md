@@ -19,7 +19,7 @@ projects are built with the installed `dotnet` SDK when running `func start`
 or `func run`; `--no-build` uses the existing build output. It runs MSBuild's
 `GetTargetPath` target to locate that output without compiling. Successful lookups
 are silent; failed lookups include the captured diagnostics. The CLI and workload
-binaries continue to target .NET 10.
+binaries target .NET 11.
 
 ## 1.0.0-preview.1
 

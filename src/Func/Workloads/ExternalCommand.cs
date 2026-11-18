@@ -42,8 +42,8 @@ internal sealed class ExternalCommand : FuncCliCommand
         Workload = workload;
         Source = source;
 
-        _optionLookup = new Dictionary<FuncCommandOption, Option>(ReferenceEqualityComparer.Instance);
-        _argumentLookup = new Dictionary<FuncCommandArgument, Argument>(ReferenceEqualityComparer.Instance);
+        _optionLookup = [with(ReferenceEqualityComparer.Instance)];
+        _argumentLookup = [with(ReferenceEqualityComparer.Instance)];
 
         AddOptions(source.Options);
         AddArguments(source.Arguments);

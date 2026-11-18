@@ -39,9 +39,9 @@ internal sealed class StartInitializationState
     public string? BundleDownloadPath { get; set; }
 
     // TODO: This should move to host environment variables
-    public Dictionary<string, string> BundleEnvVarsForHost { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> BundleEnvVarsForHost { get; } = [with(StringComparer.Ordinal)];
 
-    public Dictionary<string, string> HostEnvironmentVariables { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> HostEnvironmentVariables { get; } = [with(StringComparer.OrdinalIgnoreCase)];
 
     public IHostEventStream? EventStream { get; set; }
 

@@ -2,6 +2,7 @@
 
 ## 4.0.5489-preview.1
 
+- Retarget the workload assembly to `net11.0` for the .NET 11-based Azure Functions CLI; the PowerShell worker payloads are unchanged.
 - Updated the PowerShell 7.4 worker payload to 4.0.5485 and the PowerShell 7.6 worker payload to 4.0.5489, matching host release 4.1055.100.
 
 ## 4.0.5362-preview.1

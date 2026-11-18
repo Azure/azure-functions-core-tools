@@ -45,7 +45,7 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {
-        Dictionary<string, string> defaults = new(StringComparer.Ordinal);
+        Dictionary<string, string> defaults = [with(StringComparer.Ordinal)];
 
         if (context.Project is { } project)
         {

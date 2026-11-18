@@ -153,7 +153,7 @@ internal sealed class AzureWebJobsStorageClassifier : IAzureWebJobsStorageClassi
 
     private static Dictionary<string, string> Parse(string connectionString)
     {
-        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> result = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (string raw in connectionString.Split(';'))
         {
             string segment = raw.Trim();

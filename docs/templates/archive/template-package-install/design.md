@@ -14,7 +14,7 @@ The implementation has the following relevant surfaces:
 - `Workloads/Catalog/IPackageSourceProvider.cs` already implements the required `--source`, `FUNC_CLI_WORKLOADS_SOURCE`, and nuget.org precedence.
 - `Workloads/Install/WorkloadInstaller.cs` already reads NuGet package types with `NuGet.Packaging`, but its validation is specific to `FuncCliWorkload`.
 
-Microsoft.TemplateEngine 10.0.301 provides a global `IManagedTemplatePackageProvider` through `TemplatePackageManager.GetBuiltInManagedProvider(InstallationScope.Global)`. The provider resolves an `InstallRequest` to exactly one installer, persists package registration in the func hive, and exposes install, update, uninstall, and latest-version operations. Its replacement path removes the old managed package before the installer acquires the replacement, so its native behavior alone does not satisfy the required failure-safe replacement guarantee.
+Microsoft.TemplateEngine 11.0.100 provides a global `IManagedTemplatePackageProvider` through `TemplatePackageManager.GetBuiltInManagedProvider(InstallationScope.Global)`. The provider resolves an `InstallRequest` to exactly one installer, persists package registration in the func hive, and exposes install, update, uninstall, and latest-version operations. Its replacement path removes the old managed package before the installer acquires the replacement, so its native behavior alone does not satisfy the required failure-safe replacement guarantee.
 
 ## Goals / Non-Goals
 

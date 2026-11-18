@@ -16,7 +16,7 @@ internal sealed class LocalSettingsConfigurationProvider(
     public override void Load()
     {
         LocalSettingsSnapshot localSettings = _localSettingsProvider.Get(_projectDirectory);
-        Dictionary<string, string?> data = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> data = [with(StringComparer.OrdinalIgnoreCase)];
 
         if (localSettings.WorkerRuntime is { Length: > 0 } runtime)
         {

@@ -55,7 +55,7 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 
 ## Quick Start
 
-1. Create a class library project under `src/Workloads/<kind>/<Name>/` that targets `net10.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
+1. Create a class library project under `src/Workloads/<kind>/<Name>/` that targets `net11.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
 2. Reference `Azure.Functions.Cli.Abstractions` (with `PrivateAssets=all` and `ExcludeAssets=runtime` so it isn't shipped inside your package)
 3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
 4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
@@ -82,7 +82,7 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Title>Node.js</Title>
     <Description>Azure Functions CLI tooling for Node.js projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>

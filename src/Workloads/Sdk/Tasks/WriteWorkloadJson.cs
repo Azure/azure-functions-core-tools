@@ -54,7 +54,7 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
         Dictionary<string, string>? packages = null;
         if (string.Equals(Kind, "rid-pointer", StringComparison.Ordinal))
         {
-            packages = new(StringComparer.Ordinal);
+            packages = [with(StringComparer.Ordinal)];
             foreach (ITaskItem package in InnerPackages)
             {
                 packages[package.GetMetadata("RuntimeIdentifier")] = package.ItemSpec;
@@ -153,7 +153,7 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
 
     private void ValidateInnerPackages()
     {
-        HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> runtimeIdentifiers = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (ITaskItem package in InnerPackages)
         {
             string runtimeIdentifier = package.GetMetadata("RuntimeIdentifier");

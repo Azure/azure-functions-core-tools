@@ -548,7 +548,7 @@ public class TerminalSessionTests
 
         public TaskCompletionSource Disposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public BlockingCollection<TerminalInputEvent> Input { get; } = new(8);
+        public BlockingCollection<TerminalInputEvent> Input { get; } = [with(8)];
 
         public Exception? ReadFailure { get; init; }
 
