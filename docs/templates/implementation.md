@@ -41,7 +41,7 @@ The next command slice is .NET 10 isolated/C#/HTTP using workload-provided, cons
 
 4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
 
-5. **Connect production content.** Make workload packaging emit `templateRoot` and carry the approved templates in the payload. The existing store, loader, and provider expose them to the engine without a separate managed-package installation. Verify the actual packaged install/update/uninstall path and advance timestamps on same-version reinstalls. Keep the missing-root diagnostic as explicit follow-up. Discovery must not install packages or force a cache rebuild on every command.
+5. **Connect production content.** Make workload packaging emit `templateRoot` and carry the approved templates in the payload. These core templates are versioned and serviced with the workload, so changing one requires a new workload version; see [template versioning](architecture.md#core-and-independently-packaged-template-versioning). The existing store, loader, and provider expose them to the engine without a separate managed-package installation. Verify the actual packaged install/update/uninstall path and advance timestamps on same-version reinstalls. Keep the missing-root diagnostic as explicit follow-up. Discovery must not install packages or force a cache rebuild on every command.
 
 6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 

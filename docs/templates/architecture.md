@@ -99,7 +99,7 @@ Ordinary listing should exclude hidden items while retaining diagnostics for una
 
 ### Versioning and duplicate identities
 
-Package versions, template identities, and cache-format versions are separate concepts. Embedded templates are versioned with their workload. Workload activation chooses the highest RID-compatible runtime version of each package ID before the provider supplies its root; the template engine does not make that workload-version decision.
+Package versions, template identities, and cache-format versions are separate concepts. Core templates are versioned with their workload; see [Core and independently packaged template versioning](#core-and-independently-packaged-template-versioning). Workload activation chooses the highest RID-compatible runtime version of each package ID before the provider supplies its root; the template engine does not make that workload-version decision.
 
 The current integration adds no duplicate-identity rejection or version-resolution pass; it inherits the pinned Microsoft.TemplateEngine behavior described here, which is current engine behavior rather than a permanent CLI v5 product contract. In the pinned engine, providers are ordered by priority and the last scanned template with a given identity wins. The workload provider has default priority 0; the built-in managed provider has priority 1000, so managed templates override workload templates with the same identity. This is not a highest-NuGet-version comparison, and template `precedence` is not used for cache identity deduplication. Distinct templates should have distinct identities; shared identities are intentional overrides. Ambiguous short names among different identities still need command-level selection.
 
@@ -231,11 +231,15 @@ In the proposed flow, `func init` and `func new` create a `Templater` and use th
 
 The existing .NET project-template workflow uses its own `dotnet new` hive, which is separate from workload template roots. Keep current Stack initialization working while package producers migrate content to the format expected by the new engine.
 
-Embedded template changes require a workload release. Standalone packages will be independently versioned; they do not update a workload's embedded payload in place.
+### Core and independently packaged template versioning
+
+Core templates are the basic templates that a Stack workload carries under its `templateRoot`, such as the .NET project template for `func init` and basic .NET item templates, such as HTTP, for `func new`. They are versioned and serviced with that workload and have no separate package version or servicing lifecycle, so updating a core template requires publishing a new workload version.
+
+Additional templates, such as Service Bus, SDK- or service-specific, partner, and quickstart scenarios, or templates that need more frequent updates, can later be delivered as independently versioned template packages: the future standalone packages described below. Once installed, their templates would use the same Microsoft.TemplateEngine discovery and selection path as workload templates, which `func init` and `func new` are intended to consume; commands need no separate path for workload-bundled and independently packaged templates. These packages do not modify a workload's payload, and the native identity precedence described above is not a servicing channel for core templates. Independent packages are not implemented, and this does not change the existing `func quickstart` route.
 
 ### Future standalone template packages
 
-The intended management command family is `func templates`, not the historical `func new install/update/uninstall` proposal. These commands are not implemented in the current workload-only slice.
+The current design direction is a dedicated `func templates` experience for listing, installing, uninstalling, and managing independently packaged templates, rather than the historical `func new install/update/uninstall` proposal. No such commands are implemented. The exact command surface, acquisition flow, search, source and version selection, and update, downgrade, rollback, and other lifecycle semantics remain separate design work.
 
 For a known NuGet package ID, the future CLI command delegates acquisition and lifecycle operations to the engine's built-in managed provider in the same CLI hive. The engine retains and mounts the package archive, discovers its templates, and aggregates them with workload-provided roots. The CLI should not extract standalone packages into the workload store or require a fixed internal template layout.
 
