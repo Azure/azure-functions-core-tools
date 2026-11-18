@@ -2,13 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.FirstRun;
-using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using NSubstitute;
 using Spectre.Console.Rendering;
 
@@ -90,41 +90,6 @@ public sealed class FirstRunCoordinatorTests
     }
 
     [Theory]
-    [InlineData("new", false)]
-    [InlineData("new --list", false)]
-    [InlineData("new --force", false)]
-    [InlineData("new --list --force", false)]
-    [InlineData("new", true)]
-    [InlineData("new --list", true)]
-    public async Task UnavailableNew_SkipsFirstRunAndReturnsFailure(string invocation, bool markerPresent)
-    {
-        _stateStore.GetStateAsync(Arg.Any<CancellationToken>())
-            .Returns(markerPresent ? FirstRunState.MarkerWithoutWorkloads : FirstRunState.NeverPrompted);
-        _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
-            .Returns(new SetupRunResult(0));
-        var root = new FuncRootCommand();
-        root.Subcommands.Add(new NewCommand(_interaction));
-        ParseResult parseResult = root.Parse(invocation);
-        parseResult.Errors.Should().BeEmpty();
-        string commandName = CommandNameResolver.ResolveCommandName(parseResult, root);
-        commandName.Should().Be("new");
-        FirstRunCoordinator coordinator = CreateCoordinator();
-
-        int? firstRunExitCode = await coordinator.EnsureFirstRunPromptedAsync(commandName, parseResult, CancellationToken.None);
-        int exitCode = firstRunExitCode ?? await parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
-
-        exitCode.Should().Be(1);
-        _interaction.Lines.Should().Contain(line =>
-            line.StartsWith("ERROR:", StringComparison.Ordinal)
-            && line.Contains("temporarily unavailable"));
-        _interaction.Lines.Should().NotContain(line => line.Contains("`func setup`"));
-        _interaction.ConfirmCalls.Should().Be(0);
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
-        await _stateStore.DidNotReceiveWithAnyArgs().GetStateAsync(default);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
-    }
-
-    [Theory]
     [InlineData("--help")]
     [InlineData("-h")]
     [InlineData("--version")]
@@ -134,6 +99,21 @@ public sealed class FirstRunCoordinatorTests
         FirstRunCoordinator coordinator = CreateCoordinator();
 
         int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse($"start {token}"), CancellationToken.None);
+
+        result.Should().BeNull();
+        _interaction.ConfirmCalls.Should().Be(0);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+    }
+
+    [Theory]
+    [InlineData("new --non-interactive")]
+    [InlineData("new --list")]
+    [InlineData("new -l")]
+    public async Task SkipsAndDoesNotMark_ForNonPromptingNewInvocations(string invocation)
+    {
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("new", Parse(invocation), CancellationToken.None);
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
@@ -235,6 +215,7 @@ public sealed class FirstRunCoordinatorTests
 
     [Theory]
     [InlineData("init")]
+    [InlineData("new")]
     [InlineData("start")]
     [InlineData("run")]
     [InlineData("quickstart")]
@@ -350,7 +331,8 @@ public sealed class FirstRunCoordinatorTests
         root.Subcommands.Add(new Command("version"));
         root.Subcommands.Add(new Command("start"));
         root.Subcommands.Add(new Command("init"));
-        root.Subcommands.Add(new Command("new"));
+        root.Subcommands.Add(new NewCommand(
+            Substitute.For<IInteractionService>(), Substitute.For<IFunctionsProjectResolver>(), Substitute.For<ITemplaterFactory>()));
         root.Subcommands.Add(new Command("run"));
         root.Subcommands.Add(new Command("quickstart"));
 

@@ -12,14 +12,14 @@ The current CLI includes:
 - `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns `FuncTemplateInfo` values that forward engine metadata, expose the original native `ITemplateInfo` through `.Template`, and hold parsed `func.host.json` in `HostData`. Metadata loading does not add constraint evaluation.
 - `TemplateParameterBinder`: consumes `FuncTemplateInfo.HostData.SymbolInfo` to bind explicitly supplied template options. `FuncCliCommand.AddPathArgument(captureTemplateArguments: true)` retains undeclared tokens for this binding. Defaults and choices remain template-owned.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
-- `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
-- `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
+- `NewCommand` retains the current public argument surface. It requires an initialized project (`.func/config.json`) and directs the user to run `func init` otherwise, then resolves the project and instantiates an installed item template for the project language. `--list` still reports template listing unavailable and returns exit code 1.
+- `FirstRunCoordinator`: for eligible commands, including `func init` and `func new`, setup can complete before the handler and ask the user to rerun. `func new --non-interactive` and `func new --list` / `-l` skip setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
 - Test-only local template installation in isolated hives. Active workloads' declared `templateRoot` directories are exposed through a read-only engine package provider; workload packaging is separate.
 
 `func init` consumes discovery through `Templater.FindProjectTemplateAsync`: a unique project template matching the language is instantiated by `Templater.InstantiateAsync` using its original `.Template`. Without a match, it calls the existing `IProjectInitializer`; adoption and repair also preserve the existing paths. Binding completes before destination creation, config writes, or `--force` cleanup. A template can map to an initializer-declared option through its host aliases, but an explicitly supplied unmapped Stack option is rejected rather than discarded. Built-in command options cannot be reinterpreted, and duplicate option claims are errors.
 
-The engine declines destructive changes unless `--force` is supplied. `func new` remains unintegrated. The CLI does not add custom constraint evaluation or guarded private rendering; the previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
+The engine declines destructive changes unless `--force` is supplied. `func new` calls `Templater.FindItemTemplatesAsync` with the project language and optional `--template` reference (exact identity first, otherwise name or short name), prompts for the template and name when interactive, and calls `Templater.InstantiateAsync` in the project directory. Non-interactive runs need both `--template` and `--name`. Workload packaging does not emit `templateRoot` yet. The CLI does not add custom constraint evaluation or guarded private rendering; the previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 
 ### Existing initialization limitations
 
@@ -31,13 +31,13 @@ Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Comma
 
 ## Next implementation steps
 
-The discovery API now serves `func init`; the following items describe remaining qualification and future integration work, not additional behavior in this increment.
+The discovery API now serves `func init` and `func new`; the following items describe remaining qualification and future integration work, not additional behavior in this increment.
 
 1. **Build on the discovery API.** The factory creates a `Templater` with command context and DI-registered engine components. Discovery returns `FuncTemplateInfo` values in a `TemplateResolutionResult`; project selection and invocation already serve `func init`. Keep the original engine template available through `.Template`, and do not add group or catalog types before they have a consumer.
 
 2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove Stack filtering, exact selection, parameter evaluation, and invocation against selected content. Reuse the host metadata loaded into `FuncTemplateInfo.HostData`. Use multiple metadata variants to expose filtering and ambiguity behavior.
 
-3. **Extend command integration.** Preserve the integrated `func init` project route, adoption/repair, and initializer fallback. A future `func new` item route is separate work.
+3. **Extend command integration.** Preserve the integrated `func init` project route, adoption/repair, and initializer fallback, and the `func new` item route.
 
 4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
 
@@ -45,7 +45,7 @@ The discovery API now serves `func init`; the following items describe remaining
 
 6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
-Guarded publication remains future safety work; the current init integration uses the engine's direct output path.
+Guarded publication remains future safety work; the current init and new integrations use the engine's direct output path.
 
 This order is a delivery plan, not a mandate for a large framework or a complete catalog before the first engine proof.
 

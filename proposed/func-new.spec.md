@@ -4,8 +4,8 @@ Navigation gateway, not a competing specification. Start with [Templates Archite
 
 ## Current behavior
 
-[NewCommand](../src/Func/Commands/NewCommand.cs) retains one positional `[path]`, `--name` / `-n`, `--template` / `-t`, `--force`, `--non-interactive`, `--list` / `-l`, and `--format`, plus inherited/global options. It has no positional template selector, `--path`, `--output` or public dry-run. Its migration handler reports scaffolding and listing unavailable and returns 1 before project file/configuration writes.
+[NewCommand](../src/Func/Commands/NewCommand.cs) retains one positional `[path]`, `--name` / `-n`, `--template` / `-t`, `--force`, `--non-interactive`, `--list` / `-l`, and `--format`, plus inherited/global options. It has no positional template selector, `--path`, `--output` or public dry-run. It requires `.func/config.json` and otherwise directs the user to run `func init`; it never initializes a project. `--list` reports listing unavailable and returns 1.
 
-`func new` skips first-run setup. Its unavailable-command handler returns exit code 1 without running setup.
+`func new` participates in first-run setup like `func init`, except that `--non-interactive`, `--list`, and `-l` skip setup.
 
-The existing [Templater](../src/Func/Templates/Engine/Templater.cs) lists installed templates in a command-scoped session. Command-facing resolution, parameter evaluation, selection and invocation are not wired. Test-only local hive registration is not production registration of workload-delivered templates. Public generation, package lifecycle and grammar changes remain unauthorized; historical specifications and checkboxes are evidence only.
+The existing [Templater](../src/Func/Templates/Engine/Templater.cs) lists installed templates in a command-scoped session, including those exposed from workload `templateRoot` paths. Command-facing resolution and instantiation are wired for `func init` (project template by language, with host metadata binding its options) and `func new` (item templates by project language and an optional identity, name or short-name reference). Workload packaging does not emit `templateRoot` yet. Package lifecycle and grammar changes remain unauthorized; historical specifications and checkboxes are evidence only.

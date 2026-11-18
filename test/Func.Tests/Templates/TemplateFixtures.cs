@@ -99,6 +99,27 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
+    public static string WriteItemPackage(string parentDirectory, string identity, string name, string? language = null)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "item-template");
+        string languageTag = language is null ? string.Empty : $", \"language\": \"{language}\"";
+        WriteTemplate(
+            packageDirectory,
+            $$"""
+            {
+              "identity": "{{identity}}",
+              "name": "{{name}}",
+              "shortName": "func-tests-item",
+              "sourceName": "Function",
+              "defaultName": "Function1",
+              "tags": { "type": "item"{{languageTag}} }
+            }
+            """,
+            ("Function.txt", "Function content"));
+
+        return packageDirectory;
+    }
+
     /// <summary>
     /// Writes a folder package with one project template whose <c>func.host.json</c> names options for its parameters,
     /// and returns its path.
