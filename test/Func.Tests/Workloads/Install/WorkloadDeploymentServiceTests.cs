@@ -19,6 +19,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     private readonly string _root = Directory.CreateTempSubdirectory("workload-lifecycle-").FullName;
     private readonly IWorkloadStore _store = Substitute.For<IWorkloadStore>();
     private readonly IWorkloadMetadataReader _metadataReader = Substitute.For<IWorkloadMetadataReader>();
+    private readonly IWorkloadChangeObserver _observer = Substitute.For<IWorkloadChangeObserver>();
     private readonly IWorkloadPaths _paths;
     private readonly WorkloadDeploymentService _deploymentService;
 
@@ -26,7 +27,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     {
         _paths = new WorkloadPathsOptions(Path.Combine(_root, ".azure-functions"));
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _deploymentService = new WorkloadDeploymentService(_paths, _store, _metadataReader);
+        _deploymentService = new WorkloadDeploymentService(_paths, _store, _metadataReader, [_observer]);
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
@@ -197,7 +198,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task Deployment_ReplacementExtractsAllPayloadExceptNuGetBookkeeping(bool update)
     {
         WorkloadStore store = new(_paths);
-        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
         WorkloadInstallResult installed = await deployment.InstallAsync(
             Package("1.0.0", TemplateMetadata(null)),
             _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
@@ -259,7 +260,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task Deployment_PersistsTemplateRootOnInstallAndReplacement(bool reinstall, string? initialRoot, string? newRoot)
     {
         WorkloadStore store = new(_paths);
-        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
         WorkloadMetadata initialMetadata = TemplateMetadata(initialRoot);
         InspectedWorkloadPackage initial = Package("1.0.0", initialMetadata, includeTemplates: true);
         WorkloadInstallResult installed = await deployment.InstallAsync(
@@ -310,7 +311,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task Deployment_PackageEntryEscapesStaging_LeavesExistingInstallIntact(bool update, string entryPath)
     {
         WorkloadStore store = new(_paths);
-        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
         WorkloadInstallResult installed = await deployment.InstallAsync(
             Package("1.0.0", TemplateMetadata("templates"), includeTemplates: true),
             _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
@@ -340,7 +341,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task Deployment_InvalidTemplateRoot_DoesNotMutateRegistry(bool update)
     {
         WorkloadStore store = new(_paths);
-        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
         InspectedWorkloadPackage initial = Package("1.0.0", TemplateMetadata("templates"));
         WorkloadInstallResult installed = await deployment.InstallAsync(
             initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
@@ -361,7 +362,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task Deployment_ChangedTemplateRootSinceInspection_DoesNotMutateRegistry(bool update)
     {
         WorkloadStore store = new(_paths);
-        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
         WorkloadInstallResult installed = await deployment.InstallAsync(
             Package("1.0.0", TemplateMetadata("templates/original")),
             _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
@@ -384,7 +385,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task InstallAsync_DifferentRegistryTemplateRoot_ReusesInstalledPayload(string? registeredRoot)
     {
         WorkloadStore store = new(_paths);
-        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
         InspectedWorkloadPackage package = Package("1.0.0", TemplateMetadata("templates/current"));
         await deployment.InstallAsync(package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
         await store.SaveWorkloadAsync(new WorkloadEntry
@@ -469,6 +470,97 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         await FluentActions.Awaiting(() => _deploymentService.UninstallAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit))
             .Should().ThrowExactlyAsync<InvalidOperationException>()
             .WithMessage($"Workload '{entry.PackageId}' version '{entry.PackageVersion}' has no package root.");
+    }
+
+    [Fact]
+    public async Task Deployment_InstallReinstallAndUpdate_NotifyObserversForEachChange()
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
+
+        WorkloadInstallResult installed = await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
+        await deployment.UpdateAsync(
+            installed.Entry, Package("2.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null);
+
+        await _observer.Received(3).OnWorkloadsChangedAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Deployment_UninstallAsync_NotifiesObserversOnlyWhenOwnershipIsRemoved()
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
+        WorkloadInstallResult installed = await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        _observer.ClearReceivedCalls();
+
+        bool missingRemoved = await deployment.UninstallAsync("missing.workload", "1.0.0", WorkloadOwnershipKind.Explicit);
+        await _observer.DidNotReceiveWithAnyArgs().OnWorkloadsChangedAsync(default);
+
+        bool removed = await deployment.UninstallAsync(installed.Entry.PackageId, installed.Entry.PackageVersion, WorkloadOwnershipKind.Explicit);
+
+        missingRemoved.Should().BeFalse();
+        removed.Should().BeTrue();
+        await _observer.Received(1).OnWorkloadsChangedAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Deployment_ReusedInstall_DoesNotNotifyObservers()
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
+        await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        _observer.ClearReceivedCalls();
+
+        WorkloadInstallResult result = await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+
+        result.AlreadyInstalled.Should().BeTrue();
+        await _observer.DidNotReceiveWithAnyArgs().OnWorkloadsChangedAsync(default);
+    }
+
+    [Fact]
+    public async Task InstallAsync_CancelledAfterRegistryCommit_StillNotifiesObservers()
+    {
+        using CancellationTokenSource cts = new();
+        _store.SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ =>
+            {
+                cts.Cancel();
+                return Task.CompletedTask;
+            });
+        WorkloadDeploymentService deployment = new(_paths, _store, new WorkloadMetadataReader(), [_observer]);
+
+        WorkloadInstallResult result = await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata(null)), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: cts.Token);
+
+        result.AlreadyInstalled.Should().BeFalse();
+        await _observer.Received(1).OnWorkloadsChangedAsync(Arg.Is<CancellationToken>(token => !token.IsCancellationRequested));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Deployment_FailedReplacement_DoesNotNotifyObservers(bool update)
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader(), [_observer]);
+        WorkloadInstallResult installed = await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata("templates")), _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        _observer.ClearReceivedCalls();
+        InspectedWorkloadPackage invalid = Package("2.0.0", TemplateMetadata("../templates"));
+
+        Func<Task> action = update
+            ? () => deployment.UpdateAsync(installed.Entry, invalid, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null)
+            : () => deployment.InstallAsync(invalid, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+
+        await action.Should().ThrowExactlyAsync<InvalidWorkloadException>();
+        await _observer.DidNotReceiveWithAnyArgs().OnWorkloadsChangedAsync(default);
     }
 
     private WorkloadEntry Entry(string packageId, string version, bool explicitlyInstalled = false,

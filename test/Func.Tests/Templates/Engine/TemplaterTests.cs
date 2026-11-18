@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
@@ -134,6 +136,41 @@ public sealed class TemplaterTests : IDisposable
         TemplateResolutionResult result = await next.ListAsync(CancellationToken.None);
 
         result.Templates.Should().ContainSingle().Which.Name.Should().Be(expectedName);
+    }
+
+    [Fact]
+    public async Task WorkloadTemplateCacheInvalidator_AfterWorkloadChange_NextTemplaterRebuildsStaleCache()
+    {
+        CliConfigurationPathsOptions paths = new(Path.Combine(_root, "home"));
+        string root = TemplateFixtures.WriteItemPackage(_root, "Test.Item", "Original");
+        string metadataPath = Path.Combine(_root, "workload.json");
+        File.WriteAllText(metadataPath, "{}");
+        DateTime timestamp = new(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Directory.SetLastWriteTimeUtc(root, timestamp);
+        File.SetLastWriteTimeUtc(metadataPath, timestamp);
+        var provider = Substitute.For<IWorkloadProvider>();
+        provider.GetRuntimeWorkloads().Returns([CreateWorkload(root)]);
+        string cachePath;
+        using (Templater first = CreateFactoryTemplater(paths, provider))
+        {
+            (await first.ListAsync(CancellationToken.None)).Templates.Should().ContainSingle().Which.Name.Should().Be("Original");
+            cachePath = Path.Combine(first.Settings.Paths.HostVersionSettingsDir, "templatecache.json");
+        }
+
+        TemplateFixtures.WriteItemPackage(_root, "Test.Item", "Updated");
+        Directory.SetLastWriteTimeUtc(root, timestamp);
+        File.SetLastWriteTimeUtc(metadataPath, timestamp);
+        using (Templater stale = CreateFactoryTemplater(paths, provider))
+        {
+            (await stale.ListAsync(CancellationToken.None)).Templates.Should().ContainSingle().Which.Name.Should().Be("Original");
+        }
+
+        WorkloadTemplateCacheInvalidator invalidator = new(paths, new PhysicalFileSystem(), NullLogger<WorkloadTemplateCacheInvalidator>.Instance);
+        await invalidator.OnWorkloadsChangedAsync(CancellationToken.None);
+
+        File.Exists(cachePath).Should().BeFalse();
+        using Templater next = CreateFactoryTemplater(paths, provider);
+        (await next.ListAsync(CancellationToken.None)).Templates.Should().ContainSingle().Which.Name.Should().Be("Updated");
     }
 
     [Fact]
@@ -296,6 +333,14 @@ public sealed class TemplaterTests : IDisposable
         WorkloadTemplateSource source = new(provider, new PhysicalFileSystem());
         WorkloadTemplatePackageProviderFactory factory = new(source);
         return new(Context(), _hive, [new TestTemplateComponent<ITemplatePackageProviderFactory>(factory)]);
+    }
+
+    private Templater CreateFactoryTemplater(CliConfigurationPathsOptions paths, IWorkloadProvider provider)
+    {
+        WorkloadTemplateSource source = new(provider, new PhysicalFileSystem());
+        WorkloadTemplatePackageProviderFactory providerFactory = new(source);
+        TemplaterFactory factory = new(paths, [new TestTemplateComponent<ITemplatePackageProviderFactory>(providerFactory)]);
+        return factory.Create(Context());
     }
 
     private static RuntimeWorkloadInfo CreateWorkload(string templateRoot, string packageId = "Test.Workload.A", string version = "1.0.0")

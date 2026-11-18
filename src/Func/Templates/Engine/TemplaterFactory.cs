@@ -17,7 +17,7 @@ internal sealed class TemplaterFactory(
     /// Sub-directory (under the func home) that holds the engine's settings,
     /// installed template packages, and caches.
     /// </summary>
-    private const string SettingsDirectoryName = "templates";
+    internal const string SettingsDirectoryName = "templates";
 
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths
         ?? throw new ArgumentNullException(nameof(configurationPaths));

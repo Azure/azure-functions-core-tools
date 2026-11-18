@@ -10,13 +10,16 @@ using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workloads.Install;
 
-internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadStore store, IWorkloadMetadataReader metadataReader)
+internal sealed class WorkloadDeploymentService(
+    IWorkloadPaths paths, IWorkloadStore store, IWorkloadMetadataReader metadataReader, IEnumerable<IWorkloadChangeObserver> changeObservers)
     : IWorkloadDeploymentService
 {
     private readonly IWorkloadPaths _paths = paths ?? throw new ArgumentNullException(nameof(paths));
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IWorkloadMetadataReader _metadataReader =
         metadataReader ?? throw new ArgumentNullException(nameof(metadataReader));
+    private readonly IEnumerable<IWorkloadChangeObserver> _changeObservers =
+        changeObservers ?? throw new ArgumentNullException(nameof(changeObservers));
 
     public async Task<WorkloadEntry> GetUpdateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
@@ -83,6 +86,39 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     public async Task<WorkloadInstallResult> InstallAsync(InspectedWorkloadPackage package, string source, WorkloadOwnershipKind ownership,
         LogicalPackage? logicalPackage, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        WorkloadInstallResult result = await InstallCoreAsync(package, source, ownership, logicalPackage, force, progress, cancellationToken);
+        if (!result.AlreadyInstalled)
+        {
+            await NotifyWorkloadsChangedAsync();
+        }
+
+        return result;
+    }
+
+    public async Task<WorkloadEntry> UpdateAsync(WorkloadEntry currentEntry, InspectedWorkloadPackage package, string source,
+        WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, IProgress<WorkloadInstallProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        WorkloadEntry entry = await UpdateCoreAsync(currentEntry, package, source, ownership, logicalPackage, progress, cancellationToken);
+        await NotifyWorkloadsChangedAsync();
+        return entry;
+    }
+
+    public async Task<bool> UninstallAsync(string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+    {
+        bool uninstalled = await UninstallCoreAsync(packageId, version, ownership, cancellationToken);
+        if (uninstalled)
+        {
+            await NotifyWorkloadsChangedAsync();
+        }
+
+        return uninstalled;
+    }
+
+    private async Task<WorkloadInstallResult> InstallCoreAsync(InspectedWorkloadPackage package, string source, WorkloadOwnershipKind ownership,
+        LogicalPackage? logicalPackage, bool force, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(package);
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
@@ -158,9 +194,9 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    public async Task<WorkloadEntry> UpdateAsync(WorkloadEntry currentEntry, InspectedWorkloadPackage package, string source,
-        WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, IProgress<WorkloadInstallProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+    private async Task<WorkloadEntry> UpdateCoreAsync(WorkloadEntry currentEntry, InspectedWorkloadPackage package, string source,
+        WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, IProgress<WorkloadInstallProgress>? progress,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(currentEntry);
         ArgumentNullException.ThrowIfNull(package);
@@ -212,8 +248,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    public async Task<bool> UninstallAsync(string packageId, string version,
-        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+    private async Task<bool> UninstallCoreAsync(string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -274,7 +310,23 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
 
         currentLogicalOwner ??= ResolveCurrentLogicalOwner(installed, WorkloadOwnershipKind.Logical, logicalPackage);
-        return await AttachOwnershipAsync(existing, WorkloadOwnershipKind.Logical, logicalPackage, currentLogicalOwner, cancellationToken);
+        WorkloadInstallResult result = await AttachOwnershipAsync(existing, WorkloadOwnershipKind.Logical, logicalPackage, currentLogicalOwner, cancellationToken);
+        if (!result.AlreadyInstalled)
+        {
+            await NotifyWorkloadsChangedAsync();
+        }
+
+        return result;
+    }
+
+    private async Task NotifyWorkloadsChangedAsync()
+    {
+        // The registry change is already committed; a late cancellation must not leave observers such as
+        // the template cache stale.
+        foreach (IWorkloadChangeObserver observer in _changeObservers)
+        {
+            await observer.OnWorkloadsChangedAsync(CancellationToken.None);
+        }
     }
 
     private async Task<WorkloadInstallResult> AttachOwnershipAsync(WorkloadEntry existing, WorkloadOwnershipKind ownership,

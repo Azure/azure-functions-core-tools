@@ -96,7 +96,7 @@ public abstract class WorkloadInstallerTestBase : IDisposable
         WorkloadPackageInspector inspector = new(reader, selector);
         WorkloadPackageSource packageSource =
             new(_catalog, inspector, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
-        WorkloadDeploymentService deploymentService = new(_paths, _store, reader);
+        WorkloadDeploymentService deploymentService = new(_paths, _store, reader, []);
         IWorkloadPackageTrust trust = packageTrust ?? Substitute.For<IWorkloadPackageTrust>();
         if (packageTrust is null)
         {
