@@ -82,6 +82,28 @@ jobs:
         -cliVersion "$(Build.BuildNumber)"
       displayName: 'Generate MSI files'
 
+    # TEMPORARY DIAGNOSTIC: compare light.exe ICE validation across environment variations.
+    - pwsh: >
+        ./eng/scripts/diagnose-msi-environment.ps1
+        -WorkingDirectory "$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}"
+        -Platform "${{ replace(parameters.runtime, 'win-', '') }}"
+        -OutputDirectory "$(Agent.TempDirectory)/msi-env-matrix"
+        -AttemptTimeoutMinutes 10
+        -MaxExperimentMinutes 70
+      displayName: 'Diagnose MSI environment matrix'
+      condition: always()
+      continueOnError: true
+      timeoutInMinutes: 80
+
+    # TEMPORARY DIAGNOSTIC: collect Application Error, WER, and dump analysis for msiexec.exe.
+    - pwsh: >
+        ./eng/scripts/collect-msi-crash-diagnostics.ps1
+        -DumpDirectory "$(Agent.TempDirectory)/msi-env-matrix/dumps"
+      displayName: 'Collect msiexec crash diagnostics'
+      condition: always()
+      continueOnError: true
+      timeoutInMinutes: 20
+
     - template: /eng/ci/templates/official/steps/sign-msi.yml@self
       parameters:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
