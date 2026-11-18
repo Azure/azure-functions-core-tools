@@ -24,16 +24,16 @@ internal sealed class FunctionsProjectResolver(IEnumerable<WorkloadProjectFactor
             cancellationToken.ThrowIfCancellationRequested();
 
             ProjectCreationResult result = await registration.Factory.TryCreateProjectAsync(creationContext, cancellationToken);
-            switch (result)
+            ProjectResolutionResult? resolution = result switch
             {
-                case ProjectCreationResult.Created created:
-                    return ProjectResolutionResults.Resolved(created.Project, created.Reason);
+                ProjectCreationResult.Created created => ProjectResolutionResults.Resolved(created.Project, created.Reason),
+                ProjectCreationResult.Failed failed => ProjectResolutionResults.NotResolved(failed.Failure.Message, failed.Failure),
+                ProjectCreationResult.NotCreated or null => null,
+            };
 
-                case ProjectCreationResult.Failed failed:
-                    return ProjectResolutionResults.NotResolved(failed.Failure.Message, failed.Failure);
-
-                case ProjectCreationResult.NotCreated:
-                    continue;
+            if (resolution is not null)
+            {
+                return resolution;
             }
         }
 

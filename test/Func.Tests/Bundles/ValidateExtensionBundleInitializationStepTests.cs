@@ -153,6 +153,24 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
     }
 
     [Fact]
+    public async Task BundleDeclared_ResolverReturnsNotResolved_ThrowsUserError()
+    {
+        WriteHostJson(new { extensionBundle = new { id = "Microsoft.Azure.Functions.ExtensionBundle", version = "[4.*, 5.0.0)" } });
+
+        IExtensionBundleResolver resolver = Substitute.For<IExtensionBundleResolver>();
+        resolver.ResolveAsync(Arg.Any<ExtensionBundleProjectContext>(), Arg.Any<CancellationToken>())
+            .Returns(new ExtensionBundleResolution.NotResolved("CUSTOM-RESOLVER-MESSAGE"));
+
+        ValidateExtensionBundleInitializationStep step = NewStep(resolver);
+        StartInitializationStepContext context = NewContext();
+
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Be("CUSTOM-RESOLVER-MESSAGE");
+        ex.IsUserError.Should().BeTrue();
+        context.State.BundleEnvVarsForHost.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task BundleDeclared_UsesResolvedProjectDirectoryForHostJson()
     {
         string optionsDirectory = Path.Combine(_projectDir, "options");

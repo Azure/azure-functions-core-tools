@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Result of a workload attempting to create a Functions project.
 /// </summary>
-public abstract record ProjectCreationResult
+public closed record ProjectCreationResult
 {
     private ProjectCreationResult()
     {

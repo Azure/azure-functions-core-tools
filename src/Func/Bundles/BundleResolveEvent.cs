@@ -52,7 +52,9 @@ internal static class BundleResolveEventFactory
             ExtensionBundleResolution.NoCompatibleInstall => new BundleResolveEvent(
                 context.BundleId, constraintRange, null, BundleResolveReason.NoCompatibleInstall, context.ProfileName, durationMs),
 
-            _ => throw new InvalidOperationException($"Unknown resolution variant: {resolution.GetType().Name}"),
+            // ExtensionBundleResolver never produces NotResolved; this factory only records that resolver's outcomes.
+            ExtensionBundleResolution.NotResolved => throw new InvalidOperationException(
+                $"{nameof(ExtensionBundleResolution.NotResolved)} has no bundle.resolve telemetry reason."),
         };
     }
 }

@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Workers;
 /// <summary>
 /// Result of resolving a Functions worker runtime.
 /// </summary>
-public abstract record FunctionsWorkerResolutionResult
+public closed record FunctionsWorkerResolutionResult
 {
     private FunctionsWorkerResolutionResult()
     {

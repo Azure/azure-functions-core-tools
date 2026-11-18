@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Workers;
 /// <summary>
 /// Describes why a Functions worker runtime could not be resolved.
 /// </summary>
-public abstract record FunctionsWorkerResolutionFailure
+public closed record FunctionsWorkerResolutionFailure
 {
     private FunctionsWorkerResolutionFailure(string message)
     {
