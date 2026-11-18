@@ -124,7 +124,7 @@ function New-PlatformMSI {
 
         # Reduce only the linker's environment for the ICE validation test.
         $lightStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
-        $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop).Source
+        $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $lightStartInfo.WorkingDirectory = (Get-Location).Path
         $lightStartInfo.UseShellExecute = $false
         foreach ($argument in @('-ext', 'WixUIExtension', '-out', $msiPath, '-sice:ICE61', "$masterWxsName.wixobj", "$fragmentName.wixobj")) {
