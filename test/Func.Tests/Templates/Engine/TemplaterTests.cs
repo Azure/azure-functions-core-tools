@@ -47,7 +47,6 @@ public sealed class TemplaterTests : IDisposable
             TemplateFixtures.OtherTypeTemplateIdentity,
             TemplateFixtures.UntypedTemplateIdentity,
         ]);
-        result.Templates.Should().AllSatisfy(template => template.Template.Identity.Should().Be(template.Identity));
     }
 
     [Fact]

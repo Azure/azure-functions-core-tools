@@ -9,12 +9,13 @@ This document describes the existing CLI v5 infrastructure, what remains to be i
 The current CLI includes:
 
 - `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, an isolated CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`. The factory passes DI-registered `ITemplateComponent` instances directly to the host; no separate engine-session abstraction is used.
-- `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata and retain the original engine template. `HostConfigPlace` is available, but its file is not read yet.
+- `TemplateResolutionResult`: discovery returns the engine's `ITemplateInfo` values unchanged, so `HostConfigPlace` and optional engine interfaces stay available. The `HostConfigPlace` file is not read yet.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
-- Test-only local template registration in isolated hives. Workload installation does not yet register its template folders in the CLI template hive.
+- Workload template roots: a workload can declare an optional `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, the loader resolves it for active runtime workloads, and `WorkloadTemplatePackageProviderFactory` exposes the roots to the engine as read-only template packages. Workload packaging does not emit `templateRoot` yet, and installs that predate it need a reinstall.
+- Test-only local template installation in isolated hives.
 
 The discovery foundation is not yet integrated with `func init` or `func new`. It does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 
@@ -30,7 +31,7 @@ Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Comma
 
 The first increment provides an internal installed-template discovery API, but it is not exposed through CLI commands. Add the remaining behavior in small steps.
 
-1. **Build on the discovery API.** The factory creates a `Templater` with command context and DI-registered engine components. It lists installed templates as `FuncTemplateInfo` values in a `TemplateResolutionResult`. Add selection and invocation APIs when a command needs them. Keep the original engine template available for later use, and do not add group or catalog types before they have a consumer.
+1. **Build on the discovery API.** The factory creates a `Templater` with command context and DI-registered engine components. It lists installed templates as the engine's `ITemplateInfo` values in a `TemplateResolutionResult`. Add selection and invocation APIs when a command needs them, and do not add group, catalog, or wrapper types before they have a consumer.
 
 2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove Stack filtering, exact selection, parameter evaluation, and invocation against selected content. If a command needs func-specific metadata, read it through `HostConfigPlace`. Use multiple metadata variants to expose filtering and ambiguity behavior.
 
@@ -38,7 +39,7 @@ The first increment provides an internal installed-template discovery API, but i
 
 4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
 
-5. **Connect production content.** Once template content owners and workload owners confirm the template folder layout, make workload install register its template folders with Microsoft.TemplateEngine in the CLI hive, and make uninstall and update remove or replace them. After integration, `func init` and `func new` use those registrations and the engine's cache without registering content themselves. Verify cache invalidation, and do not make discovery install packages or force a full cache rebuild on every command.
+5. **Connect production content.** Once template content owners and workload owners confirm the template folder layout, make workload packaging emit `templateRoot` and carry the templates in the package payload. The existing store, loader, and provider then expose them to the engine, and install, update, and uninstall need no registration step. `func init` and `func new` use the roots through the `Templater`. Verify that a reinstalled or updated workload is rescanned, report a declared root that is missing instead of listing nothing, and do not make discovery install packages or force a full cache rebuild on every command.
 
 6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
@@ -70,10 +71,10 @@ Keep the distinction between the language Stack and the Azure Functions Runtime.
 | Command-facing API, group/variant and alias behavior | Freezing signatures and public selection behavior |
 | Microsoft.TemplateEngine parameter and selected-content APIs | Claiming supported evaluation and exact invocation |
 | Representative real project and item content | Completing the first useful end-to-end proof |
-| Workload template folder layout and install-time registration | Making templates available through installed workloads |
+| Workload template folder layout and `templateRoot` packaging | Making templates available through installed workloads |
 | Supported Stack scope, platform policy, and force behavior | Public activation and release acceptance |
 
-Engine work with isolated representative content does not need to wait for the entire production catalog. A public template-backed journey does need approved content and production registration.
+Engine work with isolated representative content does not need to wait for the entire production catalog. A public template-backed journey does need approved content and production packaging.
 
 ## Tests and acceptance
 
@@ -95,15 +96,15 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 
 - **Discovery and selection:** missing content, multiple metadata variants, ambiguous aliases, ineligible exact IDs, duplicate identities, unavailable constraints, and no sibling substitution.
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
-- **Content integrity:** changed or missing configuration/assets between selection and invocation; rendering from the verified selected content; unsupported engine features fail before destination effects.
+- **Content integrity:** unsupported engine features fail before destination effects, and a workload removed or replaced during a command fails the command without substituting another template.
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
 - **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that invoking `func new` outside an initialized Functions project fails with actionable guidance to run `func init`, without initializing a project or modifying the destination.
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
-- **Packaging:** isolated test registration versus real workload registration; registration on install, removal on uninstall, and replacement on update; repeated registration of the same version; missing or unreadable registered folders; cache refresh after a folder changes.
+- **Packaging:** isolated test installation versus a packaged workload that declares `templateRoot`; templates follow the active workload entry through install, update, and uninstall; a missing or unreadable declared root; a reinstalled workload that reuses its version is rescanned.
 
 ## Qualification and limitations
 
-Static source and tests do not prove the published engine works end to end. Runtime qualification is still required for Microsoft.TemplateEngine parameter and mount behavior, selected-content integrity, actual Host discovery, filesystem operations across supported OS/RIDs, package acquisition/registration, and supported Stack coverage.
+Static source and tests do not prove the published engine works end to end. Runtime qualification is still required for Microsoft.TemplateEngine parameter and mount behavior, actual Host discovery, filesystem operations across supported OS/RIDs, workload packaging, and supported Stack coverage.
 
 Keep current initializers and the separate Quickstart route until their replacement or migration is explicitly in scope and validated. Package install/update/uninstall/search, producer pipeline expansion, template-first or multi-project Quickstart UX, general template actions, and physical engine extraction are outside this initial increment.
 
