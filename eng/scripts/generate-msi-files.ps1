@@ -115,10 +115,15 @@ function New-PlatformMSI {
         # Compile WiX sources
         & { candle -arch $Platform -dPlatform="$Platform" -dSource='.' -dProductVersion="$CliVersion" $masterWxsPath $fragmentPath }
 
+        # Report environment sizes without logging variable values.
+        $envVars = Get-ChildItem env:
+        $envSize = ($envVars | ForEach-Object { $_.Name.Length + $_.Value.Length + 2 } | Measure-Object -Sum).Sum + 1
+        Write-Host "Environment: $($envVars.Count) vars, ~$envSize UTF-16 code units (~$($envSize * 2) bytes)"
+        $envVars | Sort-Object { $_.Value.Length } -Descending | Select-Object -First 10 |
+            ForEach-Object { Write-Host "  $($_.Name): $($_.Value.Length) chars" }
+
         # Link to create MSI
-        # TEMPORARY: -sval skips ICE validation because the current 1es-windows-2022 image (518.0.0)
-        # cannot access the Windows Installer service. Remove once the image is fixed.
-        & { light -ext "WixUIExtension" -sval -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
+        & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
 
         # Verify MSI was created
         if (-not (Test-Path -Path $msiPath)) {
