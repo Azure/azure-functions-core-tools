@@ -1,5 +1,5 @@
 # template-package-install
 
-> **DEFERRED historical lifecycle proposal.** `func new install/update/uninstall` are not current commands or first-slice prerequisites. Production registration of workload-delivered local content is a separate unresolved installer/setup step. Start with [Templates Architecture](../../README.md).
+> **DEFERRED historical lifecycle proposal.** The old `func new install/update/uninstall` command family is superseded by the future `func templates` direction. Workload roots already feed the engine through a read-only provider using the persistent CLI hive; workload packaging is still pending. Standalone acquisition will use the engine's managed provider in that same hive. Start with [Templates Architecture](../../README.md).
 
-Define template package installation through func new and its boundary with workload installation.
+Preserve the earlier lifecycle research; the current workload-only slice does not implement standalone template management.

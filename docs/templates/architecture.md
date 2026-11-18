@@ -8,9 +8,11 @@ The proposed Template Engine is intended to let `func init` create a Functions p
 
 The initial goal is a working local journey: `func init` creates a valid project; `func new` adds a parameterized function; the Functions Host discovers that function. A small set of representative templates can establish this integration before the complete template catalog is migrated. This is not, by itself, release qualification.
 
+The first slice is .NET 10 isolated, C#, and HTTP, with project and item templates supplied by the workload. Timer, other Stacks, custom constraints, standalone package management, and remote search follow separately. Language and template kind select the initial templates using the default programming model.
+
 ## Current foundation
 
-The current code provides a command-scoped `Templater` with an isolated settings hive. `Templater.ListAsync` returns the engine's `ITemplateInfo` values in a `TemplateResolutionResult`, so optional engine interfaces and `HostConfigPlace` stay available to callers.
+The current code provides a command-scoped `Templater` using the persistent CLI template hive under `<CLI home>/templates`. `Templater.ListAsync` returns the engine's `ITemplateInfo` values in a `TemplateResolutionResult`, so optional engine interfaces and `HostConfigPlace` stay available to callers.
 
 Neither `func init` nor `func new` uses this discovery API yet. A workload can declare a `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, and a workload template package provider exposes active runtime workloads' roots without installing them in the CLI hive. Workload packaging does not emit `templateRoot` yet. The current foundation does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The rest of this document describes proposed work beyond discovery.
 
@@ -52,21 +54,60 @@ Template invocation and its temporary rendering resources are not implemented. D
 
 These are responsibilities and useful object-model concepts, not a requirement to introduce a public class or interface for each row. Reuse existing types where they fit. The proposed group, resolution, request, and result shapes inform the command-facing API; their exact signatures still need agreement against concrete command calls.
 
-**Terminology:** A *Stack* is an Azure Functions language stack, such as Node.js or Python. *Runtime* means the Azure Functions application/Functions Host runtime, not a language worker. A `hive` is an isolated scope of installed templates. There is one component named **Template Engine**; the previous unshipped implementation is not the design to reproduce.
+**Terminology:** A *Stack* is an Azure Functions language stack, such as Node.js or Python. *Runtime* means the Azure Functions application/Functions Host runtime, not a language worker. A `hive` is the engine's isolated persistent settings, managed-package state, and cache location; it is not necessarily where a provider's template payload lives. Core Tools v4 refers to the legacy CLI; CLI v5 is the new implementation. There is one component named **Template Engine**; the previous unshipped implementation is not the design to reproduce.
 
-## Installed templates and discovery
+## Installed sources, hive, and cache
 
 `Templater.ListAsync` currently lists the templates found in the roots that active workloads declare, plus any packages installed in the isolated CLI hive. The API does not provide template registration or installation, and no CLI command uses it yet.
 
-In the proposed flow, `func init` and `func new` create a `Templater` and read the workload roots through it. The CLI loads the active workload inventory at startup, and each root carries a `LastChangeTime`: the later of the template directory and `workload.json` write times. Microsoft.TemplateEngine uses that timestamp as its rescan signal, including for same-version reinstalls when the timestamp changes. A workload that is no longer active contributes no root, and a root whose directory is missing is skipped.
+`TemplaterFactory` uses `<CLI home>/templates` for `EngineEnvironmentSettings`. Microsoft.TemplateEngine stores `templatecache.json` under its host-version settings directory inside that hive. Its managed provider also keeps installed-package state in the hive. Workload payloads remain in the workload store; exposing them through a read-only provider still uses the same engine and hive. There is no second CLI-owned template inventory or cache.
 
-The provider does not watch for changes during a command. These timestamps are not content hashes and do not detect every in-place edit. End-to-end cache removal after a root disappears and cache refresh after reinstall still need qualification; listing alone does not establish that cached content is usable.
+### Cache lifetime and invalidation
+
+The engine manager and its in-memory source/cache state live for the command-scoped `Templater`. The on-disk cache survives process exit. On `GetTemplatesAsync`, the engine compares the supplied mount paths and timestamps with the cache:
+
+- Added or removed mount paths rebuild the cache, including removal of stale entries for sources no longer supplied.
+- A `LastChangeTime` strictly newer than the cached timestamp rebuilds it. Equal or older timestamps do not.
+- Missing/unreadable cache data, an incompatible cache format, or a changed UI locale also cause a rebuild.
+- Otherwise, the engine reuses the cache rather than scanning every template again.
+
+The CLI loads the active workload inventory at startup. `WorkloadTemplateSource` supplies existing declared roots, with `LastChangeTime` equal to the later of the root-directory and `workload.json` write times. After workload install, update, or uninstall, the next CLI process supplies the new inventory; the engine refreshes lazily when discovery next runs. The workload installer does not eagerly rebuild the template cache.
+
+The workload provider does not watch for mutations during an existing command. Its source list is cached by the engine manager. Same-version reinstalls require an advanced timestamp; arbitrary nested-file edits without that signal are not detected. These timestamps are not content hashes or locks. Missing roots are omitted, so a new command drops their cached entries, although the missing-root diagnostic is still pending.
+
+`TemplaterTests` exercises the real engine with isolated persistent hives and the workload provider: source addition/removal, a deleted root, active-version replacement with the old payload retained, unchanged-timestamp reuse, and same-version refresh through a newer manifest timestamp. This qualifies discovery across fresh engine instances, not concurrent filesystem mutation during rendering.
+
+### Delegation to Microsoft.TemplateEngine
+
+| Responsibility | Owner |
+| --- | --- |
+| Workload acquisition, extraction, ownership, active-version selection, and declared roots | CLI workload infrastructure |
+| Mount folders/archives, find template definitions, parse native template metadata, build/reuse the local cache, and normalize duplicate identities | Microsoft.TemplateEngine |
+| Native filtering, parameter evaluation, and instantiation APIs | Microsoft.TemplateEngine; command integration is still pending |
+| Project/Stack context, supported command behavior, prompts, errors, destination permissions, and explicitly supported follow-up work | CLI commands and services |
+| Future standalone NuGet template acquisition, managed-package state, update/uninstall, and archive mounting | Microsoft.TemplateEngine's managed provider, called by future CLI management commands |
+| Functions-specific raw constraint validation and eligibility | Separate constraints work using engine mounts/components; not implemented by cached listing |
+| Remote package search index and search UX | Separate Functions search/index work, not the local engine cache |
+
+The engine's native scanner validates its template format and filters invalid templates while reporting diagnostics; cached listing is not a fail-closed package-validation API. `WorkloadTemplateSource` checks that declared directories exist; it does not inspect their `template.json` files. There is currently no additional Functions-specific raw declaration validator.
 
 The planned command integration supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
 
 Template producers can develop project and item content independently. Representative local templates with different Stack metadata should exercise discovery, filtering, and selection. Production content arrives through workload packaging, which does not emit `templateRoot` yet: test-only installation in an isolated hive does not prove that a packaged workload exposes its templates.
 
 Ordinary listing should exclude hidden items while retaining diagnostics for unavailable candidates, without imposing creation-only bundle gates. Resolve the explicit project target without introducing upward search, and keep selection within the chosen source/channel scope.
+
+### Versioning and duplicate identities
+
+Package versions, template identities, and cache-format versions are separate concepts. Embedded templates are versioned with their workload. Workload activation chooses the highest RID-compatible runtime version of each package ID before the provider supplies its root; the template engine does not make that workload-version decision.
+
+CLI v5 uses native engine duplicate-identity precedence, not an additional duplicate-ID rejection pass. In the pinned engine, providers are ordered by priority and the last scanned template with a given identity wins. The workload provider has default priority 0; the built-in managed provider has priority 1000, so managed templates override workload templates with the same identity. This is not a highest-NuGet-version comparison, and template `precedence` is not used for cache identity deduplication. Distinct templates should have distinct identities; shared identities are intentional overrides. Ambiguous short names among different identities still need command-level selection.
+
+For future standalone installation by NuGet package ID, the managed provider normally keeps one installed version of that identifier per installer. Installing the same version reports it as already installed; changing versions replaces the previous package rather than supplying a general side-by-side version catalog. Replacement can uninstall the old package before the new install succeeds, so future command UX must not promise transactional rollback.
+
+The native precedence and workload/managed-provider aggregation are covered by isolated engine tests. This does not enable public standalone-package commands or finalize their version/source-selection UX.
+
+The verified engine behavior above comes from Microsoft.TemplateEngine **10.0.301**: [cache refresh](https://github.com/dotnet/templating/blob/v10.0.301/src/Microsoft.TemplateEngine.Edge/Settings/TemplatePackageManager.cs), [identity normalization](https://github.com/dotnet/templating/blob/v10.0.301/src/Microsoft.TemplateEngine.Edge/Settings/TemplateCache.cs), [native scanning](https://github.com/dotnet/templating/blob/v10.0.301/src/Microsoft.TemplateEngine.Edge/Settings/Scanner.cs), and [managed-package lifecycle](https://github.com/dotnet/templating/blob/v10.0.301/src/Microsoft.TemplateEngine.Edge/BuiltInManagedProvider/GlobalSettingsTemplatePackageProvider.cs). Rerun the focused tests when upgrading the engine.
 
 <a id="parameter-evaluation"></a>
 <a id="token-capture"></a>
@@ -81,9 +122,11 @@ Selection and parameter evaluation are not implemented. The proposed design allo
 - Project, Stack, language, template kind, and declared constraints determine eligibility. Invalid or unreadable declarations must not silently become successful selections.
 - A catalog entry describes a candidate. Only the exact resolved candidate within its valid command scope may be invoked.
 
-Group variants only by explicit GroupIdentity; an ungrouped template is an identity-keyed singleton. Within the selected source scope, match full identity before aliases or eligibility filtering. Duplicate applicable full IDs are an error. An alias matching one variant does not widen to its siblings, and matching display names do not establish a family. Preserve established supported IDs and known aliases; changes to alias, case or precedence policy require agreement. A concrete catalog selection stays pinned to its issued candidate; family selection is explicit.
+For richer selection, group variants only by explicit GroupIdentity; an ungrouped template is an identity-keyed singleton. Within the effective engine catalog, match full identity before aliases or eligibility filtering. Duplicate identities have already been resolved by the native precedence described above; cached listing cannot report every original declaration. An alias matching one variant does not widen to its siblings, and matching display names do not establish a family. Preserve established supported IDs and known aliases; changes to alias, case or precedence policy require agreement. A concrete catalog selection stays pinned to its issued candidate; family selection is explicit.
 
-Validate raw mounted template declarations before engine normalization can discard invalid or duplicate requirements. `Templater.ListAsync` returns the engine's normalized results, in which duplicate identities can collapse, so it cannot enforce this on its own. This validation is not part of the discovery foundation; the constraints work decides where the roots are validated. Evaluate engine constraints and func workload/bundle requirements against one captured context. Failed, restricted, unknown or unevaluated required constraints block selection and invocation, including with force. Preserve their diagnostics; unreadable or corrupt installed content is not an empty-success catalog.
+The separate constraints increment must validate raw Functions-specific declarations before relying on normalized/cache results. `Templater.ListAsync` has a TODO immediately before `GetTemplatesAsync` marking this shared boundary. The intended flow is engine package enumeration (`GetTemplatePackagesAsync`), engine scanning/mounting (`Scanner.ScanAsync`, retaining invalid-template diagnostics where available), and reading original declarations through each scan's mount and `ConfigPlace`. Validate the raw constraint JSON there, not the cached `ITemplateInfo.Constraints` projection. This works over workload folders now and managed archives later without a second directory crawler or cache. The TODO is a handoff, not an implemented validator, and does not change native duplicate-identity precedence.
+
+Constraint-aware selection and invocation will evaluate engine constraints and Functions requirements against one captured context. Failed, restricted, unknown or unevaluated required constraints must block those operations, including with force. Preserve diagnostics rather than treating unreadable or corrupt content as an empty successful selection. The initial constraint-free .NET/HTTP slice does not implement that broader contract.
 
 Template-specific options vary by candidate. The CLI must retain the user's original arguments until it can check their syntax against eligible candidates **before choosing the final variant**. An unknown option's value must not accidentally become the project path. For the initial `func new` grammar, an explicit project path belongs before template-specific options; ambiguous ordering produces guidance rather than silently using the current directory.
 
@@ -176,6 +219,8 @@ Do not report planned output as completed changes.
 
 Workloads are the delivery mechanism for templates. A workload declares an optional `templateRoot` in `workload.json`, a path relative to its package root. Installation persists it and extracts the package payload. The loader resolves the root for each active runtime workload, and the workload template package provider hands those roots to Microsoft.TemplateEngine on every command. Microsoft.TemplateEngine keeps mounting, scanning and caching; func adds no parallel implementation.
 
+One declared root can contain multiple project and item templates. The engine discovers them recursively; the CLI does not prescribe per-template subdirectory names or register each definition separately. Workload packaging still needs to emit `templateRoot` and include the approved content.
+
 Workload templates require no CLI-hive installation or removal step. Install, update and uninstall change the workload inventory, and the next command uses the resulting active roots. Because the roots come from the resolved workload store, they do not depend on `FUNC_CLI_HOME` matching `FUNC_CLI_WORKLOADS_HOME`.
 
 A package can have several owners. Removing one owner must not delete the payload while another owner retains it; final-owner removal allows the physical package and its templates to be removed together. Retention and discovery are separate: only the highest RID-compatible runtime version of each package ID is selected for loading, and only successfully loaded workloads contribute roots. Older versions retained for rollback do not contribute templates while inactive.
@@ -186,7 +231,17 @@ In the proposed flow, `func init` and `func new` create a `Templater` and use th
 
 The existing .NET project-template workflow uses its own `dotnet new` hive, which is separate from workload template roots. Keep current Stack initialization working while package producers migrate content to the format expected by the new engine.
 
-How packaging emits `templateRoot`, version and channel rules, and integrity checks still need agreement between the CLI team, template content owners, and workload owners.
+Embedded template changes require a workload release. Standalone packages will be independently versioned; they do not update a workload's embedded payload in place.
+
+### Future standalone template packages
+
+The intended management command family is `func templates`, not the historical `func new install/update/uninstall` proposal. These commands are not implemented in the current workload-only slice.
+
+For a known NuGet package ID, the future CLI command delegates acquisition and lifecycle operations to the engine's built-in managed provider in the same CLI hive. The engine retains and mounts the package archive, discovers its templates, and aggregates them with workload-provided roots. The CLI should not extract standalone packages into the workload store or require a fixed internal template layout.
+
+Managed-provider changes raise `TemplatePackagesChanged`; the engine refreshes its source list and checks/rebuilds the cache on subsequent discovery. Thus both acquisition paths feed one engine catalog, but only the workload installer owns workload payloads. A package can contain multiple templates; one package per authoring repository is the default publishing model, not an engine restriction.
+
+Remote indexing/search answers which packages could be installed. It is separate from the local cache and is not required for installation by known package ID. Functions package-type validation, allowed feeds, source/version UX, and failure handling must be settled before enabling standalone management commands; they are not new infrastructure in this slice.
 
 <a id="normative-authority"></a>
 
@@ -198,9 +253,9 @@ This document defines the proposed initial contract. Archived task lists are not
 | --- | --- |
 | `func new` | Retain item-only scope, explicit `--template`, candidate-specific validation and noninteractive failure. Positional-template syntax, `--path`, `--output`, upward project search and bundle-gated listing are superseded. Public dry-run, lifecycle commands and fallback parameter aliases are deferred. |
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
-| Engine integration | Retain host context, catalog metadata, explicit group identity, func-host aliases, fail-closed eligibility and exact invocation. Projection-driven conditional evaluation and full-ID widening are superseded. General selection frameworks and authored action plumbing are deferred. |
-| Constraints | Raw validation, fail-closed evaluation and selected-content checks are proposed for selection and invocation; they are not implemented in the discovery foundation. Installer/update preflight and producer-specific rules are deferred with those workflows. |
-| Package lifecycle | User-facing template package install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; workload templates reach the engine through the workload template package provider, not through a separate TemplateEngine package installation. |
+| Engine integration | Retain host context, engine metadata, native duplicate precedence, func-host aliases and exact invocation. Blanket duplicate-ID rejection, projection-driven conditional evaluation and full-ID widening are superseded. Richer grouping/selection frameworks and authored action plumbing are deferred. |
+| Constraints | Raw validation and fail-closed evaluation belong to the separate constraints increment, with a pre-cache TODO in `Templater.ListAsync`. They do not block the initial constraint-free .NET/HTTP slice. Installer/update preflight and producer-specific rules are deferred with those workflows. |
+| Package lifecycle | `func templates` management and feed UX are deferred. The old `func new install/update/uninstall` command family is historical. Future standalone packages use the engine's managed provider and the existing hive; workload roots use the read-only workload provider. Replacement safety still needs qualification. |
 | Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 
@@ -209,9 +264,9 @@ The historical research reports `docs/research/historical-design-reconciliation.
 ## Decisions to finish with the team
 
 - **CLI team:** the smallest command-facing API and object shapes; template group/variant selection and alias policy; supported parameter semantics and token handoff.
-- **Template content owners and workload owners:** representative project/item packages, the template folder layout inside a workload and how packaging emits `templateRoot`, versioning, and content integrity.
-- **CLI team and release owners:** initial supported Stack scope, public activation, force-policy changes, and release qualification.
+- **Template content owners and workload owners:** approved project/item content, how workload packaging emits `templateRoot`, and independently published package-type/feed policy. Let the engine discover definitions within each root/archive rather than prescribing their internal layout.
+- **CLI team and release owners:** public activation, force-policy changes, release qualification, and Stack expansion beyond the initial .NET/HTTP slice.
 
-The CLI team and release owners must settle explicit hidden-ID access, profile/no-bundle policy and supported item-Stack scope, including Go, Java and PowerShell. Until approved, these decisions do not change current public behavior or activate unavailable generation.
+Beyond the initial slice, the CLI team and release owners must settle explicit hidden-ID access, profile/no-bundle policy and additional item-Stack scope, including Go, Java and PowerShell. Until approved, these decisions do not change current public behavior or activate unavailable generation.
 
 The first implementation can proceed with representative installed content while these production-content decisions are resolved. Public availability requires the appropriate real content, packaging, and qualification.

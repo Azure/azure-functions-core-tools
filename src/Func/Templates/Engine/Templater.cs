@@ -45,6 +45,9 @@ internal sealed class Templater : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        // TODO: Validate raw func constraints on engine-mounted packages before GetTemplatesAsync.
+        // Use the engine's package enumeration and scanner to locate declarations; cached results
+        // have already collapsed identities and cannot validate the original constraint JSON.
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
         return new([.. templates]);
     }
