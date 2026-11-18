@@ -74,6 +74,20 @@ $msiVersion = $cliVersion -replace '^(\d+\.\d+\.\d+).*$', '$1'
 
 Write-Host "MSI Version: $msiVersion"
 
+# Quotes an argument using Windows command-line rules. ProcessStartInfo.ArgumentList
+# isn't available in Windows PowerShell 5.1, which some pipelines use to run this script.
+function ConvertTo-CommandLineArgument {
+    param([string]$Argument)
+
+    if ($Argument -and $Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    $escaped = $Argument -replace '(\\*)"', '$1$1\"'
+    $escaped = $escaped -replace '(\\+)$', '$1$1'
+    return "`"$escaped`""
+}
+
 # Function to process MSI generation for a platform
 function New-PlatformMSI {
     param(
@@ -121,15 +135,14 @@ function New-PlatformMSI {
         $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $lightStartInfo.WorkingDirectory = (Get-Location).Path
         $lightStartInfo.UseShellExecute = $false
-        foreach ($argument in @('-ext', 'WixUIExtension', '-out', $msiPath, '-sice:ICE61', "$masterWxsName.wixobj", "$fragmentName.wixobj")) {
-            $lightStartInfo.ArgumentList.Add($argument)
-        }
+        $lightArguments = @('-ext', 'WixUIExtension', '-out', $msiPath, '-sice:ICE61', "$masterWxsName.wixobj", "$fragmentName.wixobj")
+        $lightStartInfo.Arguments = ($lightArguments | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join ' '
 
         # Remove large environment variables that light.exe doesn't need
         foreach ($name in @('PIP_INDEX_URL', 'THIRDPARTYBINARIESTOSIGN', 'JAVA_TOOL_OPTIONS', 'NO_PROXY')) {
-            [void]$lightStartInfo.Environment.Remove($name)
+            $lightStartInfo.EnvironmentVariables.Remove($name)
         }
-        $lightEnvSize = ($lightStartInfo.Environment.GetEnumerator() |
+        $lightEnvSize = ($lightStartInfo.EnvironmentVariables.GetEnumerator() |
             ForEach-Object { $_.Key.Length + $_.Value.Length + 2 } | Measure-Object -Sum).Sum + 1
         Write-Host "light.exe environment size: ~$lightEnvSize UTF-16 chars"
         if ($lightEnvSize -gt 32000) {
