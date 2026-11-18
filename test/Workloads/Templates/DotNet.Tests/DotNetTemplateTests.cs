@@ -3,42 +3,19 @@
 
 using System.Text.Json;
 using System.Xml.Linq;
+using Azure.Functions.Cli.TestHelpers.Templates;
 using Microsoft.TemplateEngine.Abstractions;
-using Microsoft.TemplateEngine.Abstractions.Installer;
-using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
-using Microsoft.TemplateEngine.Edge;
-using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Workloads.Templates.DotNet.Tests;
 
-public sealed class DotNetTemplateTests : IDisposable
+public sealed class DotNetTemplateTests : IAsyncLifetime
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "dotnet-templates-" + Guid.NewGuid().ToString("N"));
-    private readonly EngineEnvironmentSettings _settings;
-    private readonly TemplatePackageManager _packages;
+    private readonly TemplateTestHost _host = new(Path.Combine(AppContext.BaseDirectory, "content", "templates"));
 
-    public DotNetTemplateTests()
-    {
-        DefaultTemplateEngineHost host = new(
-            "func", "1.0.0", [],
-            [
-                .. Microsoft.TemplateEngine.Edge.Components.AllComponents,
-                .. Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components.AllComponents,
-            ]);
-        _settings = new(host, settingsLocation: Path.Combine(_root, "hive"));
-        _packages = new(_settings);
-    }
+    public Task InitializeAsync() => Task.CompletedTask;
 
-    public void Dispose()
-    {
-        _packages.Dispose();
-        _settings.Dispose();
-        if (Directory.Exists(_root))
-        {
-            Directory.Delete(_root, recursive: true);
-        }
-    }
+    public Task DisposeAsync() => _host.DisposeAsync().AsTask();
 
     [Theory]
     [InlineData(false, false)]
@@ -156,21 +133,12 @@ public sealed class DotNetTemplateTests : IDisposable
 
     private async Task<ITemplateInfo> GetTemplateAsync(string shortName, string type)
     {
-        string templatesPath = Path.Combine(AppContext.BaseDirectory, "DotNetTemplates");
-        IManagedTemplatePackageProvider provider = _packages.GetBuiltInManagedProvider(InstallationScope.Global);
-        IReadOnlyList<InstallResult> installs = await provider.InstallAsync([new InstallRequest(templatesPath)], CancellationToken.None);
-        installs.Should().ContainSingle().Which.Success.Should().BeTrue();
-        IReadOnlyList<ITemplateInfo> templates = await _packages.GetTemplatesAsync(CancellationToken.None);
-        ITemplateInfo template = templates.Should().ContainSingle(item => item.ShortNameList.Contains(shortName)).Subject;
+        ITemplateInfo template = await _host.GetTemplateAsync(shortName);
         template.TagsCollection["type"].Should().Be(type);
         template.TagsCollection["language"].Should().Be("C#");
         return template;
     }
 
     private Task<ITemplateCreationResult> GenerateAsync(ITemplateInfo template, string name, Dictionary<string, string?> parameters)
-    {
-        TemplateCreator creator = new(_settings);
-        return creator.InstantiateAsync(
-            template, name, name, Path.Combine(_root, "output"), parameters, cancellationToken: CancellationToken.None);
-    }
+        => _host.InstantiateAsync(template, name, parameters);
 }

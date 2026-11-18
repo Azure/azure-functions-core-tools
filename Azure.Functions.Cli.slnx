@@ -37,6 +37,9 @@
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.WithCommand/Workloads.Tests.Fixtures.WithCommand.csproj" />
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
   </Folder>
+  <Folder Name="/test/Helpers/">
+    <Project Path="test/Helpers/Templates/TestHelpers.Templates.csproj" />
+  </Folder>
   <Folder Name="/test/Workloads/">
     <Project Path="test/Workloads/Host.Tests/Workloads.Host.Tests.csproj" />
     <Project Path="test/Workloads/Sdk.Tests/Workloads.Sdk.Tests.csproj" />

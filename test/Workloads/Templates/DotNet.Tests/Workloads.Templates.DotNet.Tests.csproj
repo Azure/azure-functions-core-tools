@@ -5,15 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.TemplateEngine.Edge" />
-    <PackageReference Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="$(SrcRoot)Workloads/Templates/DotNet/*/**/*"
-             Exclude="$(SrcRoot)Workloads/Templates/DotNet/**/bin/**;$(SrcRoot)Workloads/Templates/DotNet/**/obj/**"
-             Link="DotNetTemplates/%(RecursiveDir)%(Filename)%(Extension)"
-             CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="$(TestRoot)Helpers/Templates/TestHelpers.Templates.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
