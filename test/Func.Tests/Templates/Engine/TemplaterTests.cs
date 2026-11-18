@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Settings;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -47,6 +48,7 @@ public sealed class TemplaterTests : IDisposable
             TemplateFixtures.OtherTypeTemplateIdentity,
             TemplateFixtures.UntypedTemplateIdentity,
         ]);
+        result.Templates.Should().AllSatisfy(template => template.Should().BeAssignableTo<ITemplateInfoHostJsonCache>());
     }
 
     [Fact]

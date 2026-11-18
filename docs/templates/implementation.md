@@ -84,7 +84,7 @@ These are acceptance criteria for future integration, not a claim that the end-t
 
 Use a real project template and a parameterized HTTP-function template for one supported Stack:
 
-1. Install both into an isolated CLI hive.
+1. Stage both under a workload `templateRoot` and expose it through the workload provider using an isolated CLI hive. This fixture is not proof of production packaging.
 2. Run `func init` and verify the resulting project with the normal project resolver.
 3. Run `func new` against that project, passing a required parameter.
 4. Verify the generated function uses the supplied parameter.
@@ -96,11 +96,11 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 
 - **Discovery and selection:** missing content, multiple metadata variants, ambiguous aliases, ineligible exact IDs, duplicate identities, unavailable constraints, and no sibling substitution.
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
-- **Content integrity:** unsupported engine features fail before destination effects, and a workload removed or replaced during a command fails the command without substituting another template.
+- **Content integrity:** unsupported engine features fail before destination effects; missing or unreadable selected content fails without substituting another template. Qualify concurrent replacement behavior when invocation is added.
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
 - **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that invoking `func new` outside an initialized Functions project fails with actionable guidance to run `func init`, without initializing a project or modifying the destination.
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
-- **Packaging:** isolated test installation versus a packaged workload that declares `templateRoot`; templates follow the active workload entry through install, update, and uninstall; a missing or unreadable declared root; a reinstalled workload that reuses its version is rescanned.
+- **Packaging and cache:** isolated test installation versus a packaged workload that declares `templateRoot`; templates follow the active workload entry through install, update, and uninstall; removing one owner preserves a still-active shared package; inactive rollback versions are not listed; missing or removed roots leave no stale cached choices; a same-version reinstall with a changed timestamp is rescanned.
 
 ## Qualification and limitations
 

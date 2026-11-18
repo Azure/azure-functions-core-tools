@@ -1,4 +1,4 @@
-> **MIXED historical integration proposal.** The command-scoped factory, host context and installed-template discovery are implemented infrastructure; the session and catalog projection were removed; constraint-aware groups, selection and invocation below are proposed, not wired command behavior. Immutable list-shaped group APIs are not mandatory current signatures. [Templates Architecture](../../README.md) links to Phase 6's proposed authority and owner decisions.
+> **MIXED historical integration proposal.** The command-scoped factory, host context and installed-template discovery are implemented infrastructure. The separate session abstraction and catalog projection were removed; constraint-aware groups, selection and invocation below are proposed, not wired command behavior. Immutable list-shaped group APIs are not mandatory current signatures. [Templates Architecture](../../README.md) links to Phase 6's proposed authority and owner decisions.
 
 ## Why
 

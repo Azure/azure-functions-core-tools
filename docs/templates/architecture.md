@@ -12,7 +12,7 @@ The initial goal is a working local journey: `func init` creates a valid project
 
 The current code provides a command-scoped `Templater` with an isolated settings hive. `Templater.ListAsync` returns the engine's `ITemplateInfo` values in a `TemplateResolutionResult`, so optional engine interfaces and `HostConfigPlace` stay available to callers.
 
-Neither `func init` nor `func new` uses this discovery API yet. A workload can declare a `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, and a workload template package provider hands those roots to the engine on every command, so nothing is registered in the CLI hive. Workload packaging does not emit `templateRoot` yet. The current foundation does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The rest of this document describes proposed work beyond discovery.
+Neither `func init` nor `func new` uses this discovery API yet. A workload can declare a `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, and a workload template package provider exposes active runtime workloads' roots without installing them in the CLI hive. Workload packaging does not emit `templateRoot` yet. The current foundation does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The rest of this document describes proposed work beyond discovery.
 
 <a id="end-to-end-proof"></a>
 
@@ -58,7 +58,9 @@ These are responsibilities and useful object-model concepts, not a requirement t
 
 `Templater.ListAsync` currently lists the templates found in the roots that active workloads declare, plus any packages installed in the isolated CLI hive. The API does not provide template registration or installation, and no CLI command uses it yet.
 
-In the proposed flow, `func init` and `func new` create a `Templater` and read the workload roots through it. Each command reads the roots from the workload store, and each root carries a `LastChangeTime`: the later of the template directory and `workload.json` write times. Microsoft.TemplateEngine uses that time to decide whether to rescan, so an updated or reinstalled workload is picked up even when its version is unchanged. A workload that is no longer active contributes no root, and a root whose directory is missing is skipped.
+In the proposed flow, `func init` and `func new` create a `Templater` and read the workload roots through it. The CLI loads the active workload inventory at startup, and each root carries a `LastChangeTime`: the later of the template directory and `workload.json` write times. Microsoft.TemplateEngine uses that timestamp as its rescan signal, including for same-version reinstalls when the timestamp changes. A workload that is no longer active contributes no root, and a root whose directory is missing is skipped.
+
+The provider does not watch for changes during a command. These timestamps are not content hashes and do not detect every in-place edit. End-to-end cache removal after a root disappears and cache refresh after reinstall still need qualification; listing alone does not establish that cached content is usable.
 
 The planned command integration supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
 
@@ -105,7 +107,7 @@ Rendering and selected-content validation are not implemented. The proposed desi
 
 Before a template can be invoked or its parameters prompted for, validate its configuration, metadata, and assets. Reject unsafe paths, unreadable or unsupported content, and assets that exceed the configured size or expansion limits.
 
-A workload's template root is owned by the workload installer, which is its only writer; the engine and the commands only read it. Rendering reads the selected template from that root directly, so no private snapshot, manifest or second verification pass is taken. If the workload is removed or replaced while a command runs, the command fails; it does not rediscover or substitute another template.
+Workload installation owns the template payload; the engine and template commands only read it. The proposed rendering path reads the selected template from that root directly, without a private source snapshot, content manifest or duplicate verification pass. Missing or unreadable selected content must fail rather than trigger rediscovery or substitution. This ownership model is not a filesystem lock: detecting concurrent in-place replacement is not implemented, and that behavior needs qualification when invocation is added.
 
 The exact Microsoft.TemplateEngine mount and invocation API is still to be qualified. Use the existing engine APIs through the command-scoped `Templater` rather than introducing a second engine or a separate lifecycle framework.
 
@@ -174,7 +176,9 @@ Do not report planned output as completed changes.
 
 Workloads are the delivery mechanism for templates. A workload declares an optional `templateRoot` in `workload.json`, a path relative to its package root. Installation persists it and extracts the package payload. The loader resolves the root for each active runtime workload, and the workload template package provider hands those roots to Microsoft.TemplateEngine on every command. Microsoft.TemplateEngine keeps mounting, scanning and caching; func adds no parallel implementation.
 
-Nothing is registered in a CLI template hive. Install, update and uninstall change which workload entries are active, and the next command sees the new set of roots. Because the roots come from the resolved workload store, they do not depend on `FUNC_CLI_HOME` matching `FUNC_CLI_WORKLOADS_HOME`. A package can have several owners or be kept for rollback: its templates stay available while its entry is in the store and active, and disappear only when the last owner removes the physical package. Only the active version of each package ID contributes a root.
+Workload templates require no CLI-hive installation or removal step. Install, update and uninstall change the workload inventory, and the next command uses the resulting active roots. Because the roots come from the resolved workload store, they do not depend on `FUNC_CLI_HOME` matching `FUNC_CLI_WORKLOADS_HOME`.
+
+A package can have several owners. Removing one owner must not delete the payload while another owner retains it; final-owner removal allows the physical package and its templates to be removed together. Retention and discovery are separate: only the highest RID-compatible runtime version of each package ID is selected for loading, and only successfully loaded workloads contribute roots. Older versions retained for rollback do not contribute templates while inactive.
 
 In the proposed flow, `func init` and `func new` create a `Templater` and use these roots without registering content themselves. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
 
@@ -196,7 +200,7 @@ This document defines the proposed initial contract. Archived task lists are not
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
 | Engine integration | Retain host context, catalog metadata, explicit group identity, func-host aliases, fail-closed eligibility and exact invocation. Projection-driven conditional evaluation and full-ID widening are superseded. General selection frameworks and authored action plumbing are deferred. |
 | Constraints | Raw validation, fail-closed evaluation and selected-content checks are proposed for selection and invocation; they are not implemented in the discovery foundation. Installer/update preflight and producer-specific rules are deferred with those workflows. |
-| Package lifecycle | User-facing template package install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; workload templates reach the engine through the workload template package provider, not through package install. |
+| Package lifecycle | User-facing template package install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; workload templates reach the engine through the workload template package provider, not through a separate TemplateEngine package installation. |
 | Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 
