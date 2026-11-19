@@ -35,7 +35,7 @@
         "projectFileExtensions": ".csproj"
       },
       "manualInstructions": [
-        { "text": "Add Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore version 2.1.1 to your .csproj. Ensure Microsoft.AspNetCore.App is referenced and Program.cs calls ConfigureFunctionsWebApplication()." }
+        { "text": "Ensure the Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore package and Microsoft.AspNetCore.App framework is referenced by your project. Ensure Program.cs calls ConfigureFunctionsWebApplication()." }
       ]
     }
   ]
