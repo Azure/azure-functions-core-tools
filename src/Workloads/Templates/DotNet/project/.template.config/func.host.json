@@ -1,6 +1,6 @@
 {
   "symbolInfo": {
-    "Framework": { "longName": "target-framework" },
+    "Framework": { "longName": "framework" },
     "NoHttp": { "longName": "no-http" },
     "NoTelemetry": { "longName": "no-telemetry" }
   }
