@@ -95,7 +95,7 @@ public class FullScreenDashboardTests
         await terminal.WaitForTextAsync(character.ToString(), timeout.Token);
 
         shutdown.Should().Be(0);
-        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, default);
+        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class FullScreenDashboardTests
         await terminal.SendAndWaitAsync(Interrupt(), timeout.Token);
 
         shutdown.Should().Be(0);
-        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, default);
+        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, TestContext.Current.CancellationToken);
         terminal.Text.Should().Contain("Selection expired");
     }
 
@@ -339,10 +339,11 @@ public class FullScreenDashboardTests
         await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
         try
         {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Task summary = renderer.OnSummaryAsync(
                 new DashboardState().BuildSummary("sigint", DateTimeOffset.UtcNow), CancellationToken.None);
-            (TimeSpan delay, Action expire) = await shutdownDeadline.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            (TimeSpan delay, Action expire) = await shutdownDeadline.Task.WaitAsync(
+                TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             delay.Should().Be(TimeSpan.FromSeconds(2));
             expire();
 
@@ -354,7 +355,7 @@ public class FullScreenDashboardTests
         finally
         {
             release.Set();
-            await returned.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await returned.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
     }
 
@@ -474,7 +475,7 @@ public class FullScreenDashboardTests
         await terminal.WaitForTextAsync("Stopping", timeout.Token);
 
         run.IsCancellationRequested.Should().BeTrue();
-        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, default);
+        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Theory]

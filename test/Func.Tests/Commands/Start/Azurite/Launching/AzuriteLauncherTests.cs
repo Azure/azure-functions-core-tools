@@ -125,7 +125,7 @@ public class AzuriteLauncherTests
         await handle.DisposeAsync();
 
         // Give the OS a moment to reap.
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         IsProcessAlive(pid).Should().BeFalse();
     }
 

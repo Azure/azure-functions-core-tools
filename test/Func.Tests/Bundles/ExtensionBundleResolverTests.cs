@@ -13,7 +13,7 @@ public class ExtensionBundleResolverTests
     public async Task HostJsonRangeOnly_PicksHighestInstalled()
     {
         ExtensionBundleResolution result = await Build([Row("4.10.0"), Row("4.22.0")])
-            .ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
+            .ResolveAsync(Context(host: "[4.0.0, 5.0.0)"), TestContext.Current.CancellationToken);
 
         ExtensionBundleResolution.Resolved resolved = result.Should().BeOfType<ExtensionBundleResolution.Resolved>().Subject;
         resolved.Version.Should().Be("4.22.0");
@@ -25,7 +25,9 @@ public class ExtensionBundleResolverTests
     public async Task HostAndProfile_NonEmptyIntersection_PicksHighestInIntersection()
     {
         ExtensionBundleResolution result = await Build([Row("4.10.0"), Row("4.22.0"), Row("5.1.0")])
-            .ResolveAsync(Context(host: "[4.0.0, 6.0.0)", profile: "[4.15.0, 5.0.0)"));
+            .ResolveAsync(
+                Context(host: "[4.0.0, 6.0.0)", profile: "[4.15.0, 5.0.0)"),
+                TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ExtensionBundleResolution.Resolved>()
             .Which.Version.Should().Be("4.22.0");
@@ -35,7 +37,9 @@ public class ExtensionBundleResolverTests
     public async Task EmptyIntersection_ReturnsEmptyIntersectionVariant()
     {
         ExtensionBundleResolution result = await Build([Row("3.30.0"), Row("4.10.0")])
-            .ResolveAsync(Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"));
+            .ResolveAsync(
+                Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"),
+                TestContext.Current.CancellationToken);
 
         ExtensionBundleResolution.EmptyIntersection empty = result.Should().BeOfType<ExtensionBundleResolution.EmptyIntersection>().Subject;
         empty.HighestVersionSatisfyingHostJsonOnly.Should().Be("3.30.0");
@@ -46,7 +50,7 @@ public class ExtensionBundleResolverTests
     public async Task NoInstalledMatch_ReturnsNoCompatibleInstall()
     {
         ExtensionBundleResolution result = await Build([Row("4.10.0")])
-            .ResolveAsync(Context(host: "[5.0.0, 6.0.0)"));
+            .ResolveAsync(Context(host: "[5.0.0, 6.0.0)"), TestContext.Current.CancellationToken);
 
         ExtensionBundleResolution.NoCompatibleInstall none = result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>().Subject;
         none.Hint.Should().Contain("4.10.0");
@@ -56,7 +60,8 @@ public class ExtensionBundleResolverTests
     [Fact]
     public async Task NoInstalledRows_ReturnsWorkloadMissing()
     {
-        ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
+        ExtensionBundleResolution result = await Build([]).ResolveAsync(
+            Context(host: "[4.0.0, 5.0.0)"), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>()
             .Which.Hint.Should().Contain("func workload install");
@@ -65,7 +70,8 @@ public class ExtensionBundleResolverTests
     [Fact]
     public async Task NoInstalledRows_KnownRuntime_HintIncludesFuncSetup()
     {
-        ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)", workerRuntime: "go"));
+        ExtensionBundleResolution result = await Build([]).ResolveAsync(
+            Context(host: "[4.0.0, 5.0.0)", workerRuntime: "go"), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>()
             .Which.Hint.Should().Contain("func setup --features go");
@@ -75,7 +81,9 @@ public class ExtensionBundleResolverTests
     public async Task NoInstalledMatch_KnownRuntime_HintIncludesFuncSetup()
     {
         ExtensionBundleResolution result = await Build([Row("4.10.0")])
-            .ResolveAsync(Context(host: "[5.0.0, 6.0.0)", workerRuntime: "node"));
+            .ResolveAsync(
+                Context(host: "[5.0.0, 6.0.0)", workerRuntime: "node"),
+                TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>()
             .Which.Hint.Should().Contain("func setup --features node");
@@ -85,7 +93,9 @@ public class ExtensionBundleResolverTests
     public async Task TelemetryReason_IsOkOnResolved()
     {
         var telemetry = new RecordingTelemetry();
-        await Build([Row("4.22.0")], telemetry).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
+        await Build([Row("4.22.0")], telemetry).ResolveAsync(
+            Context(host: "[4.0.0, 5.0.0)"),
+            TestContext.Current.CancellationToken);
 
         BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
         evt.Reason.Should().Be(BundleResolveReason.Ok);
@@ -96,7 +106,7 @@ public class ExtensionBundleResolverTests
     public async Task TelemetryReason_IsWorkloadMissing()
     {
         var telemetry = new RecordingTelemetry();
-        await Build([], telemetry).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
+        await Build([], telemetry).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"), TestContext.Current.CancellationToken);
 
         telemetry.Events.Should().ContainSingle().Which.Reason.Should().Be(BundleResolveReason.WorkloadMissing);
     }
@@ -105,7 +115,8 @@ public class ExtensionBundleResolverTests
     public async Task TelemetryReason_IsEmptyIntersection()
     {
         var telemetry = new RecordingTelemetry();
-        await Build([Row("4.22.0")], telemetry).ResolveAsync(Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"));
+        await Build([Row("4.22.0")], telemetry).ResolveAsync(
+            Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"), TestContext.Current.CancellationToken);
 
         telemetry.Events.Should().ContainSingle().Which.Reason.Should().Be(BundleResolveReason.EmptyIntersection);
     }
@@ -114,7 +125,9 @@ public class ExtensionBundleResolverTests
     public async Task TelemetryReason_IsNoCompatibleInstall()
     {
         var telemetry = new RecordingTelemetry();
-        await Build([Row("3.0.0")], telemetry).ResolveAsync(Context(host: "[5.0.0, 6.0.0)"));
+        await Build([Row("3.0.0")], telemetry).ResolveAsync(
+            Context(host: "[5.0.0, 6.0.0)"),
+            TestContext.Current.CancellationToken);
 
         telemetry.Events.Should().ContainSingle().Which.Reason.Should().Be(BundleResolveReason.NoCompatibleInstall);
     }

@@ -39,7 +39,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
         Directory.CreateDirectory(entry.PackageRoot);
 
-        WorkloadInstallResult? result = await _deploymentService.TryReuseExplicitAsync(entry.PackageId, entry.PackageVersion);
+        WorkloadInstallResult? result = await _deploymentService.TryReuseExplicitAsync(
+            entry.PackageId, entry.PackageVersion, TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.AlreadyInstalled.Should().BeTrue();
@@ -79,7 +80,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             .Returns(call => new WorkloadOwnershipMoveResult(call.Arg<WorkloadEntry>(), PreviousEntryRemoved: true));
 
         WorkloadInstallResult? result =
-            await _deploymentService.TryReuseImplementationForUpdateAsync(current, reusable.PackageId, reusable.PackageVersion, "win-x64", newLogical);
+            await _deploymentService.TryReuseImplementationForUpdateAsync(
+                current, reusable.PackageId, reusable.PackageVersion, "win-x64", newLogical,
+                TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.AlreadyInstalled.Should().BeFalse();
@@ -101,7 +104,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             .Returns(call => call.Arg<WorkloadEntry>());
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseImplementationAsync(
-            existing.PackageId, existing.PackageVersion, existing.RuntimeIdentifier!, logicalPackage);
+            existing.PackageId, existing.PackageVersion, existing.RuntimeIdentifier!, logicalPackage,
+            TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.Entry.Should().BeEquivalentTo(CompleteEntry(logicalPackage));
@@ -134,7 +138,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             BuildPackage(packageId, version), identity, metadata, WorkloadPackageRole.RuntimeIdentifierImplementation);
 
         WorkloadInstallResult result = await _deploymentService.InstallAsync(
-            package, source, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
+            package, source, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         WorkloadEntry expected = new()
         {
@@ -186,7 +191,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         _metadataReader.Read(installPath).Throws(new InvalidWorkloadException("invalid manifest"));
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseImplementationAsync(
-            reusable.PackageId, reusable.PackageVersion, "win-x64", Logical("example.pointer", "1.0.0"));
+            reusable.PackageId, reusable.PackageVersion, "win-x64", Logical("example.pointer", "1.0.0"),
+            TestContext.Current.CancellationToken);
 
         result.Should().BeNull();
     }
@@ -200,7 +206,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
         WorkloadInstallResult installed = await deployment.InstallAsync(
             Package("1.0.0", TemplateMetadata(null)),
-            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
         InspectedWorkloadPackage package = Package(update ? "2.0.0" : "1.0.0", TemplateMetadata(null));
         string[] excluded =
         [
@@ -230,8 +237,12 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         }
 
         WorkloadEntry entry = update
-            ? await deployment.UpdateAsync(installed.Entry, package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null)
-            : (await deployment.InstallAsync(package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true)).Entry;
+            ? await deployment.UpdateAsync(
+                installed.Entry, package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null,
+                cancellationToken: TestContext.Current.CancellationToken)
+            : (await deployment.InstallAsync(
+                package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true,
+                cancellationToken: TestContext.Current.CancellationToken)).Entry;
 
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         string[] extracted = [.. Directory.EnumerateFiles(installPath, "*", SearchOption.AllDirectories)
@@ -263,8 +274,10 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadMetadata initialMetadata = TemplateMetadata(initialRoot);
         InspectedWorkloadPackage initial = Package("1.0.0", initialMetadata, includeTemplates: true);
         WorkloadInstallResult installed = await deployment.InstallAsync(
-            initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
-        (await store.GetWorkloadsAsync()).Should().ContainSingle().Which.TemplateRoot.Should().Be(initialRoot);
+            initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
+        (await store.GetWorkloadsAsync(TestContext.Current.CancellationToken))
+            .Should().ContainSingle().Which.TemplateRoot.Should().Be(initialRoot);
         string initialPath = _paths.GetInstallDirectory(initial.Identity.PackageId, initial.Identity.Version);
         if (initialRoot is not null)
         {
@@ -276,14 +289,19 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
 
         if (reinstall)
         {
-            await deployment.InstallAsync(replacement, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
+            await deployment.InstallAsync(
+                replacement, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
         else
         {
-            await deployment.UpdateAsync(installed.Entry, replacement, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null);
+            await deployment.UpdateAsync(
+                installed.Entry, replacement, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
-        WorkloadEntry persisted = (await store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        WorkloadEntry persisted = (await store.GetWorkloadsAsync(
+            TestContext.Current.CancellationToken)).Should().ContainSingle().Subject;
         persisted.TemplateRoot.Should().Be(newRoot);
         persisted.PackageVersion.Should().Be(replacement.Identity.Version);
         string replacementPath = _paths.GetInstallDirectory(persisted.PackageId, persisted.PackageVersion);
@@ -313,8 +331,11 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
         WorkloadInstallResult installed = await deployment.InstallAsync(
             Package("1.0.0", TemplateMetadata("templates"), includeTemplates: true),
-            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
-        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
+        byte[] before = await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
         InspectedWorkloadPackage package = Package(update ? "2.0.0" : "1.0.0", TemplateMetadata("templates"));
         using (ZipArchive archive = ZipFile.Open(package.Path, ZipArchiveMode.Update))
         {
@@ -327,7 +348,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             : () => deployment.InstallAsync(package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
 
         await action.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*outside*install directory*");
-        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        (await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken)).Should().Equal(before);
         string initialPath = _paths.GetInstallDirectory(installed.Entry.PackageId, installed.Entry.PackageVersion);
         File.ReadAllText(Path.Combine(initialPath, "templates", "template.txt")).Should().Be("1.0.0");
         Directory.EnumerateFiles(_paths.WorkloadsRoot, "escaped.txt", SearchOption.AllDirectories).Should().BeEmpty();
@@ -343,8 +366,11 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
         InspectedWorkloadPackage initial = Package("1.0.0", TemplateMetadata("templates"));
         WorkloadInstallResult installed = await deployment.InstallAsync(
-            initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
-        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+            initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
+        byte[] before = await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
         InspectedWorkloadPackage invalid = Package("2.0.0", TemplateMetadata("../templates"));
 
         Func<Task> action = update
@@ -352,7 +378,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             : () => deployment.InstallAsync(invalid, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
 
         await action.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*templateRoot*");
-        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        (await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken)).Should().Equal(before);
     }
 
     [Theory]
@@ -364,8 +392,11 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
         WorkloadInstallResult installed = await deployment.InstallAsync(
             Package("1.0.0", TemplateMetadata("templates/original")),
-            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
-        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
+        byte[] before = await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
         InspectedWorkloadPackage package = Package("2.0.0", TemplateMetadata("templates/actual"));
         InspectedWorkloadPackage changed = package with { Metadata = TemplateMetadata("templates/inspected") };
         Func<Task> action = update
@@ -374,7 +405,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
 
         await action.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*changed*");
 
-        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        (await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken)).Should().Equal(before);
         Directory.Exists(_paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version)).Should().BeFalse();
     }
 
@@ -386,22 +419,29 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadStore store = new(_paths);
         WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
         InspectedWorkloadPackage package = Package("1.0.0", TemplateMetadata("templates/current"));
-        await deployment.InstallAsync(package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        await deployment.InstallAsync(
+            package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
         await store.SaveWorkloadAsync(new WorkloadEntry
         {
             PackageId = package.Identity.PackageId,
             PackageVersion = package.Identity.Version,
             TemplateRoot = registeredRoot,
-        });
-        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+        }, TestContext.Current.CancellationToken);
+        byte[] before = await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
         string payloadPath = Path.Combine(_paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version), "existing-payload.txt");
         File.WriteAllText(payloadPath, "preserve");
 
         WorkloadInstallResult result = await deployment.InstallAsync(
-            package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+            package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeTrue();
-        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        (await File.ReadAllBytesAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken)).Should().Equal(before);
         File.ReadAllText(payloadPath).Should().Be("preserve");
     }
 
@@ -426,7 +466,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([older, newer]);
 
         WorkloadEntry result =
-            await _deploymentService.GetUpdateTargetAsync("example.pointer", targetInstalledVersion: null, WorkloadOwnershipKind.Logical);
+            await _deploymentService.GetUpdateTargetAsync(
+                "example.pointer", targetInstalledVersion: null, WorkloadOwnershipKind.Logical,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(newer);
     }
@@ -442,7 +484,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
                 entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
             .Returns(new WorkloadOwnershipRemovalResult(OwnershipRemoved: true, EntryRemoved: true, Entry: entry));
 
-        bool removed = await _deploymentService.UninstallAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit);
+        bool removed = await _deploymentService.UninstallAsync(
+            entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit,
+            TestContext.Current.CancellationToken);
 
         removed.Should().BeTrue();
         Directory.Exists(installPath).Should().BeFalse();

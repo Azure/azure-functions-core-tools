@@ -147,7 +147,8 @@ public class TerminalSessionFactoryTests
         using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
         using CancellationTokenSource readCancellation = new();
         await using ITerminalSession session = factory.Open(console);
-        IAsyncEnumerator<TerminalInputEvent> reader = session.ReadAsync(readCancellation.Token).GetAsyncEnumerator();
+        IAsyncEnumerator<TerminalInputEvent> reader = session.ReadAsync(readCancellation.Token).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         Task<bool> next = reader.MoveNextAsync().AsTask();
         try
         {
@@ -165,7 +166,7 @@ public class TerminalSessionFactoryTests
             readCancellation.Cancel();
             try
             {
-                await next.WaitAsync(TimeSpan.FromSeconds(10));
+                await next.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             }
             catch (OperationCanceledException) when (next.IsCanceled)
             {

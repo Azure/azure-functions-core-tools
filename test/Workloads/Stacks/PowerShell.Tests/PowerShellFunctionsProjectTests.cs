@@ -66,7 +66,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
 
         FunctionsWorkerResolutionResult result = await project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
-            default);
+            TestContext.Current.CancellationToken);
 
         FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
         Assert.Equal("powershell", resolved.Worker.WorkerRuntime);
@@ -82,7 +82,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
         // Should complete without side-effects.
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
     }
@@ -93,7 +93,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
         PowerShellFunctionsProject project = CreateProject();
 
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => project.PrepareForHostRunAsync(null!, default));
+            () => project.PrepareForHostRunAsync(null!, TestContext.Current.CancellationToken));
     }
 
     [Fact]

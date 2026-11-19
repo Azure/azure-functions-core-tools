@@ -54,7 +54,9 @@ public class FullScreenInputHandoffTests
         inner.ReadAsync(Arg.Any<CancellationToken>()).Returns(call => NativeInput(call.Arg<CancellationToken>()));
         await interaction.ConfirmAsync("Continue?", cancellationToken: CancellationToken.None);
 
-        await using ITerminalSession session = interaction.OpenFullScreen(factory);
+        await using ITerminalSession session = interaction.OpenFullScreen(
+            factory,
+            TestContext.Current.CancellationToken);
         List<char> keys = [];
         await foreach (TerminalInputEvent input in session.ReadAsync(CancellationToken.None))
         {

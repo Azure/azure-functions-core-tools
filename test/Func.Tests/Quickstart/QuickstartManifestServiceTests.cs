@@ -31,7 +31,7 @@ public sealed class QuickstartManifestServiceTests
             },
             cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("http-python");
@@ -49,7 +49,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("cached-entry");
@@ -71,7 +71,7 @@ public sealed class QuickstartManifestServiceTests
             },
             cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("fresh-entry");
@@ -88,7 +88,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.NotModified), cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("existing-entry");
@@ -105,7 +105,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpRequestException("Network unreachable"), cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("stale-entry");
@@ -135,7 +135,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("has-ref");
@@ -154,7 +154,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("full-ref");
@@ -173,7 +173,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("tagged");
@@ -197,7 +197,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("trusted");
@@ -217,7 +217,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Count.Should().Be(3);
     }
@@ -233,7 +233,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("cached");
@@ -253,7 +253,7 @@ public sealed class QuickstartManifestServiceTests
             QuickstartManifestService service = CreateService(
                 new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
 
-            QuickstartManifest result = await service.GetManifestAsync();
+            QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
             result.Entries.Should().ContainSingle();
             result.Entries[0].Id.Should().Be("local-entry");
@@ -312,7 +312,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+        QuickstartManifest result = await service.GetManifestAsync(TestContext.Current.CancellationToken);
 
         result.Entries.Should().ContainSingle();
         result.Entries[0].Id.Should().Be("cdn-entry");

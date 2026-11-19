@@ -70,8 +70,8 @@ public sealed partial class WorkloadPackageTrustTests
 
         string sibling = Path.Combine(Root, $"{implementationId}.1.1.0.nupkg");
         File.Copy(implementation, sibling);
-        byte[] pointerBytes = await File.ReadAllBytesAsync(pointer);
-        byte[] implementationBytes = await File.ReadAllBytesAsync(sibling);
+        byte[] pointerBytes = await File.ReadAllBytesAsync(pointer, TestContext.Current.CancellationToken);
+        byte[] implementationBytes = await File.ReadAllBytesAsync(sibling, TestContext.Current.CancellationToken);
         ConfigurePointerCatalog(id, "1.1.0", pointer, sibling);
         WorkloadEntry current = new()
         {
@@ -96,9 +96,14 @@ public sealed partial class WorkloadPackageTrustTests
 
         WorkloadEntry entry = route switch
         {
-            "local" => (await installer.InstallFromPackageAsync(pointer, allowUntrusted: !signed)).Entry,
-            "catalog" => (await installer.InstallFromCatalogAsync(id, null, null, false, true, false, allowUntrusted: !signed)).Entry,
-            _ => (await installer.UpdateAsync(id, null, null, false, false, WorkloadOwnershipKind.Logical, allowUntrusted: !signed)).Entry,
+            "local" => (await installer.InstallFromPackageAsync(
+                pointer, allowUntrusted: !signed, cancellationToken: TestContext.Current.CancellationToken)).Entry,
+            "catalog" => (await installer.InstallFromCatalogAsync(
+                id, null, null, false, true, false, allowUntrusted: !signed,
+                cancellationToken: TestContext.Current.CancellationToken)).Entry,
+            _ => (await installer.UpdateAsync(
+                id, null, null, false, false, WorkloadOwnershipKind.Logical, allowUntrusted: !signed,
+                cancellationToken: TestContext.Current.CancellationToken)).Entry,
         };
 
         entry.PackageId.Should().Be(implementationId);
@@ -109,8 +114,10 @@ public sealed partial class WorkloadPackageTrustTests
         entry.LogicalPackage.Source.Should().Be(route == "local" ? Path.GetFullPath(pointer) : "https://example/v3/index.json");
         File.ReadAllBytes(Path.Combine(Paths.GetInstallDirectory(implementationId, "1.1.0"), "tools", "any", "Test.dll"))
             .Should().Equal([0x4D, 0x5A]);
-        (await File.ReadAllBytesAsync(pointer)).Should().Equal(pointerBytes);
-        (await File.ReadAllBytesAsync(sibling)).Should().Equal(implementationBytes);
+        (await File.ReadAllBytesAsync(pointer, TestContext.Current.CancellationToken)).Should().Equal(pointerBytes);
+        (await File.ReadAllBytesAsync(
+            sibling,
+            TestContext.Current.CancellationToken)).Should().Equal(implementationBytes);
         snapshots.Should().HaveCount(2);
         foreach (WorkloadPackageSnapshot snapshot in snapshots)
         {
@@ -330,7 +337,7 @@ public sealed partial class WorkloadPackageTrustTests
         using X509Certificate2 root = CreateRoot();
         using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject);
         string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
-        byte[] original = await File.ReadAllBytesAsync(signed);
+        byte[] original = await File.ReadAllBytesAsync(signed, TestContext.Current.CancellationToken);
         CliConfigurationPathsOptions paths = new(Path.Combine(Root, "home"));
         WorkloadPathsOptions workloads = new(Path.Combine(Root, "workload-home"));
         CliProcessTestRunner runner = new(output);
@@ -343,7 +350,7 @@ public sealed partial class WorkloadPackageTrustTests
         (result.StandardOutput + result.StandardError).Should().Contain("Workload publisher verification failed");
         File.Exists(workloads.WorkloadRegistryPath).Should().BeFalse();
         Directory.Exists(workloads.GetInstallDirectory(OfficialId.ToLowerInvariant(), "1.0.0")).Should().BeFalse();
-        (await File.ReadAllBytesAsync(signed)).Should().Equal(original);
+        (await File.ReadAllBytesAsync(signed, TestContext.Current.CancellationToken)).Should().Equal(original);
         Directory.GetDirectories(Path.Combine(Root, CliProcessTestRunner.StateDirectoryName), "func-workload-trust-*",
             SearchOption.AllDirectories).Should().BeEmpty();
     }

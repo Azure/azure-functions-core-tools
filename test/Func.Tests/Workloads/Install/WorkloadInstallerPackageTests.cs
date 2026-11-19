@@ -35,7 +35,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             tags: $"{WorkloadPackageTags.AliasPrefix}test {WorkloadPackageTags.AliasPrefix}stub other-tag");
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
         result.Entry.PackageId.Should().Be("test.workload");
@@ -69,7 +70,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         string nupkg = BuildNupkg(tags: "search-keyword another-keyword");
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.Aliases.Should().BeEmpty();
     }
@@ -87,7 +89,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         ]);
 
         WorkloadInstaller installer = NewInstaller();
-        await installer.InstallFromPackageAsync(nupkg);
+        await installer.InstallFromPackageAsync(nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
         string[] entries = [.. Directory
@@ -155,7 +157,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             });
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.Kind.Should().Be(WorkloadKind.Content);
         result.Entry.EntryPoint.Should().BeNull();
@@ -179,7 +182,11 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         var progress = new RecordingProgress(reports);
 
         WorkloadInstaller installer = NewInstaller();
-        await installer.InstallFromPackageAsync(nupkg, force: false, progress);
+        await installer.InstallFromPackageAsync(
+            nupkg,
+            force: false,
+            progress,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         reports.Should().SatisfyRespectively(
             report => report.Phase.Should().Be(WorkloadInstallPhase.Extracting),
@@ -194,7 +201,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         string nupkg = BuildNupkg(title: "Functions Host", description: "Azure Functions host workload.");
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.DisplayName.Should().Be("Functions Host");
         result.Entry.Description.Should().Be("Azure Functions host workload.");
@@ -220,7 +228,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             });
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.DisplayName.Should().Be("Manifest Name");
         result.Entry.Description.Should().Be("Manifest description.");
@@ -240,7 +249,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         _ = BuildRidImplementationNupkg("example.workload.win-x64", "1.0.0", "win-x64");
 
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(pointerPath);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            pointerPath, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be("example.workload.win-x64");
         result.Entry.LogicalPackage!.Source.Should().Be(Path.GetFullPath(pointerPath));
@@ -319,7 +329,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             payloadFileName: "Azure.Functions.Cli.Workloads.Host");
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         string hostBinary = Path.Combine(
             _paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion),
@@ -345,7 +356,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             payloadFileName: "Azure.Functions.Cli.Workloads.Host");
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         string payload = Path.Combine(
             _paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion),

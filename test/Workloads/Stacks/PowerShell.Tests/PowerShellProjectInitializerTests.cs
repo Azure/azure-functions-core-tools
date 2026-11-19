@@ -72,7 +72,7 @@ public class PowerShellProjectInitializerTests
                 Language: null,
                 Force: false);
 
-            await initializer.InitializeAsync(context, root.Parse([]));
+            await initializer.InitializeAsync(context, root.Parse([]), TestContext.Current.CancellationToken);
 
             File.Exists(Path.Combine(tempDir, "host.json")).Should().BeTrue();
             File.Exists(Path.Combine(tempDir, "local.settings.json")).Should().BeTrue();
@@ -110,7 +110,10 @@ public class PowerShellProjectInitializerTests
                 Language: null,
                 Force: false);
 
-            await initializer.InitializeAsync(context, root.Parse(["--managed-dependencies"]));
+            await initializer.InitializeAsync(
+                context,
+                root.Parse(["--managed-dependencies"]),
+                TestContext.Current.CancellationToken);
 
             File.Exists(Path.Combine(tempDir, "requirements.psd1")).Should().BeTrue();
             string requirements = File.ReadAllText(Path.Combine(tempDir, "requirements.psd1"));
@@ -148,7 +151,10 @@ public class PowerShellProjectInitializerTests
                 Language: null,
                 Force: false);
 
-            await initializer.InitializeAsync(context, root.Parse(["--no-bundles"]));
+            await initializer.InitializeAsync(
+                context,
+                root.Parse(["--no-bundles"]),
+                TestContext.Current.CancellationToken);
 
             string hostJson = File.ReadAllText(Path.Combine(tempDir, "host.json"));
             JsonObject host = JsonNode.Parse(hostJson)!.AsObject();
@@ -190,7 +196,10 @@ public class PowerShellProjectInitializerTests
                 Language: null,
                 Force: false);
 
-            await initializer.InitializeAsync(context, root.Parse(["--runtime-version", "7.6"]));
+            await initializer.InitializeAsync(
+                context,
+                root.Parse(["--runtime-version", "7.6"]),
+                TestContext.Current.CancellationToken);
 
             string localSettings = File.ReadAllText(Path.Combine(tempDir, "local.settings.json"));
             localSettings.Should().Contain("\"7.6\"");

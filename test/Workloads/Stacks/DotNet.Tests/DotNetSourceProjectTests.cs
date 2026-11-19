@@ -49,7 +49,7 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         string expectedDir = Path.GetDirectoryName(assemblyPath)!;
         context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar).Should().Be(expectedDir);
@@ -75,7 +75,7 @@ public class DotNetSourceProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateHostRunContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Info && entry.Line == "Build succeeded.");
         reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");

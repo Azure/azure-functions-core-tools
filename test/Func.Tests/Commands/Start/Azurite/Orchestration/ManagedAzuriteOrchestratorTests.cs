@@ -378,7 +378,7 @@ public class ManagedAzuriteOrchestratorTests
             progress: null,
             cts.Token);
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
         cts.Cancel();
 
         await FluentActions.Awaiting(() => resultTask).Should().ThrowAsync<OperationCanceledException>();

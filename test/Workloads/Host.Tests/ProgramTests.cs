@@ -17,7 +17,7 @@ public sealed class ProgramTests
         monitorTask.IsCompleted.Should().BeFalse();
 
         reader.Release();
-        await monitorTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await monitorTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         shutdownTokenSource.IsCancellationRequested.Should().BeTrue();
     }
 

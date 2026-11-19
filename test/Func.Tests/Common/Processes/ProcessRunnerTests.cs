@@ -204,7 +204,8 @@ public class ProcessRunnerTests
                 if (child.StartTime.ToUniversalTime().Ticks == startTicks && !child.HasExited)
                 {
                     child.Kill();
-                    await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2));
+                    await child.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(
+                        TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
                 }
             }
             catch (ArgumentException)

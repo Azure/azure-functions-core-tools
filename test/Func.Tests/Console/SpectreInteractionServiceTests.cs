@@ -462,7 +462,7 @@ public class SpectreInteractionServiceTests
             Assert.DoesNotContain("\u2500", stderr.ToString());
             stderr.GetStringBuilder().Clear();
             return Task.FromResult(42);
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(42, result);
         Assert.EndsWith($"{check} Installing [workload]{Environment.NewLine}", stderr.ToString());
@@ -496,7 +496,7 @@ public class SpectreInteractionServiceTests
             spinnerRow = GetRenderedRow(writer.GetStringBuilder().ToString(), "Installing workload");
             Assert.Equal(1, spinnerRow);
             return Task.FromResult(0);
-        }, writeCompletion: writeCompletion);
+        }, TestContext.Current.CancellationToken, writeCompletion: writeCompletion);
 
         if (!writeCompletion)
         {
@@ -521,7 +521,7 @@ public class SpectreInteractionServiceTests
                 spinnerRow = GetRenderedRow(stderr.GetStringBuilder().ToString(), "Installing workload");
                 Assert.Equal(0, spinnerRow);
                 throw new InvalidOperationException("Invalid package");
-            }, writeCompletion: false));
+            }, TestContext.Current.CancellationToken, writeCompletion: false));
 
         Assert.Equal(spinnerRow, GetRenderedRow(stderr.GetStringBuilder().ToString(), "Installing workload"));
     }
@@ -535,7 +535,7 @@ public class SpectreInteractionServiceTests
         {
             await Task.Delay(250);
             return 0;
-        });
+        }, TestContext.Current.CancellationToken);
 
         // Include a refresh beyond the initial frame, final frame, and completion row.
         Assert.True(Regex.Matches(stderr.ToString(), "Downloading").Count >= 4);
@@ -555,7 +555,7 @@ public class SpectreInteractionServiceTests
                 progress.SetDescription("Resolving");
                 progress.SetDescription("Downloading [package]");
                 throw expected;
-            }));
+            }, TestContext.Current.CancellationToken));
 
         Assert.Same(expected, actual);
         Assert.EndsWith(
@@ -627,7 +627,7 @@ public class SpectreInteractionServiceTests
             progress.SetDescription("Extracting");
             Assert.DoesNotContain("%", stderr.ToString());
             return Task.FromResult(0);
-        });
+        }, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -645,7 +645,7 @@ public class SpectreInteractionServiceTests
             progress.Increment(10);
             progress.SetDescription("Extracting");
             return Task.FromResult(0);
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(
             $"Installing...{Environment.NewLine}Downloading...{Environment.NewLine}Extracting...{Environment.NewLine}",
@@ -662,12 +662,16 @@ public class SpectreInteractionServiceTests
 
         if (generic)
         {
-            int result = await service.ShowStatusAsync("Fetching catalog...", _ => Task.FromResult(42));
+            int result = await service.ShowStatusAsync(
+                "Fetching catalog...", _ => Task.FromResult(42), TestContext.Current.CancellationToken);
             Assert.Equal(42, result);
         }
         else
         {
-            await service.StatusAsync("Fetching catalog...", _ => Task.CompletedTask);
+            await service.StatusAsync(
+                "Fetching catalog...",
+                _ => Task.CompletedTask,
+                TestContext.Current.CancellationToken);
         }
 
         Assert.EndsWith($"\u2713 Fetching catalog...{Environment.NewLine}", stderr.ToString());
@@ -680,7 +684,7 @@ public class SpectreInteractionServiceTests
     {
         var (service, stdout, stderr) = CreateService(interactive: false);
 
-        await service.StatusAsync("Fetching catalog", _ => Task.CompletedTask);
+        await service.StatusAsync("Fetching catalog", _ => Task.CompletedTask, TestContext.Current.CancellationToken);
 
         Assert.Equal($"Fetching catalog...{Environment.NewLine}", stderr.ToString());
         Assert.Empty(stdout.ToString());
@@ -691,8 +695,8 @@ public class SpectreInteractionServiceTests
     {
         var (service, _, stderr) = CreateService(interactive: true);
 
-        await service.StatusAsync("First", _ => Task.CompletedTask);
-        await service.StatusAsync("Second", _ => Task.CompletedTask);
+        await service.StatusAsync("First", _ => Task.CompletedTask, TestContext.Current.CancellationToken);
+        await service.StatusAsync("Second", _ => Task.CompletedTask, TestContext.Current.CancellationToken);
 
         Assert.Contains($"\u2713 First{Environment.NewLine}", stderr.ToString());
         Assert.EndsWith($"\u2713 Second{Environment.NewLine}", stderr.ToString());
@@ -706,8 +710,12 @@ public class SpectreInteractionServiceTests
         var (service, _, stderr) = CreateService(interactive: true);
 
         await service.RunWithProgressAsync("Updating workload", (_, _) => Task.FromResult(0),
+            TestContext.Current.CancellationToken, writeCompletion: false);
+        await service.StatusAsync(
+            "Scaffolding",
+            _ => Task.CompletedTask,
+            TestContext.Current.CancellationToken,
             writeCompletion: false);
-        await service.StatusAsync("Scaffolding", _ => Task.CompletedTask, writeCompletion: false);
 
         Assert.DoesNotContain("\u2713", stderr.ToString());
     }
@@ -722,7 +730,7 @@ public class SpectreInteractionServiceTests
             {
                 progress.SetDescription("Extracting");
                 throw new InvalidOperationException("Invalid package");
-            }, writeCompletion: false));
+            }, TestContext.Current.CancellationToken, writeCompletion: false));
 
         Assert.EndsWith($"\u00d7 Installing{Environment.NewLine}  \u2514 Extracting{Environment.NewLine}", stderr.ToString());
     }
@@ -737,7 +745,7 @@ public class SpectreInteractionServiceTests
             CreateConsole(stdout, interactive: false, unicode: true),
             CreateConsole(stderr, interactive: true, unicode: true));
 
-        await service.StatusAsync("Fetching catalog", _ => Task.CompletedTask);
+        await service.StatusAsync("Fetching catalog", _ => Task.CompletedTask, TestContext.Current.CancellationToken);
 
         Assert.False(service.IsInteractive);
         Assert.Equal($"Fetching catalog...{Environment.NewLine}", stderr.ToString());
