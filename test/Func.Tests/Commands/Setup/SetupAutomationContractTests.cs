@@ -118,19 +118,12 @@ public sealed class SetupAutomationContractTests
         harness.Configuration.DidNotReceive().GetProjectConfiguration(Arg.Any<DirectoryInfo>());
     }
 
-    [Theory]
-    [InlineData("dotnet")]
-    [InlineData("go")]
-    [InlineData("java")]
-    [InlineData("node")]
-    [InlineData("powershell")]
-    [InlineData("python")]
-    public async Task ResolveFeaturesAsync_NormalInteractiveRun_OffersFriendlyLabelsAndUsesStackIdentifiers(string stack)
+    [Fact]
+    public async Task ResolveFeaturesAsync_NormalInteractiveRun_OffersBuiltInStacksWithFriendlyLabels()
     {
         Harness harness = CreateHarness();
-        harness.Interaction.SelectedFeatures = [stack];
 
-        SetupFeaturePlan? plan = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
+        _ = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
 
         harness.Interaction.PromptCount.Should().Be(1);
         harness.Interaction.MultiSelectionChoices.Should().ContainSingle().Which.Should().Equal(
@@ -140,9 +133,29 @@ public sealed class SetupAutomationContractTests
             new MultiSelectionChoice("node", "Node.js"),
             new MultiSelectionChoice("powershell", "PowerShell"),
             new MultiSelectionChoice("python", "Python"));
+    }
+
+    [Theory]
+    [InlineData("dotnet", "dotnet-isolated", false, false)]
+    [InlineData("go", "go", true, true)]
+    [InlineData("java", "java", true, true)]
+    [InlineData("node", "node", true, true)]
+    [InlineData("powershell", "powershell", true, true)]
+    [InlineData("python", "python", true, true)]
+    public async Task ResolveFeaturesAsync_NormalInteractiveRun_UsesSelectedStackIdentifier(
+        string stack, string profileRuntime, bool installWorker, bool includeExtensionBundle)
+    {
+        Harness harness = CreateHarness();
+        harness.Interaction.SelectedFeatures = [stack];
+
+        SetupFeaturePlan? plan = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
+
         plan.Should().NotBeNull();
         plan!.Features.Should().Equal(stack);
-        plan.RuntimeFeatures.Should().ContainSingle().Which.Name.Should().Be(stack);
+        plan.RuntimeFeatures.Should().ContainSingle().Which.Should()
+            .BeEquivalentTo(new SetupRuntimeFeature(stack, profileRuntime, installWorker));
+        plan.WorkerRuntimes.Should().Equal(installWorker ? [stack] : []);
+        plan.IncludeExtensionBundle.Should().Be(includeExtensionBundle);
     }
 
     [Theory]
