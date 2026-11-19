@@ -168,7 +168,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. 3.11.x, 3.12.x, 3.13.x, 3.14.x, or 3.15.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. 3.10.x, 3.11.x, 3.12.x, 3.13.x, 3.14.x, or 3.15.x is recommended, and used in Azure Functions.";
                 if (errorIfNoVersion)
                 {
                     throw new CliException(message);
@@ -194,15 +194,15 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (errorIfNotSupported)
                 {
-                    throw new CliException($"Python 3.11.x to 3.15.x is required for this operation. " +
-                        $"Please install Python 3.11, 3.12, 3.13, 3.14 or 3.15 and use a virtual environment to switch to Python 3.11, 3.12, 3.13, 3.14 or 3.15.");
+                    throw new CliException($"Python 3.10.x to 3.15.x is required for this operation. " +
+                        $"Please install Python 3.10, 3.11, 3.12, 3.13, 3.14 or 3.15 and use a virtual environment to switch to the appropriate Python version.");
                 }
 
-                ColoredConsole.WriteLine(WarningColor("Python 3.11.x, 3.12.x, 3.13.x, 3.14.x or 3.15.x is recommended, and used in Azure Functions."));
+                ColoredConsole.WriteLine(WarningColor("Python 3.10.x, 3.11.x, 3.12.x, 3.13.x, 3.14.x or 3.15.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.[11|12|13|14|15]) is required.";
+            var error = "Python 3.x (recommended version 3.[10|11|12|13|14|15]) is required.";
             if (errorIfNoVersion)
             {
                 throw new CliException(error);
@@ -325,7 +325,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception)
             {
-                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.10, 3.11, 3.12, 3.13, or 3.14 installed.");
+                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.10, 3.11, 3.12, 3.13, 3.14, or 3.15 installed.");
             }
 
             if (exitCode == 0)
