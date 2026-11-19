@@ -592,7 +592,7 @@ namespace Azure.Functions.Cli.Helpers
             return tmp;
         }
 
-        public static Task<string> GetDockerInitFileContent(WorkerLanguageVersionInfo info)
+        public static Task<string> GetDockerInitFileContent(WorkerLanguageVersionInfo info, bool standardDockerfile = false)
         {
             if (info?.Major == 3)
             {
@@ -609,7 +609,9 @@ namespace Azure.Functions.Cli.Helpers
                     case 13:
                         return StaticResources.DockerfilePython313;
                     case 14:
-                        return StaticResources.DockerfilePython314;
+                        return standardDockerfile
+                            ? StaticResources.DockerfilePython314
+                            : StaticResources.DockerfilePython314Chiseled;
                     case 15:
                         return StaticResources.DockerfilePython315;
                 }

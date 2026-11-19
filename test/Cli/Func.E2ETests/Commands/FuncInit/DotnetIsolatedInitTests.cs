@@ -15,6 +15,15 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
     public class DotnetIsolatedInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
+        private static readonly string[] _expectedNet10ChiseledDockerfileContent =
+        [
+            "FROM mcr.microsoft.com/dotnet/sdk:10.0-resolute AS build",
+            "FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated10.0-chiseled AS final",
+            "COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0-resolute /usr/share/dotnet /usr/share/dotnet",
+            "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated",
+            "AzureWebJobsScriptRoot=/home/site/wwwroot"
+        ];
+
         private static readonly string[] _expectedNet11ChiseledDockerfileContent =
         [
             "FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build",
@@ -182,16 +191,15 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithDotnetIsolatedAndDockerFlag_GeneratesDockerFile()
+        public void Init_WithDotnetIsolatedAndDockerFlag_GeneratesChiseledDockerFile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithDotnetIsolatedAndDockerFlag_GeneratesDockerFile);
+            var testName = nameof(Init_WithDotnetIsolatedAndDockerFlag_GeneratesChiseledDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
-            var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated10.0" };
             var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {
-                (dockerFilePath, expectedDockerfileContent)
+                (dockerFilePath, _expectedNet10ChiseledDockerfileContent)
             };
 
             // Initialize dotnet-isolated function app
@@ -203,6 +211,22 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             funcInitResult.Should().ExitWith(0);
             funcInitResult.Should().WriteDockerfile();
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+        }
+
+        [Fact]
+        public void Init_WithNet10AndStandardFlag_GeneratesStandardDockerFile()
+        {
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithNet10AndStandardFlag_GeneratesStandardDockerFile), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", "net10.0", "--docker", "--standard"]);
+
+            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().WriteDockerfile();
+
+            string dockerfile = File.ReadAllText(Path.Combine(WorkingDirectory, "Dockerfile"));
+            dockerfile.Should()
+                .Contain("FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated10.0")
+                .And.NotContain("chiseled");
         }
 
         [Theory]

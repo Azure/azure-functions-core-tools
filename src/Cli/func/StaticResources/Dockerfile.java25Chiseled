@@ -1,0 +1,32 @@
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-resolute AS build
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openjdk-25-jdk-headless maven && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY . /src/java-function-app
+RUN cd /src/java-function-app && \
+    mkdir -p /home/site/wwwroot && \
+    mvn clean package && \
+    cd ./target/azure-functions/ && \
+    cd $(ls -d */|head -n 1) && \
+    cp -a . /home/site/wwwroot
+
+# This image uses a chiseled (minimal) Azure Functions base image.
+# It doesn't include the Java 25 runtime, so the next step copies it in from the matching runtime image.
+FROM mcr.microsoft.com/azure-functions/java:4-java25-chiseled AS final
+COPY --from=eclipse-temurin:25-jre-resolute /opt/java/openjdk /opt/java/openjdk
+
+# The base image doesn't include a shell. For debugging purposes, you can add other dependencies as needed.
+# For example, uncomment the lines below to add a lightweight shell using BusyBox.
+# BusyBox doesn't include an SSH server, so it doesn't enable SSH access to your app on App Service.
+# COPY --from=busybox:uclibc /bin/busybox /bin/busybox
+# RUN ["/bin/busybox", "--install", "-s", "/bin"]
+
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}" \
+    FUNCTIONS_WORKER_RUNTIME=java \
+    AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true
+
+COPY --from=build /home/site/wwwroot /home/site/wwwroot
