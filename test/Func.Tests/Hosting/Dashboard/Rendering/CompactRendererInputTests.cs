@@ -82,7 +82,7 @@ public class CompactRendererInputTests
         {
             if (interactionSupported && inputSupported)
             {
-                await readStarted.Task.WaitAsync(_testTimeout);
+                await readStarted.Task.WaitAsync(_testTimeout, TestContext.Current.CancellationToken);
                 inputTask.Should().NotBeNull();
             }
             else
@@ -125,14 +125,14 @@ public class CompactRendererInputTests
         Task? summaryTask = null;
         try
         {
-            await readStarted.Task.WaitAsync(_testTimeout);
+            await readStarted.Task.WaitAsync(_testTimeout, TestContext.Current.CancellationToken);
             if (cancelLifetime)
             {
                 lifetime.Cancel();
             }
 
             summaryTask = SummarizeAsync(renderer);
-            await cancellationObserved.Task.WaitAsync(_testTimeout);
+            await cancellationObserved.Task.WaitAsync(_testTimeout, TestContext.Current.CancellationToken);
             summaryTask.IsCompleted.Should().BeFalse();
             interaction.DidNotReceive().WriteLine(Arg.Any<string>());
         }
@@ -210,8 +210,8 @@ public class CompactRendererInputTests
         await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
         try
         {
-            await nextReadStarted.Task.WaitAsync(_testTimeout);
-            await shutdownRequested.Task.WaitAsync(_testTimeout);
+            await nextReadStarted.Task.WaitAsync(_testTimeout, TestContext.Current.CancellationToken);
+            await shutdownRequested.Task.WaitAsync(_testTimeout, TestContext.Current.CancellationToken);
             shutdownRequests.Should().Be(1);
         }
         finally
@@ -237,7 +237,8 @@ public class CompactRendererInputTests
 
         await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
         Task inputTask = GetInputTask(renderer)!;
-        Exception? readFailure = await Record.ExceptionAsync(() => inputTask.WaitAsync(_testTimeout));
+        Exception? readFailure = await Record.ExceptionAsync(() => inputTask.WaitAsync(
+            _testTimeout, TestContext.Current.CancellationToken));
         Exception? summaryFailure = await Record.ExceptionAsync(() => SummarizeAsync(renderer));
 
         readFailure.Should().BeSameAs(failure);

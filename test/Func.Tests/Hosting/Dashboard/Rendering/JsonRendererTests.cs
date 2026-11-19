@@ -17,7 +17,7 @@ public class JsonRendererTests
     {
         var (renderer, stream) = NewRenderer();
         var state = new DashboardState();
-        await renderer.OnStartAsync(state, default);
+        await renderer.OnStartAsync(state, TestContext.Current.CancellationToken);
 
         var entry = MakeEntry(
             new Dictionary<string, object?>
@@ -27,8 +27,10 @@ public class JsonRendererTests
             });
 
         IReadOnlyList<DashboardEvent> events = state.Observe(entry);
-        await renderer.OnEventAsync(entry, events, default);
-        await renderer.OnSummaryAsync(state.BuildSummary("sigint", DateTimeOffset.UtcNow), default);
+        await renderer.OnEventAsync(entry, events, TestContext.Current.CancellationToken);
+        await renderer.OnSummaryAsync(
+            state.BuildSummary("sigint", DateTimeOffset.UtcNow),
+            TestContext.Current.CancellationToken);
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
@@ -48,7 +50,7 @@ public class JsonRendererTests
         var (renderer, stream) = NewRenderer();
         var state = new DashboardState();
 
-        await renderer.OnStartAsync(state, default);
+        await renderer.OnStartAsync(state, TestContext.Current.CancellationToken);
         var entry = MakeEntry(
             new Dictionary<string, object?>
             {
@@ -56,8 +58,10 @@ public class JsonRendererTests
                 [HostLogAttributeKeys.FunctionName] = "HttpTrigger1",
                 [HostLogAttributeKeys.FunctionTriggerType] = "http",
             });
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
-        await renderer.OnSummaryAsync(state.BuildSummary("sigint", DateTimeOffset.UtcNow), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
+        await renderer.OnSummaryAsync(
+            state.BuildSummary("sigint", DateTimeOffset.UtcNow),
+            TestContext.Current.CancellationToken);
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
@@ -69,7 +73,7 @@ public class JsonRendererTests
     {
         var (renderer, stream) = NewRenderer();
         var state = new DashboardState();
-        await renderer.OnStartAsync(state, default);
+        await renderer.OnStartAsync(state, TestContext.Current.CancellationToken);
 
         var entry = MakeEntry(
             new Dictionary<string, object?>
@@ -78,8 +82,10 @@ public class JsonRendererTests
                 [HostLogAttributeKeys.HostState] = "ready",
             });
 
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
-        await renderer.OnSummaryAsync(state.BuildSummary("source_completed", DateTimeOffset.UtcNow), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
+        await renderer.OnSummaryAsync(
+            state.BuildSummary("source_completed", DateTimeOffset.UtcNow),
+            TestContext.Current.CancellationToken);
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
@@ -93,7 +99,7 @@ public class JsonRendererTests
     {
         var (renderer, stream) = NewRenderer();
         var state = new DashboardState();
-        await renderer.OnStartAsync(state, default);
+        await renderer.OnStartAsync(state, TestContext.Current.CancellationToken);
         var exceptionDetails = new HostLogExceptionDetails(
             "Microsoft.Azure.WebJobs.Host.FunctionInvocationException",
             "Exception while executing function",
@@ -118,7 +124,7 @@ public class JsonRendererTests
             ExceptionDetails = exceptionDetails,
         };
 
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
@@ -164,7 +170,7 @@ public class JsonRendererTests
             ExceptionDetails = exceptionDetails,
         };
 
-        await renderer.OnEventAsync(entry, [], default);
+        await renderer.OnEventAsync(entry, [], TestContext.Current.CancellationToken);
         await renderer.DisposeAsync();
 
         JsonElement exception = ReadAll(stream).Should().ContainSingle().Subject

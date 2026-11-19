@@ -354,7 +354,10 @@ public class WorkloadSearchCommandTests
 
         // ListVersionsAsync is not called when prerelease is off, the
         // server-side search filter already gives us the stable row.
-        await _catalog.DidNotReceiveWithAnyArgs().ListVersionsAsync(default!, default, default);
+        await _catalog.DidNotReceiveWithAnyArgs().ListVersionsAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
         _interaction.Lines.Should().NotContain(l => l.StartsWith("Channel:"));
     }
 

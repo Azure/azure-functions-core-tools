@@ -20,10 +20,10 @@ public class DashboardPipelineTests
         var pipeline = new DashboardPipeline(state, source, renderer);
 
         Task<int> runTask = pipeline.RunAsync(CancellationToken.None);
-        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         renderer.RequestShutdown();
 
-        int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         renderer.Summary.Should().NotBeNull();
@@ -56,10 +56,10 @@ public class DashboardPipelineTests
         var pipeline = new DashboardPipeline(state, source, renderer);
 
         Task<int> runTask = pipeline.RunAsync(CancellationToken.None);
-        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         renderer.RequestShutdown();
 
-        int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         source.ShutdownRequested.Should().BeTrue();

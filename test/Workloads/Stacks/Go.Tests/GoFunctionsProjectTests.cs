@@ -44,7 +44,7 @@ public class GoFunctionsProjectTests : IDisposable
         });
 
         FunctionsProjectHostRunContext context = CreateContext();
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
         observedRoot.Should().Be(_projectDir.FullName);
@@ -69,7 +69,7 @@ public class GoFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "compiling example.com/myapp");
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "go: warning");
@@ -106,7 +106,7 @@ public class GoFunctionsProjectTests : IDisposable
         });
 
         FunctionsProjectHostRunContext context = CreateContext(skipBuild: true);
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         invoked.Should().BeFalse();
         context.StartupDirectory.FullName.Should().Be(_projectDir.FullName);
@@ -153,7 +153,7 @@ public class GoFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         };
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         calls.Count.Should().Be(2);
         calls[0].Should().Be($"tidy:{_projectDir.FullName}");
@@ -192,7 +192,7 @@ public class GoFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         };
 
-        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), TestContext.Current.CancellationToken);
 
         tidyInvoked.Should().BeFalse();
     }

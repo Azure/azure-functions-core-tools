@@ -23,7 +23,7 @@ public class VersionCheckerTests
     public async Task CheckForUpdateAsync_DoesNotThrow()
     {
         // Even if network is unavailable, should return null gracefully
-        var result = await VersionChecker.CheckForUpdateAsync();
+        var result = await VersionChecker.CheckForUpdateAsync(TestContext.Current.CancellationToken);
 
         // Result can be null (offline/current) or a version string — both are valid
         if (result is not null)

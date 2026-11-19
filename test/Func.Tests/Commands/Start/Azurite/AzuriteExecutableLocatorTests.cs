@@ -149,7 +149,7 @@ public class AzuriteExecutableLocatorTests
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
         result.Should().BeNull();
-        await _processRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        await _processRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

@@ -41,7 +41,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
             "test.workload", version: null, source: null,
-            includePrerelease: false, exact: true, force: false);
+            includePrerelease: false, exact: true, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
         result.Entry.PackageId.Should().Be("test.workload");
@@ -103,7 +104,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
             "test.workload", requested, source: null,
-            includePrerelease: false, exact: true, force: false);
+            includePrerelease: false, exact: true, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageVersion.Should().Be("1.0.0");
     }
@@ -138,7 +140,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
             "node-worker", version: null, source: null,
-            includePrerelease: true, exact: false, force: false);
+            includePrerelease: true, exact: false, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be("real.workload.id");
         await _catalog.Received(1).SearchAsync(
@@ -170,7 +173,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         _ = await installer.InstallFromCatalogAsync(
             "node", version: null, source: null,
-            includePrerelease: false, exact: false, force: false);
+            includePrerelease: false, exact: false, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         await _catalog.DidNotReceive().SearchAsync(
             Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
@@ -292,7 +296,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
             explicitId, version: null, source: null,
-            includePrerelease: true, exact: true, force: false);
+            includePrerelease: true, exact: true, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         await _catalog.Received(1).ResolveLatestVersionAsync(
@@ -347,7 +352,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
             "example", version: null, source: null,
-            includePrerelease: false, exact: false, force: false);
+            includePrerelease: false, exact: false, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be(implementationId);
         result.Entry.RuntimeIdentifier.Should().Be("win-x64");

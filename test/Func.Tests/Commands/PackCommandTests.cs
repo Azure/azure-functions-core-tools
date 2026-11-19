@@ -23,7 +23,7 @@ public class PackCommandTests
         var command = new PackCommand(_interaction);
         var parseResult = command.Parse([]);
 
-        var exitCode = await parseResult.InvokeAsync();
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().NotBe(0);
         _interaction.AllOutput.Should().Contain("not supported yet");
@@ -37,7 +37,7 @@ public class PackCommandTests
         var command = new PackCommand(_interaction);
         var parseResult = command.Parse(["--output", "bin/release", "myapp.zip"]);
 
-        var exitCode = await parseResult.InvokeAsync();
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().NotBe(0);
         _interaction.AllOutput.Should().Contain("not supported yet");

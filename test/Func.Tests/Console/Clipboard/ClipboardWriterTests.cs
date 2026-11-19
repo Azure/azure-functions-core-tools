@@ -23,7 +23,7 @@ public class ClipboardWriterTests
         var result = await fixture.Writer.CopyAsync("selection", fixture.Terminal, CancellationToken.None);
 
         result.Status.Should().Be(ClipboardCopyStatus.Confirmed);
-        _ = fixture.Runner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        _ = fixture.Runner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
         fixture.Terminal.DidNotReceiveWithAnyArgs().WriteControl(default!);
     }
 
@@ -45,8 +45,8 @@ public class ClipboardWriterTests
         var result = await fixture.Writer.CopyAsync("remote text", fixture.Terminal, CancellationToken.None);
 
         result.Status.Should().Be(ClipboardCopyStatus.Sent);
-        _ = fixture.Native.DidNotReceiveWithAnyArgs().CopyAsync(default!, default);
-        _ = fixture.Runner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        _ = fixture.Native.DidNotReceiveWithAnyArgs().CopyAsync(default!, TestContext.Current.CancellationToken);
+        _ = fixture.Runner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
         fixture.Terminal.Received(1).WriteControl("\u001b]52;c;" + Convert.ToBase64String(Encoding.UTF8.GetBytes("remote text")) + "\u0007");
     }
 
@@ -89,7 +89,7 @@ public class ClipboardWriterTests
         fixture.Variables["DISPLAY"] = "localhost:10.0";
         var result = await fixture.Writer.CopyAsync("data", fixture.Terminal, CancellationToken.None);
         result.Status.Should().Be(ClipboardCopyStatus.Sent);
-        _ = fixture.Runner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        _ = fixture.Runner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -155,7 +155,7 @@ public class ClipboardWriterTests
         fixture.Native.IsLocalSession.Returns(true);
         var result = await fixture.Writer.CopyAsync(new string('x', ClipboardWriter.MaximumLocalBytes + 1), fixture.Terminal, CancellationToken.None);
         result.Status.Should().Be(ClipboardCopyStatus.Failed);
-        _ = fixture.Native.DidNotReceiveWithAnyArgs().CopyAsync(default!, default);
+        _ = fixture.Native.DidNotReceiveWithAnyArgs().CopyAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

@@ -54,7 +54,8 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
 
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false);
+            "test.workload", null, null, false, allowMajor: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.NoUpdateAvailable.Should().BeTrue();
         result.NoCandidateOnSource.Should().BeTrue();
@@ -76,7 +77,8 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
 
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false);
+            "test.workload", null, null, false, allowMajor: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.NoUpdateAvailable.Should().BeTrue();
         result.NoCandidateOnSource.Should().BeFalse();
@@ -101,7 +103,8 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
 
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false);
+            "test.workload", null, null, false, allowMajor: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.NoUpdateAvailable.Should().BeFalse();
         result.PreviousVersion.Should().Be("1.0.0");
@@ -220,7 +223,8 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync(
             pointerId, targetInstalledVersion: null, source: null,
-            includePrerelease: false, allowMajor: false, WorkloadOwnershipKind.Logical);
+            includePrerelease: false, allowMajor: false, WorkloadOwnershipKind.Logical,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.PreviousVersion.Should().Be("2.0.0");
 
@@ -272,7 +276,8 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync(
             pointerId, targetInstalledVersion: null, source: null,
-            includePrerelease: false, allowMajor: false, WorkloadOwnershipKind.Logical);
+            includePrerelease: false, allowMajor: false, WorkloadOwnershipKind.Logical,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.NoUpdateAvailable.Should().BeTrue();
         result.Entry.PackageVersion.Should().Be("2.0.0");

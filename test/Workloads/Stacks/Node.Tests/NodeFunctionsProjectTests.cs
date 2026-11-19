@@ -39,7 +39,7 @@ public class NodeFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         invoked.Should().BeFalse();
     }
@@ -55,7 +55,7 @@ public class NodeFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         commands.Should().ContainSingle();
         commands[0].Should().Equal(["install"]);
@@ -73,7 +73,7 @@ public class NodeFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         commands.Should().BeEmpty();
     }
@@ -90,7 +90,7 @@ public class NodeFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         commands.Should().ContainSingle();
         commands[0].Should().Equal(["run", "build"]);
@@ -110,7 +110,7 @@ public class NodeFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "added 42 packages");
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "npm warn deprecated");
@@ -149,7 +149,7 @@ public class NodeFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), TestContext.Current.CancellationToken);
 
         commands.Should().BeEmpty();
     }
@@ -165,7 +165,7 @@ public class NodeFunctionsProjectTests : IDisposable
             return Task.FromResult(0);
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), TestContext.Current.CancellationToken);
 
         commands.Should().ContainSingle();
         commands[0].Should().Equal(["install"]);

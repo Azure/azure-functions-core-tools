@@ -51,7 +51,9 @@ public sealed class SetupRunnerProfileLifecycleTests
     {
         using Fixture fixture = new(secondProfileFails: true);
         await fixture.SeedDependenciesAsync("4.1.0");
-        byte[] before = await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath);
+        byte[] before = await File.ReadAllBytesAsync(
+            fixture.Paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
 
         SetupRunResult result = await fixture.Runner().RunAsync(fixture.Options(check: true), CancellationToken.None);
 
@@ -65,7 +67,9 @@ public sealed class SetupRunnerProfileLifecycleTests
             .Which.GetProperty("failure_count").GetInt32().Should().Be(3);
         fixture.Interaction.EventTypes.Should().NotContain("setup.completed");
         fixture.PackageInstaller.ReceivedCalls().Should().BeEmpty();
-        (await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath)).Should().Equal(before);
+        (await File.ReadAllBytesAsync(
+            fixture.Paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken)).Should().Equal(before);
         fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -143,7 +147,8 @@ public sealed class SetupRunnerProfileLifecycleTests
     {
         using Fixture fixture = new();
         if (check) await fixture.SeedDependenciesAsync("4.1.0", "4.2.0", "4.3.0");
-        byte[]? before = check ? await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath) : null;
+        byte[]? before = check ? await File.ReadAllBytesAsync(
+            fixture.Paths.WorkloadRegistryPath, TestContext.Current.CancellationToken) : null;
 
         SetupRunResult result = await fixture.Runner().RunAsync(fixture.Options(check), CancellationToken.None);
 
@@ -165,7 +170,8 @@ public sealed class SetupRunnerProfileLifecycleTests
         if (check)
         {
             fixture.PackageInstaller.ReceivedCalls().Should().BeEmpty();
-            (await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath)).Should().Equal(before!);
+            (await File.ReadAllBytesAsync(
+                fixture.Paths.WorkloadRegistryPath, TestContext.Current.CancellationToken)).Should().Equal(before!);
             fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
             fixture.MarkerEvents.Should().BeEmpty();
         }
@@ -185,7 +191,9 @@ public sealed class SetupRunnerProfileLifecycleTests
     {
         using Fixture fixture = new();
         await fixture.SeedDependenciesAsync("4.1.0", "4.2.0", "4.3.0");
-        byte[] before = await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath);
+        byte[] before = await File.ReadAllBytesAsync(
+            fixture.Paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
         var catalog = Substitute.For<IProfileCatalog>();
         catalog.LoadAsync(Arg.Any<ProfileSourceContext>(), Arg.Any<CancellationToken>()).Returns([]);
         List<string> resolvedNames = [];
@@ -210,7 +218,9 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.BundleReader.ReceivedCalls().Should().BeEmpty();
         fixture.Catalog.ReceivedCalls().Should().BeEmpty();
         fixture.PackageInstaller.ReceivedCalls().Should().BeEmpty();
-        (await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath)).Should().Equal(before);
+        (await File.ReadAllBytesAsync(
+            fixture.Paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken)).Should().Equal(before);
         fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
     }
 

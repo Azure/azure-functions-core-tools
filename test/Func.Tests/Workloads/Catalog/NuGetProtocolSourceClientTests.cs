@@ -216,7 +216,7 @@ public sealed class NuGetProtocolSourceClientTests
 
         stream.CanSeek.Should().BeTrue();
         var copied = new MemoryStream();
-        await stream.CopyToAsync(copied);
+        await stream.CopyToAsync(copied, TestContext.Current.CancellationToken);
         copied.ToArray().Should().Equal(payload);
     }
 

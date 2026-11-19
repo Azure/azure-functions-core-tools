@@ -453,7 +453,7 @@ public class WorkloadInstallCommandTests
     public async Task Install_LocalNupkgPath_RoutesToLocalInstaller()
     {
         string tempPkg = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.nupkg");
-        await File.WriteAllBytesAsync(tempPkg, [0x50, 0x4B]);
+        await File.WriteAllBytesAsync(tempPkg, [0x50, 0x4B], TestContext.Current.CancellationToken);
         try
         {
             _installer.InstallFromPackageAsync(tempPkg, Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>())
@@ -473,7 +473,8 @@ public class WorkloadInstallCommandTests
             await _installer.Received(1).InstallFromPackageAsync(
                 tempPkg, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
             await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(
-                default!, default, default, default, default, default, default);
+                default!, default, default, default, default, default, default,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
         finally
         {
@@ -500,7 +501,8 @@ public class WorkloadInstallCommandTests
         await _installer.Received(1).InstallFromPackageAsync(
             missingPkg, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(
-            default!, default, default, default, default, default, default);
+            default!, default, default, default, default, default, default,
+            cancellationToken: TestContext.Current.CancellationToken);
     }
 
     [Fact]

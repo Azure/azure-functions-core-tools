@@ -84,7 +84,8 @@ public class HelpCommandTests
     [InlineData("help")]
     public async Task Help_WithoutCommandPath_ShowsGeneralHelp(string commandLine)
     {
-        var exitCode = await _rootCommand.Parse(commandLine).InvokeAsync();
+        var exitCode = await _rootCommand.Parse(commandLine).InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.AllOutput.Should().Contain("TITLE: Azure Functions CLI").And.Contain("RULE: Commands");
@@ -101,9 +102,11 @@ public class HelpCommandTests
     {
         var expectedInteraction = new TestInteractionService();
         var expectedRoot = TestParser.CreateRoot(expectedInteraction);
-        var expectedExitCode = await expectedRoot.Parse($"{commandPath} --help").InvokeAsync();
+        var expectedExitCode = await expectedRoot.Parse($"{commandPath} --help").InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync();
+        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         expectedExitCode.Should().Be(0);
         exitCode.Should().Be(0);
@@ -118,7 +121,8 @@ public class HelpCommandTests
     [InlineData("workload install nonexistent")]
     public async Task Help_WithInvalidCommandPath_ReturnsErrorWithoutRenderingPartialHelp(string commandPath)
     {
-        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync();
+        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(1);
         _interaction.Lines.Should().ContainSingle()
@@ -172,7 +176,7 @@ public class HelpCommandTests
     {
         var result = _rootCommand.Parse(commandLine);
 
-        var exitCode = await result.InvokeAsync();
+        var exitCode = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         result.Errors.Should().BeEmpty();
         result.GetValue(_rootCommand.VerboseOption).Should().BeTrue();
@@ -202,7 +206,8 @@ public class HelpCommandTests
         cloud.Subcommands.Add(deployment);
         _rootCommand.Subcommands.Add(cloud);
 
-        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync();
+        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         executed.Should().BeFalse();
@@ -258,7 +263,8 @@ public class HelpCommandTests
         });
         var root = Parser.CreateCommand(provider);
 
-        var exitCode = await root.Parse(commandLine).InvokeAsync();
+        var exitCode = await root.Parse(commandLine).InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().ContainInOrder("RULE: Options", "RULE: first stack", "RULE: Second stack");
@@ -290,7 +296,8 @@ public class HelpCommandTests
         var provider = TestParser.BuildServiceProviderWith(_interaction, services => services.AddSingleton(initializer));
         var root = Parser.CreateCommand(provider);
 
-        var exitCode = await root.Parse("init --help").InvokeAsync();
+        var exitCode = await root.Parse("init --help").InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().ContainInOrder("RULE: Options", $"RULE: {displayName}");
@@ -333,7 +340,8 @@ public class HelpCommandTests
         });
         var root = Parser.CreateCommand(provider);
 
-        var exitCode = await root.Parse(commandLine).InvokeAsync();
+        var exitCode = await root.Parse(commandLine).InvokeAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().ContainInOrder("RULE: Options", "RULE: .NET", "RULE: Node.js");

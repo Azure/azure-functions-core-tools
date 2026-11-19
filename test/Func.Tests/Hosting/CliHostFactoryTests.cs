@@ -219,9 +219,9 @@ public sealed class CliHostFactoryTests : IDisposable
                 ["Workloads:Home"] = configHome,
             });
 
-            await builder.RegisterWorkloadsAsync();
+            await builder.RegisterWorkloadsAsync(cancellationToken: TestContext.Current.CancellationToken);
             using IHost host = builder.Build();
-            await host.StartAsync();
+            await host.StartAsync(TestContext.Current.CancellationToken);
 
             var rootCommand = Parser.CreateCommand(host.Services);
 

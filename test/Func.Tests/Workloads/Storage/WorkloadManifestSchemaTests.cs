@@ -40,9 +40,11 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public async Task SaveWorkload_WritesSchemaUrlAtTopOfDocument()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Stub", "1.0.0"));
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Stub", "1.0.0"),
+            TestContext.Current.CancellationToken);
 
-        string json = await File.ReadAllTextAsync(_registryPath);
+        string json = await File.ReadAllTextAsync(_registryPath, TestContext.Current.CancellationToken);
 
         json.Should().Contain($"\"$schema\":\"{V1Schema}\"");
         int schemaIdx = json.IndexOf("\"$schema\"", StringComparison.Ordinal);
@@ -63,7 +65,7 @@ public class WorkloadManifestSchemaTests : IDisposable
             }
             """);
 
-        IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
 
         workloads.Should().ContainSingle();
     }
@@ -81,7 +83,7 @@ public class WorkloadManifestSchemaTests : IDisposable
             }
             """);
 
-        IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
 
         workloads.Should().ContainSingle();
     }
@@ -109,11 +111,11 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public async Task RoundTrip_PreservesSchemaUrl()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Pkg", "1.0.0"));
-        await _store.GetWorkloadsAsync();
-        await _store.SaveWorkloadAsync(NewEntry("Pkg2", "2.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Pkg", "1.0.0"), TestContext.Current.CancellationToken);
+        await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(NewEntry("Pkg2", "2.0.0"), TestContext.Current.CancellationToken);
 
-        string json = await File.ReadAllTextAsync(_registryPath);
+        string json = await File.ReadAllTextAsync(_registryPath, TestContext.Current.CancellationToken);
 
         json.Should().Contain($"\"$schema\":\"{V1Schema}\"");
     }

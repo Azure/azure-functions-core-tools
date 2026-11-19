@@ -689,7 +689,7 @@ public class CompactRendererFunctionBrowserTests
         await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
-        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
@@ -708,7 +708,7 @@ public class CompactRendererFunctionBrowserTests
         await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
-        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
@@ -724,7 +724,7 @@ public class CompactRendererFunctionBrowserTests
         await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
-        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
