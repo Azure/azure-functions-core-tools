@@ -99,24 +99,12 @@
 
   <!--
   Include the copy-to-output items of project references marked with Pack="true" in the package.
-  Each item's TargetPath is used as its package-relative path.
+  Each item's (TargetPathPrefix-rebased) TargetPath is used as its package-relative path.
   -->
-  <Target Name="_IncludePackedProjectReferenceItems" DependsOnTargets="PrepareProjectReferences">
+  <Target Name="_IncludePackedProjectReferenceItems" DependsOnTargets="ResolveProjectReferenceCopyItems">
     <ItemGroup>
-      <_PackedProjectReference Include="@(_MSBuildProjectReferenceExistent)" Condition="'%(_MSBuildProjectReferenceExistent.Pack)' == 'true'" />
-    </ItemGroup>
-
-    <MSBuild Projects="@(_PackedProjectReference)"
-             Targets="GetCopyToOutputDirectoryItems"
-             BuildInParallel="$(BuildInParallel)"
-             Properties="%(_PackedProjectReference.SetConfiguration);%(_PackedProjectReference.SetPlatform);%(_PackedProjectReference.SetTargetFramework)"
-             RemoveProperties="%(_PackedProjectReference.GlobalPropertiesToRemove)$(_GlobalPropertiesToRemoveFromProjectReferences)"
-             Condition="'@(_PackedProjectReference)' != ''">
-      <Output TaskParameter="TargetOutputs" ItemName="_PackedProjectReferenceItem" />
-    </MSBuild>
-
-    <ItemGroup>
-      <TfmSpecificPackageFile Include="@(_PackedProjectReferenceItem)" PackagePath="%(_PackedProjectReferenceItem.TargetPath)" />
+      <TfmSpecificPackageFile Include="@(ProjectReferenceCopyItem)" PackagePath="%(ProjectReferenceCopyItem.TargetPath)"
+        Condition="'%(ProjectReferenceCopyItem.Pack)' == 'true'" />
     </ItemGroup>
   </Target>
 

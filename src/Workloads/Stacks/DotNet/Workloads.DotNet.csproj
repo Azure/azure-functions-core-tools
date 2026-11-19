@@ -18,6 +18,7 @@
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj"
                       ReferenceOutputAssembly="false"
+                      TargetPathPrefix="$(WorkloadTemplateRoot)"
                       Pack="true" />
   </ItemGroup>
 

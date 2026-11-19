@@ -187,9 +187,11 @@ Content, meta, and RID-pointer manifests cannot declare a non-null `templateRoot
 For SDK-generated manifests, set `<WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>`
 in the workload project. To bundle files from another project, add
 `Pack="true"` to its `ProjectReference`. The workload SDK packs that project's
-copy-to-output items, using each item's `TargetPath` as its package path. The
-.NET stack workload uses this for `Workloads.Templates.DotNet`, whose items target
-`content/templates/...`.
+copy-to-output items, using each item's `TargetPath` as its package path. Add
+`TargetPathPrefix` to the same reference to place those items under a directory
+in both the build output and the package. The .NET stack workload references
+`Workloads.Templates.DotNet` with `TargetPathPrefix="$(WorkloadTemplateRoot)"`,
+so the template project stays layout-agnostic.
 Paths must be relative according to the current platform's `Path.IsPathRooted`
 rules. The CLI normalizes both slash styles, combines the declaration with the
 package directory, and uses `Path.GetFullPath` to reject paths that resolve outside
