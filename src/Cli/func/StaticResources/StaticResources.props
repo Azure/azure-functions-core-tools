@@ -37,6 +37,42 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet11IsolatedChiseled">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet11IsolatedChiseled</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.dotnetIsolated">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.dotnetIsolated</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.python">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.python</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.node">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.node</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.powershell">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.powershell</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.java">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.java</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.java">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.java</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)dockerignore.flexByoc">
+      <LogicalName>$(AssemblyName).dockerignore.flexByoc</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>

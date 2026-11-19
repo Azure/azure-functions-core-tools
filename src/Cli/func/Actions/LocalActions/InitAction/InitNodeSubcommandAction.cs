@@ -25,6 +25,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Skip running 'npm install' after project creation.")
                 .Callback(_ => { });
 
+            Parser
+                .Setup<string>("runtime-version")
+                .WithDescription("Runtime version for Flex BYOC artifacts.")
+                .Callback(_ => { });
+
             return base.ParseArgs(args);
         }
 
