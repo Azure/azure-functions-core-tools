@@ -26,7 +26,7 @@ internal static class TemplateFixtures
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
     /// or project type, and returns its path.
     /// </summary>
-    public static string WriteBasicPackage(string parentDirectory)
+    public static string WriteBasicPackage(string parentDirectory, string? itemHostJson = null)
     {
         string packageDirectory = Path.Combine(parentDirectory, "basic-templates");
 
@@ -44,7 +44,16 @@ internal static class TemplateFixtures
               "sourceName": "ItemFunction"
             }
             """,
-            ("ItemFunction.txt", "ItemFunction content"));
+            ("ItemFunction.txt", "ItemFunction content"),
+            ("func.host.json", itemHostJson ?? """
+                {
+                  "symbolInfo": {
+                    "AuthorizationLevel": { "longName": "auth-level", "shortName": "a" }
+                  },
+                  "usageExamples": [ "func new --auth-level anonymous" ]
+                }
+                """),
+            ("dotnetcli.host.json", """{"symbolInfo":{"AuthorizationLevel":{"longName":"dotnet-auth"}},"isHidden":true}"""));
 
         WriteTemplate(
             Path.Combine(packageDirectory, "project"),

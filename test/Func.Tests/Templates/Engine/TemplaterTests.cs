@@ -1,9 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Settings;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -48,6 +50,42 @@ public sealed class TemplaterTests : IDisposable
             TemplateFixtures.UntypedTemplateIdentity,
         ]);
         result.Templates.Should().AllSatisfy(template => template.Template.Identity.Should().Be(template.Identity));
+    }
+
+    [Fact]
+    public async Task ListAsync_LoadsFuncHostDataOnDiscoveryAndCacheReload()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            using Templater templater = CreateTemplater();
+            TemplateResolutionResult result = await templater.ListAsync(CancellationToken.None);
+
+            FuncTemplateInfo item = result.Templates.Single(template => template.Identity == TemplateFixtures.ItemTemplateIdentity);
+            item.HostConfigPlace.Should().EndWith("func.host.json");
+            item.Template.Should().BeAssignableTo<ITemplateInfoHostJsonCache>()
+                .Which.HostData.Should().NotBeNullOrWhiteSpace();
+            item.HostData.SymbolInfo["AuthorizationLevel"].LongName.Should().Be("auth-level");
+            item.HostData.SymbolInfo["AuthorizationLevel"].ShortName.Should().Be("a");
+            item.HostData.UsageExamples.Should().Equal("func new --auth-level anonymous");
+            item.HostData.IsHidden.Should().BeFalse();
+            result.Templates.Single(template => template.Identity == TemplateFixtures.ProjectTemplateIdentity)
+                .HostData.SymbolInfo.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task ListAsync_InvalidFuncHostFile_ThrowsInsteadOfUsingEmptyMetadata()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root, itemHostJson: "{");
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        Func<Task> act = () => templater.ListAsync(CancellationToken.None);
+
+        await act.Should().ThrowAsync<JsonException>().WithMessage($"*{TemplateFixtures.ItemTemplateIdentity}*func.host.json*");
     }
 
     [Fact]
