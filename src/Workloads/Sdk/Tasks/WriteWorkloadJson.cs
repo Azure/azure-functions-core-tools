@@ -31,6 +31,8 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
 
     public string EntryPointType { get; set; } = string.Empty;
 
+    public string TemplateRoot { get; set; } = string.Empty;
+
     [Required]
     public ITaskItem[] InnerPackages { get; set; } = [];
 
@@ -69,6 +71,7 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
             Description = string.IsNullOrEmpty(Description) ? null : Description,
             RuntimeIdentifier = string.IsNullOrEmpty(RuntimeIdentifier) ? null : RuntimeIdentifier,
             EntryPoint = entryPoint,
+            TemplateRoot = string.IsNullOrEmpty(TemplateRoot) ? null : TemplateRoot,
             Packages = packages,
         };
 
@@ -141,6 +144,11 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
         else if (hasEntryPoint)
         {
             Log.LogError($"Workload kind '{Kind}' cannot define an entry point.");
+        }
+
+        if (!string.IsNullOrEmpty(TemplateRoot) && !string.Equals(Kind, "workload", StringComparison.Ordinal))
+        {
+            Log.LogError($"Workload kind '{Kind}' cannot define a template root.");
         }
 
         if (isPointer)
@@ -226,6 +234,9 @@ internal sealed class WorkloadJsonModel
 
     [JsonPropertyName("entryPoint")]
     public EntryPointModel? EntryPoint { get; set; }
+
+    [JsonPropertyName("templateRoot")]
+    public string? TemplateRoot { get; set; }
 
     [JsonPropertyName("packages")]
     public IDictionary<string, string>? Packages { get; set; }

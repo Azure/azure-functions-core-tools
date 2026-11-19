@@ -184,6 +184,12 @@ Runtime (`kind: workload`) manifests may also declare an optional single string
 The CLI validates this declaration and persists it in the installed workload registry.
 The declaration alone does not install a TemplateEngine package.
 Content, meta, and RID-pointer manifests cannot declare a non-null `templateRoot`.
+For SDK-generated manifests, set `<WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>`
+in the workload project. To bundle files from another project, add
+`Pack="true"` to its `ProjectReference`. The workload SDK packs that project's
+copy-to-output items, using each item's `TargetPath` as its package path. The
+.NET stack workload uses this for `Workloads.Templates.DotNet`, whose items target
+`content/templates/...`.
 Paths must be relative according to the current platform's `Path.IsPathRooted`
 rules. The CLI normalizes both slash styles, combines the declaration with the
 package directory, and uses `Path.GetFullPath` to reject paths that resolve outside

@@ -80,6 +80,7 @@
     <ItemGroup Condition="'$(WorkloadKind)' == 'workload'">
       <_WorkloadJsonInputCacheToHash Include="$(WorkloadEntryPointAssembly)" />
       <_WorkloadJsonInputCacheToHash Include="$(WorkloadEntryPointType)" />
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadTemplateRoot)" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(WorkloadKind)' == 'rid-pointer'">
@@ -112,6 +113,7 @@
       RuntimeIdentifier="$(_WorkloadManifestRuntimeIdentifier)"
       EntryPointAssemblyPath="$(WorkloadEntryPointAssembly)"
       EntryPointType="$(WorkloadEntryPointType)"
+      TemplateRoot="$(WorkloadTemplateRoot)"
       InnerPackages="@(_WorkloadRidSpecificPackage)"/>
 
     <ItemGroup>
