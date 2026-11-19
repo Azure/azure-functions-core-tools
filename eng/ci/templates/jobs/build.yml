@@ -60,27 +60,18 @@ jobs:
       parameters:
         sign: ${{ parameters.sign }}
 
-    - task: DotNetCoreCLI@2
+    - script: dotnet restore ${{ parameters.projects }} -v m ${{ parameters.build_args }}
       displayName: Restore
-      inputs:
-        command: custom
-        custom: restore
-        projects: ${{ parameters.projects }}
-        arguments: -v m ${{ parameters.build_args }}
 
-    - task: DotNetCoreCLI@2
+    - script: dotnet build ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
       displayName: Build
-      inputs:
-        command: build
-        projects: ${{ parameters.projects }}
-        arguments: -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
 
-    - task: DotNetCoreCLI@2
+    - script: >-
+        dotnet test ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m --no-build
+        --report-azdo --publish-azdo-test-results ${{ parameters.build_args }}
       displayName: Unit tests
-      inputs:
-        command: test
-        projects: ${{ parameters.projects }}
-        arguments: -c ${{ parameters.configuration }} --no-build ${{ parameters.build_args }}
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       # Only sign the intermediate DLLs if we are packing.
@@ -97,22 +88,14 @@ jobs:
             !**/Azure.Functions.Cli*Tests.dll
 
     - ${{ if containsValue(parameters.artifacts, 'pack') }}:
-      - task: DotNetCoreCLI@2
+      - script: dotnet pack ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
         displayName: Pack
-        inputs:
-          command: custom
-          custom: pack
-          projects: ${{ parameters.projects }}
-          arguments: -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
 
     - ${{ if containsValue(parameters.artifacts, 'publish') }}:
-      - task: DotNetCoreCLI@2
+      - script: >-
+          dotnet build ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m --no-restore
+          -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
         displayName: Publish All Runtimes
-        inputs:
-          command: custom
-          custom: build
-          projects: ${{ parameters.projects }}
-          arguments: -c ${{ parameters.configuration }} -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
 
       - task: CopyFiles@2
         displayName: Copy files

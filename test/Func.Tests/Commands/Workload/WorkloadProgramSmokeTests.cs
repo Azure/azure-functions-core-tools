@@ -12,7 +12,6 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
@@ -533,6 +532,12 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
         private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
 
         internal List<string> Lines { get; } = [];
+
+        public string Output => _output.Output;
+
+        public void Write(string message) => _output.Write(message);
+
+        public void Write(string format, params object[] args) => _output.Write(format, args);
 
         public void WriteLine(string message)
         {

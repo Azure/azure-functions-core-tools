@@ -57,7 +57,7 @@
     <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.16.1" />
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.5485" />
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.6" Version="4.0.5489" />
-  <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.46.2" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.46.2" />
   </ItemGroup>
 
   <!-- host -->
@@ -69,10 +69,10 @@
   <!-- test projects -->
   <ItemGroup>
     <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.AzureDevOpsReport" Version="2.5.3" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.GitHubActionsReport" Version="2.5.3" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.3" />
   </ItemGroup>
 
 </Project>
