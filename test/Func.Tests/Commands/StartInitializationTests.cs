@@ -907,9 +907,14 @@ public class StartInitializationTests : IDisposable
         runningOutput.Should().Contain("12 lines");
         runningOutput.Should().NotContain("entry 01");
         runningOutput.Should().NotContain("entry 02");
+        int previousEntryIndex = -1;
         for (int i = 3; i <= 12; i++)
         {
-            runningOutput.Should().Contain($"entry {i:00}");
+            string entry = $"entry {i:00}";
+            int entryIndex = runningOutput.IndexOf(entry, StringComparison.Ordinal);
+            entryIndex.Should().BeGreaterThan(previousEntryIndex);
+            runningOutput.Split(entry, StringSplitOptions.None).Length.Should().Be(2);
+            previousEntryIndex = entryIndex;
         }
 
         await renderer.OnEventAsync(new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, "prepare", "ready"), CancellationToken.None);
@@ -917,10 +922,13 @@ public class StartInitializationTests : IDisposable
         await renderer.OnEventAsync(new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, CreateResult()), CancellationToken.None);
         await renderer.DisposeAsync();
 
-        string completedOutput = GetLatestFrame(writer.ToString());
+        string completedTranscript = writer.ToString();
+        string completedOutput = GetLatestFrame(completedTranscript);
         completedOutput.Should().Contain("ready");
         completedOutput.Should().NotContain("entry ");
         completedOutput.Should().NotContain("lines");
+        string ellipsis = console.Profile.Capabilities.Unicode ? "\u2026" : "...";
+        completedTranscript.Should().NotContain($"lines{ellipsis}");
     }
 
     [Fact]
@@ -988,7 +996,7 @@ public class StartInitializationTests : IDisposable
             && frame.Contains("1 line", StringComparison.Ordinal));
         await renderer.DisposeAsync();
 
-        string output = GetLatestFrame(writer.ToString());
+        string output = GetOutputAfterLastCursorRestore(writer.ToString());
 
         output.Should().Contain("build failed");
         output.Should().Contain("error tail");
@@ -1192,6 +1200,13 @@ public class StartInitializationTests : IDisposable
     {
         int frameStart = output.LastIndexOf("Azure Functions CLI", StringComparison.Ordinal);
         return frameStart < 0 ? string.Empty : output[frameStart..];
+    }
+
+    private static string GetOutputAfterLastCursorRestore(string output)
+    {
+        const string cursorRestore = "\u001b[?25h";
+        int liveDisplayEnd = output.LastIndexOf(cursorRestore, StringComparison.Ordinal);
+        return liveDisplayEnd < 0 ? string.Empty : output[(liveDisplayEnd + cursorRestore.Length)..];
     }
 
     private static async Task<string> WaitForFrameAsync(StringWriter writer, Func<string, bool> predicate)
