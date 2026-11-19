@@ -1060,7 +1060,7 @@ public sealed class SetupRunnerTests : IDisposable
         // entirely so the user can't toggle them.
         interactive.Lines.Should().Contain(line => line.Contains("Already installed", StringComparison.Ordinal)
             && line.Contains("func workload uninstall", StringComparison.Ordinal));
-        interactive.Lines.Should().Contain(line => line.Contains("[✓] Node.js", StringComparison.Ordinal));
+        interactive.Lines.Should().Contain(line => line.Contains("[✓] node (Node.js)", StringComparison.Ordinal));
         interactive.Lines.Should().NotContain(line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("Node.js", StringComparison.Ordinal));
         interactive.MultiSelectionChoices.SelectMany(g => g).Should().NotContain(c => c.Value == "node");
     }

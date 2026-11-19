@@ -165,7 +165,7 @@ public sealed class SetupAutomationContractTests
 
         _ = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
 
-        harness.Interaction.Lines.Should().Contain(line => line.Contains($"[✓] {displayName}", StringComparison.Ordinal));
+        harness.Interaction.Lines.Should().Contain(line => line.Contains($"[✓] {stack} ({displayName})", StringComparison.Ordinal));
         harness.Interaction.MultiSelectionChoices.Should().ContainSingle().Which.Should().HaveCount(5)
             .And.NotContain(choice => choice.Value == stack || choice.Label == displayName);
     }

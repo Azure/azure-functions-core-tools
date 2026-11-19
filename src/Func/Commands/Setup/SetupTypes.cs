@@ -109,6 +109,22 @@ internal sealed record SetupDependency(
     public static bool SupportsStack(string stack)
         => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
 
+    public static string StackDisplayName(string stack)
+    {
+        ArgumentNullException.ThrowIfNull(stack);
+
+        return stack.Trim().ToLowerInvariant() switch
+        {
+            "dotnet" => ".NET",
+            "go" => "Go",
+            "java" => "Java",
+            "node" => "Node.js",
+            "powershell" => "PowerShell",
+            "python" => "Python",
+            _ => throw new ArgumentException($"Unsupported stack '{stack}'.", nameof(stack)),
+        };
+    }
+
     private static string StackPackageSuffix(string stack)
         => stack.Trim().ToLowerInvariant() switch
         {
