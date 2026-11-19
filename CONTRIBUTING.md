@@ -121,6 +121,19 @@ dotnet test test/Cli/Func.E2ETests/Azure.Functions.Cli.E2ETests.csproj
 export FUNC_PATH=/path/to/custom/func
 ```
 
+#### Node.js template tests
+
+Node.js v4 templates are embedded in the [template catalog](src/Cli/func/StaticResources/node-v4-templates.json). When updating them, verify JavaScript and TypeScript generation with both default and custom function names.
+
+Run the focused checks from the repository root using Node.js 24 or later:
+
+```bash
+dotnet test test/Cli/Func.UnitTests/Azure.Functions.Cli.UnitTests.csproj --filter "FullyQualifiedName~TemplatesManagerTests"
+node --test test/Cli/Func.UnitTests/node-connector-templates.test.mjs
+```
+
+See the [connector template guide](docs/connector-templates.md#local-generation-tests) for the detailed generation workflow, process-level tests, and optional SDK-dependent checks.
+
 #### Missing Templates
 
 If tests fail due to missing templates, download them:

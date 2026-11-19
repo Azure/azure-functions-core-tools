@@ -13,6 +13,47 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class NodeTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
+        [Theory]
+        [InlineData("javascript", "Office 365 trigger", "office365NewEmailPoll", "js")]
+        [InlineData("typescript", "Office 365 trigger", "office365NewEmailPoll", "ts")]
+        [InlineData("javascript", "SharePoint trigger", "sharepointNewFilePoll", "js")]
+        [InlineData("typescript", "SharePoint trigger", "sharepointNewFilePoll", "ts")]
+        [InlineData("javascript", "OneDrive trigger", "oneDriveNewFilePoll", "js")]
+        [InlineData("typescript", "OneDrive trigger", "oneDriveNewFilePoll", "ts")]
+        [InlineData("javascript", "Dataverse trigger", "dataverseNewRowPoll", "js")]
+        [InlineData("typescript", "Dataverse trigger", "dataverseNewRowPoll", "ts")]
+        [InlineData("javascript", "Teams trigger", "teamsNewChannelMessagePoll", "js")]
+        [InlineData("typescript", "Teams trigger", "teamsNewChannelMessagePoll", "ts")]
+        public void FuncNew_NodeV4Connector_UsesEmbeddedTemplateWithoutBundle(
+            string language, string templateName, string defaultName, string extension)
+        {
+            var testName = $"{nameof(FuncNew_NodeV4Connector_UsesEmbeddedTemplateWithoutBundle)}_{defaultName}_{language}";
+            var init = new FuncInitCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
+                .Execute([".", "--worker-runtime", "node", "--language", language, "--model", "V4", "--no-bundle", "--skip-npm-install"]);
+            init.Should().ExitWith(0);
+
+            foreach (var functionName in new[] { defaultName, $"custom{defaultName}" })
+            {
+                var result = new FuncNewCommand(FuncPath, testName, Log)
+                    .WithWorkingDirectory(WorkingDirectory)
+                    .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
+                    .Execute(["--language", language, "--template", $"\"{templateName}\"", "--name", functionName]);
+
+                result.Should().ExitWith(0);
+                result.Should().HaveStdOutContaining($"The function \"{functionName}\" was created successfully");
+                var code = File.ReadAllText(Path.Combine(WorkingDirectory, "src", "functions", $"{functionName}.{extension}"));
+                code.Should().Contain($"'{functionName}'");
+                code.Should().Contain("deliveryMode: DeliveryMode.Poll");
+                code.Should().NotContain("%functionName%");
+                code.Should().NotContain("cardinality:");
+                code.Should().NotContain("maxBatchSize:");
+            }
+
+            Directory.GetFiles(WorkingDirectory, "function.json", SearchOption.AllDirectories).Should().BeEmpty();
+        }
+
         [Fact]
         public void FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
         {

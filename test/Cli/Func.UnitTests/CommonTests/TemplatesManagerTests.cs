@@ -3,8 +3,10 @@
 
 using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Newtonsoft.Json.Linq;
 using NSubstitute;
 using Xunit;
 
@@ -30,10 +32,11 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             _previousOfflineEnv = Environment.GetEnvironmentVariable(Constants.FunctionsCoreToolsOffline);
             _previousBundlePathEnv = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
-            // Create an isolated working directory (no host.json by default)
+            // A missing host.json can enable default bundles; explicitly configure the no-bundle test host.
             _testWorkingDir = Path.Combine(
                 Path.GetTempPath(), "TemplatesManagerTest", Guid.NewGuid().ToString());
             Directory.CreateDirectory(_testWorkingDir);
+            File.WriteAllText(Path.Combine(_testWorkingDir, Constants.HostJsonFileName), "{\"version\":\"2.0\"}");
             Directory.SetCurrentDirectory(_testWorkingDir);
 
             // Ensure the lock file directory exists (CI agents may not have it)
@@ -164,6 +167,187 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             // Assert
             manager.Should().NotBeNull();
             manager.Should().BeAssignableTo<ITemplatesManager>();
+        }
+
+        [Fact]
+        public void TestHost_HasExplicitConfigurationWithoutExtensionBundle()
+        {
+            Assert.True(File.Exists(Path.Combine(_testWorkingDir, Constants.HostJsonFileName)));
+            Assert.Null(ExtensionBundleHelper.GetExtensionBundleOptions().Id);
+        }
+
+        public static IEnumerable<object[]> NodeConnectorTemplates()
+        {
+            (string Id, string Name, string DefaultName)[] connectors =
+            [
+                ("Outlook", "Office 365 trigger", "office365NewEmailPoll"),
+                ("Sharepoint", "SharePoint trigger", "sharepointNewFilePoll"),
+                ("OneDrive", "OneDrive trigger", "oneDriveNewFilePoll"),
+                ("Dataverse", "Dataverse trigger", "dataverseNewRowPoll"),
+                ("Teams", "Teams trigger", "teamsNewChannelMessagePoll"),
+            ];
+
+            foreach (var connector in connectors)
+            {
+                foreach (var (language, extension) in new[] { ("JavaScript", "js"), ("TypeScript", "ts") })
+                {
+                    yield return
+                    [
+                        $"{connector.Id}Trigger-{language}-4.x",
+                        connector.Name,
+                        connector.DefaultName,
+                        language,
+                        extension,
+                    ];
+                }
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task Templates_IncludesEmbeddedNodeConnectorWithoutBundle(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+
+            Assert.Equal(name, template.Metadata.Name);
+            Assert.Equal(defaultName, template.Metadata.DefaultFunctionName);
+            Assert.Equal(language, template.Metadata.Language);
+            Assert.Equal("connectorTrigger", template.Metadata.TriggerType);
+            Assert.Empty(template.Metadata.UserPrompt);
+            Assert.Null(template.Function);
+            Assert.Single(template.Files);
+            var code = template.Files[$"%functionName%.{extension}"];
+            Assert.Contains("deliveryMode: DeliveryMode.Poll", code);
+            Assert.DoesNotContain("cardinality:", code);
+            Assert.DoesNotContain("maxBatchSize:", code);
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task Deploy_EmbeddedNodeConnector_ReplacesDefaultAndCustomNames(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            Directory.CreateDirectory(Path.Combine(_testWorkingDir, "src", "functions"));
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+            Assert.Equal(name, template.Metadata.Name);
+            Assert.Equal(language, template.Metadata.Language);
+
+            foreach (var functionName in new[] { defaultName, $"custom{defaultName}" })
+            {
+                await manager.Deploy(functionName, null, template);
+
+                var file = Path.Combine(_testWorkingDir, "src", "functions", $"{functionName}.{extension}");
+                Assert.Equal(
+                    template.Files[$"%functionName%.{extension}"].Replace("%functionName%", functionName),
+                    await File.ReadAllTextAsync(file));
+                Assert.False(Directory.Exists(Path.Combine(_testWorkingDir, functionName)));
+            }
+
+            Assert.Empty(Directory.GetFiles(_testWorkingDir, "function.json", SearchOption.AllDirectories));
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task ConnectorTemplates_IncludeInstructionsCommentAndRequiredSettings(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+            Assert.Equal(name, template.Metadata.Name);
+
+            Assert.True(TemplatesManager.IsConnectorTriggerTemplate(template));
+            Assert.Contains(
+                "// Visit aka.ms/connectortrigger to local testing and deployment instructions.",
+                template.Files[$"%functionName%.{extension}"]);
+
+            var settings = TemplatesManager.GetConnectorTriggerSettings(template);
+            Assert.Contains("ConnectorNamespace__pollingEndpoint", settings.Keys);
+            Assert.Contains(settings.Keys, k => k.EndsWith("TriggerConfigName", StringComparison.Ordinal));
+            Assert.DoesNotContain(settings.Keys, k => k.Equals("functionName", StringComparison.OrdinalIgnoreCase));
+
+            var readme = TemplatesManager.BuildConnectorTriggerReadme(
+                await StaticResources.ConnectorTriggerReadme, defaultName, $"{defaultName}.{extension}", template, settings);
+            Assert.DoesNotMatch(@"\{[A-Za-z]+\}", readme);
+            Assert.Contains(defaultName, readme);
+            Assert.Contains(language, readme);
+            Assert.All(settings.Keys, key => Assert.Contains(key, readme));
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task Deploy_EmbeddedNodeConnector_WritesReadmeAndMergesLocalSettings(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            Directory.CreateDirectory(Path.Combine(_testWorkingDir, "src", "functions"));
+            var localSettingsPath = Path.Combine(_testWorkingDir, Constants.LocalSettingsJsonFileName);
+            await File.WriteAllTextAsync(
+                localSettingsPath,
+                "{\"IsEncrypted\":false,\"Values\":{\"FUNCTIONS_WORKER_RUNTIME\":\"node\",\"ConnectorNamespace__pollingEndpoint\":\"https://existing\"}}");
+
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+            Assert.Equal(name, template.Metadata.Name);
+
+            await manager.Deploy(defaultName, null, template);
+
+            Assert.True(File.Exists(Path.Combine(_testWorkingDir, "src", "functions", $"{defaultName}.{extension}")));
+            var readmePath = Path.Combine(_testWorkingDir, $"{defaultName}.README.md");
+            Assert.True(File.Exists(readmePath));
+            Assert.Contains(language, await File.ReadAllTextAsync(readmePath));
+
+            var values = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(await File.ReadAllTextAsync(localSettingsPath))["Values"];
+            Assert.Equal("node", (string)values["FUNCTIONS_WORKER_RUNTIME"]);
+            Assert.Equal("https://existing", (string)values["ConnectorNamespace__pollingEndpoint"]);
+            foreach (var key in TemplatesManager.GetConnectorTriggerSettings(template).Keys)
+            {
+                Assert.NotNull(values[key]);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, "connectornamespace__pollingendpoint", "https://existing.example")]
+        [InlineData(true, "connectornamespace__pollingendpoint", "https://existing.example")]
+        [InlineData(false, "ONNEWEMAILTRIGGERCONFIGNAME", "existing-config")]
+        [InlineData(true, "ONNEWEMAILTRIGGERCONFIGNAME", "existing-config")]
+        [InlineData(false, "connectornamespace__pollingendpoint", "")]
+        [InlineData(true, "connectornamespace__pollingendpoint", "")]
+        public async Task Deploy_EmbeddedNodeConnector_PreservesDifferentlyCasedSettings(
+            bool isEncrypted, string existingName, string existingValue)
+        {
+            Directory.CreateDirectory(Path.Combine(_testWorkingDir, "src", "functions"));
+            var localSettingsPath = Path.Combine(_testWorkingDir, Constants.LocalSettingsJsonFileName);
+            var localSettings = new AppSettingsFile(localSettingsPath) { IsEncrypted = isEncrypted };
+            localSettings.SetSecret("FUNCTIONS_WORKER_RUNTIME", "node");
+            localSettings.SetSecret(existingName, existingValue);
+            localSettings.Commit();
+            var before = JObject.Parse(await File.ReadAllTextAsync(localSettingsPath));
+
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == "OutlookTrigger-TypeScript-4.x");
+
+            await manager.Deploy("preserveExistingSettings", null, template);
+
+            var after = JObject.Parse(await File.ReadAllTextAsync(localSettingsPath));
+            Assert.Equal(isEncrypted, after.Value<bool>("IsEncrypted"));
+            var values = (JObject)after["Values"];
+            var existing = Assert.Single(values.Properties(), property => property.Name.Equals(existingName, StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(existingName, existing.Name);
+            Assert.True(JToken.DeepEquals(before["Values"][existingName], existing.Value));
+            Assert.Equal(3, values.Count);
+
+            var decryptedValues = new AppSettingsFile(localSettingsPath).GetValues();
+            Assert.Equal("node", decryptedValues["FUNCTIONS_WORKER_RUNTIME"]);
+            Assert.Equal(existingValue, decryptedValues[existingName]);
+            foreach (var setting in TemplatesManager.GetConnectorTriggerSettings(template))
+            {
+                if (!setting.Key.Equals(existingName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Assert.Equal(setting.Value, decryptedValues[setting.Key]);
+                }
+            }
         }
     }
 }

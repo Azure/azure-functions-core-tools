@@ -116,7 +116,34 @@ function New-PlatformMSI {
         & { candle -arch $Platform -dPlatform="$Platform" -dSource='.' -dProductVersion="$CliVersion" $masterWxsPath $fragmentPath }
 
         # Link to create MSI
-        & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
+        # Prepare to run light.exe with a reduced environment to avoid Windows Installer crashes due to large environment blocks
+        $lightStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $lightStartInfo.FileName = (Get-Command light -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+        $lightStartInfo.WorkingDirectory = (Get-Location).Path
+        $lightStartInfo.UseShellExecute = $false
+        $lightStartInfo.Arguments = '-ext WixUIExtension -out "{0}" -sice:ICE61 "{1}.wixobj" "{2}.wixobj"' -f $msiPath, $masterWxsName, $fragmentName
+
+        # Remove large environment variables that light.exe doesn't need
+        foreach ($name in @('PIP_INDEX_URL', 'THIRDPARTYBINARIESTOSIGN', 'JAVA_TOOL_OPTIONS', 'NO_PROXY')) {
+            [void]$lightStartInfo.Environment.Remove($name)
+        }
+        $lightEnvSize = ($lightStartInfo.Environment.GetEnumerator() |
+            ForEach-Object { $_.Key.Length + $_.Value.Length + 2 } | Measure-Object -Sum).Sum + 1
+        Write-Host "light.exe environment size: ~$lightEnvSize UTF-16 chars"
+        if ($lightEnvSize -gt 32000) {
+            Write-Warning "light.exe environment is near or above the Windows Installer limit (~32K chars); ICE validation may fail."
+        }
+
+        # Start light.exe process with the reduced environment size
+        $lightProcess = [System.Diagnostics.Process]::Start($lightStartInfo)
+        try {
+            $lightProcess.WaitForExit()
+            if ($lightProcess.ExitCode -ne 0) {
+                throw "light.exe exited with code $($lightProcess.ExitCode)."
+            }
+        } finally {
+            $lightProcess.Dispose()
+        }
 
         # Verify MSI was created
         if (-not (Test-Path -Path $msiPath)) {
