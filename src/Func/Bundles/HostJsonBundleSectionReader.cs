@@ -40,7 +40,7 @@ internal sealed class HostJsonBundleSectionReader : IHostJsonBundleSectionReader
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 throw new ExtensionBundleConfigurationException(
-                    $"host.json root must be a JSON object: '{hostJsonPath}'. Fix host.json and run 'func start' again.");
+                    $"host.json root must be a JSON object: '{hostJsonPath}'. Fix host.json.");
             }
 
             if (!document.RootElement.TryGetProperty("extensionBundle", out JsonElement bundle))
@@ -60,19 +60,19 @@ internal sealed class HostJsonBundleSectionReader : IHostJsonBundleSectionReader
         catch (JsonException ex)
         {
             throw new ExtensionBundleConfigurationException(
-                $"host.json is not valid JSON: '{hostJsonPath}'. Fix host.json and run 'func start' again.",
+                $"host.json is not valid JSON: '{hostJsonPath}'. Fix host.json.",
                 ex);
         }
         catch (IOException ex)
         {
             throw new ExtensionBundleConfigurationException(
-                $"Could not read host.json: '{hostJsonPath}'. Check file permissions and run 'func start' again.",
+                $"Could not read host.json: '{hostJsonPath}'. Check file permissions.",
                 ex);
         }
         catch (UnauthorizedAccessException ex)
         {
             throw new ExtensionBundleConfigurationException(
-                $"Could not read host.json: '{hostJsonPath}'. Check file permissions and run 'func start' again.",
+                $"Could not read host.json: '{hostJsonPath}'. Check file permissions.",
                 ex);
         }
     }
@@ -97,5 +97,5 @@ internal sealed class HostJsonBundleSectionReader : IHostJsonBundleSectionReader
     private static ExtensionBundleConfigurationException CreateInvalidBundleSection(string hostJsonPath)
         => new(
             $"host.json extensionBundle must include non-empty string 'id' and 'version' values: '{hostJsonPath}'. "
-            + "Fix host.json and run 'func start' again.");
+            + "Fix host.json.");
 }

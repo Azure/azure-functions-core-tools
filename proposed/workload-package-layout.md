@@ -187,7 +187,7 @@ In layout terms:
 │       ├── <transitive managed dependencies>.dll       # As emitted by `dotnet publish`.
 │       └── runtimes/                                   # OPTIONAL. Present only if a transitive
 │           ├── win-x64/                                # dep ships native or RID-specific managed
-│           │   ├── lib/net10.0/...                     # bits. Workload-private; resolved by the
+│           │   ├── lib/net11.0/...                     # bits. Workload-private; resolved by the
 │           │   └── native/...                          # .NET runtime, not the CLI.
 │           ├── linux-x64/...
 │           └── osx-arm64/...
@@ -343,20 +343,26 @@ to learn what to load — it does **not** scan the package's assemblies.
 3. **Validate manifest shape** (§5.4). For `kind: workload`,
    `entryPoint.assemblyPath` and `entryPoint.type` must both be
    present, the path must not be absolute or contain `..` segments,
-   and the file it points to (resolved relative to `tools/any/`)
+   and the file it points to (resolved relative to the package root,
+   with a legacy `tools/any/` fallback)
    must exist inside the package. For `kind: content`, `entryPoint`
    must be absent and the `tools/any/` payload contents are not
    further inspected. Reject the package on any failure.
-4. Move the **entire `tools/any/` payload** into the install location
-   (`<workload-home>/workloads/<packageId>/<packageVersion>/tools/any/`)
-   preserving its internal structure. The workload assembly, its
-   `.deps.json`, the `runtimes/` subtree, and any workload-internal
-   asset directories must remain adjacent so
-   `AssemblyDependencyResolver` can resolve dependencies relative to
-   the workload assembly and so workload code can find its data
-   files at paths relative to `AppContext.BaseDirectory`. Copy
-   `workload.json` itself to the install-dir root next to `tools/`
-   so the loader can re-read it without going back to the package.
+4. Extract the **entire package payload** into the install location
+   (`<workload-home>/workloads/<packageId>/<packageVersion>/`),
+   preserving package-relative paths during install, update, and
+   forced reinstall. Exclude only NuGet bookkeeping:
+   - Root-level `[Content_Types].xml` and `.signature.p7s`.
+   - The entire package-root `_rels/` directory.
+   - `.psmdcp` files under
+     `package/services/metadata/core-properties/`.
+
+   Match exclusions case-insensitively against normalized paths.
+   Skip directory entries; create directories only for extracted files.
+   Verify package trust against the original archive, extract into
+   staging, and reject entries resolving outside it before writing.
+   Preserve `workload.json` unchanged and move staging into the
+   install location only after validation.
 5. Record the package in the global registry (spec §10.1) with
    `packageId` (lowercased, NuGet-normalized), `packageVersion`,
    `kind`, `aliases` (from `.nuspec` `alias:` tags), `source`, and
@@ -938,8 +944,8 @@ A workload is binary-compatible with a CLI when **both** of these hold:
    workload's resolved reference must bind to that version. The
    workload's TFM is recorded in its assembly's
    `TargetFrameworkAttribute` and `.deps.json`; the .NET runtime's
-   standard load rules handle TFM compatibility (a `net10.0`
-   workload runs on a CLI on a `net10.0`-or-newer runtime without
+   standard load rules handle TFM compatibility (a `net11.0`
+   workload runs on a CLI on a `net11.0`-or-newer runtime without
    further intervention).
 2. **Shared frameworks:** the workload may **not** depend on any
    shared framework (`Microsoft.NETCore.App`, `Microsoft.AspNetCore.App`,

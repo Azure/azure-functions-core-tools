@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Workloads.Discovery;
@@ -86,6 +87,8 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 + "Check for spelling or try updating the CLI to the latest version.");
         }
 
+        ValidateTemplateRoot(metadata, metadataPath, packageDirectory);
+
         switch (metadata.Kind)
         {
             case WorkloadKind.Workload:
@@ -128,6 +131,30 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         }
     }
 
+    private static void ValidateTemplateRoot(WorkloadMetadata metadata, string metadataPath, string packageDirectory)
+    {
+        if (metadata.TemplateRoot is null)
+        {
+            return;
+        }
+
+        if (metadata.Kind != WorkloadKind.Workload)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' defines templateRoot, which is only supported for kind 'workload'.");
+        }
+
+        try
+        {
+            metadata.TemplateRoot = Path.NormalizePath(metadata.TemplateRoot, packageDirectory);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' has invalid templateRoot '{metadata.TemplateRoot}': {ex.Message}", ex);
+        }
+    }
+
     private static void ValidateNoEntryPoint(WorkloadMetadata metadata, string metadataPath)
     {
         if (metadata.EntryPoint is not null)
@@ -164,7 +191,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' declares kind 'rid-pointer' but does not define a non-empty packages map.");
         }
 
-        HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> runtimeIdentifiers = [with(StringComparer.OrdinalIgnoreCase)];
         foreach ((string runtimeIdentifier, string packageId) in metadata.Packages)
         {
             if (!IsNormalizedRuntimeIdentifier(runtimeIdentifier))
@@ -214,6 +241,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' is missing entryPoint.type.");
         }
 
+        // TODO: Use Path.NormalizePath for EntryPointSpec.AssemblyPath validation after reviewing the no-'..' contract.
         // Reject anything that would let a package escape its content root:
         // absolute paths or `..` segments. Defense-in-depth — the loader
         // also checks.

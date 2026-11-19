@@ -51,10 +51,10 @@ internal sealed class SetupFeatureResolver(
         }
 
         List<string> features = [];
-        HashSet<string> featureNames = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> featureNames = [with(StringComparer.OrdinalIgnoreCase)];
         List<SetupRuntimeFeature> runtimeFeatures = [];
-        HashSet<string> runtimeFeatureNames = new(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> workerRuntimes = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> runtimeFeatureNames = [with(StringComparer.OrdinalIgnoreCase)];
+        HashSet<string> workerRuntimes = [with(StringComparer.OrdinalIgnoreCase)];
         bool includeExtensionBundle = false;
 
         foreach (string rawFeature in requestedFeatures)
@@ -192,7 +192,7 @@ internal sealed class SetupFeatureResolver(
             // Surfacing installed stacks is a UX hint, not a contract. If we
             // can't read the store, fall back to showing every stack as
             // available so the user can still make a selection.
-            installedStackPackageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            installedStackPackageIds = [with(StringComparer.OrdinalIgnoreCase)];
         }
 
         List<MultiSelectionChoice> promptChoices = [];

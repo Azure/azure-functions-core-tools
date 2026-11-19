@@ -457,11 +457,11 @@ internal sealed class SetupRecordingInteraction : IInteractionService
     public Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
         => _inner.ShowStatusAsync(statusMessage, action, cancellationToken);
 
-    public Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default)
-        => _inner.StatusAsync(statusMessage, action, cancellationToken);
+    public Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default, bool writeCompletion = true)
+        => _inner.StatusAsync(statusMessage, action, cancellationToken, writeCompletion);
 
-    public Task<T> RunWithProgressAsync<T>(string initialDescription, Func<IProgressContext, CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
-        => _inner.RunWithProgressAsync(initialDescription, action, cancellationToken);
+    public Task<T> RunWithProgressAsync<T>(string initialDescription, Func<IProgressContext, CancellationToken, Task<T>> action, CancellationToken cancellationToken = default, bool writeCompletion = true)
+        => _inner.RunWithProgressAsync(initialDescription, action, cancellationToken, writeCompletion);
 
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
         => _inner.ConfirmAsync(prompt, defaultValue, cancellationToken);

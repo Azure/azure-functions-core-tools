@@ -4,7 +4,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <RuntimeIdentifiers>$(_CliRuntimeIdentifiers)</RuntimeIdentifiers>
     <AssemblyName>func</AssemblyName>
     <RootNamespace>$(TopLevelNamespace)</RootNamespace>
@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Performance.Microbenchmarks" />
     <!-- Required for NSubstitute (Castle DynamicProxy) to mock internal interfaces. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>

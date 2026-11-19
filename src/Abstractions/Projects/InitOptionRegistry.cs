@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Projects;
 public sealed class InitOptionRegistry : IInitOptionRegistry
 {
     private readonly Command _command;
-    private readonly Dictionary<string, Entry> _byName = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Entry> _byName = [with(StringComparer.Ordinal)];
     private string _activeStack = "?";
 
     public InitOptionRegistry(Command command)

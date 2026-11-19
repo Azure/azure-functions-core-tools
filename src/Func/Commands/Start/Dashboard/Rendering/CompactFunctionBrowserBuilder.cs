@@ -101,7 +101,7 @@ internal sealed class CompactFunctionBrowserBuilder(ITheme theme, FunctionPalett
             ? string.Create(CultureInfo.InvariantCulture, $" ({function.ActiveInvocations})")
             : string.Empty;
 
-        return $"{marker} {status} [{color}]{Markup.Escape(function.Name)}[/]{activeCount}";
+        return $"{marker} {status} [{color}]{LogText.EscapeMarkup(function.Name)}[/]{activeCount}";
     }
 
     private string FormatStatus(FunctionInfo function) => function.Status switch

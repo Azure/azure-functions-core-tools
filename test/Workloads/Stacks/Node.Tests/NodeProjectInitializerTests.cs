@@ -4,8 +4,8 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;

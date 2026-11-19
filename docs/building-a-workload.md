@@ -55,7 +55,7 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 
 ## Quick Start
 
-1. Create a class library project under `src/Workloads/<kind>/<Name>/` that targets `net10.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
+1. Create a class library project under `src/Workloads/<kind>/<Name>/` that targets `net11.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
 2. Reference `Azure.Functions.Cli.Abstractions` (with `PrivateAssets=all` and `ExcludeAssets=runtime` so it isn't shipped inside your package)
 3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
 4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
@@ -82,7 +82,7 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Title>Node.js</Title>
     <Description>Azure Functions CLI tooling for Node.js projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
@@ -165,7 +165,7 @@ And a `release_notes.md`:
 - Initial scaffold of the Node.js workload (entry point + stub project initializer).
 ```
 
-Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to `tools/any/`**, conventionally a bare filename (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass.
+Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to the package root**, with a legacy `tools/any/` fallback (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass. Assemblies conventionally live under `tools/<rid>/` or `tools/any/`. For RID-specific assemblies, include `tools/<rid>/` in `assemblyPath`; the loader does not automatically search that directory.
 
 ```json
 {
@@ -177,6 +177,24 @@ Add a `workload.json` that points at your entry-point type. `assemblyPath` is **
   }
 }
 ```
+
+Runtime (`kind: workload`) manifests may also declare an optional single string
+`templateRoot`, such as `"content/templates"`, relative to the **physical package root**
+(not `tools/any/` or `tools/<rid>/`). Missing or null means no declared template root.
+The CLI validates this declaration and persists it in the installed workload registry.
+The declaration alone does not install a TemplateEngine package.
+Content, meta, and RID-pointer manifests cannot declare a non-null `templateRoot`.
+Paths must be relative according to the current platform's `Path.IsPathRooted`
+rules. The CLI normalizes both slash styles, combines the declaration with the
+package directory, and uses `Path.GetFullPath` to reject paths that resolve outside
+or to the package root itself. Containment is separator-bounded and compared
+case-insensitively on Windows, ordinally elsewhere. `.` and `..` segments and
+repeated separators are resolved; registry paths use `/` without trailing separators.
+This is lexical containment, not symbolic-link resolution or a guarantee that
+directory names are valid on every filesystem. Authors must choose names supported
+on their target platforms.
+
+The registry stores package identity, not an absolute installation path. When reading entries, the workload store hydrates the non-serialized `PackageRoot` from the configured workload home, package id, and version. Entries saved or returned by ownership changes are bound to that same store's paths.
 
 Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<PackageReadmeFile>` (and the Functions icon as `<PackageIcon>`), so both surface on NuGet feeds without extra packing config. Use it to describe the workload's purpose, the language(s) it supports, and any prerequisites.
 
@@ -377,6 +395,8 @@ var packageManager = parseResult.GetValue(PackageManagerOption);
 
 This is how workloads read their own options without the CLI needing to know about them.
 
+`func init` groups stack-specific options under `IProjectInitializer.DisplayName`; `func run` / `func start` uses the matching `IProjectStack.DisplayName`. Stack headings follow the general `Options` section in ordinal, case-insensitive alphabetical order; options within each group retain their registration order. Stack IDs are matched case-insensitively, with the contributor's stack ID used when no descriptor is registered. Return the canonical options from the registry so shared options remain in the general `Options` section without duplicates. Built-in and bundle options also stay in that general section.
+
 ## Testing
 
 The contract is plain DI, so tests don't need the host:
@@ -427,7 +447,7 @@ The home is resolved as `$(FuncCliWorkloadsHome)` property, then
 By default `DeployForDebug` is **deploy-only**: it errors if no install of
 `<id>@<version>` exists at the resolved home. This is intentional. The
 install state of the home is part of what you're debugging (e.g. "what does
-`func start` do when only the stack is installed and the worker is missing?"),
+`func run` do when only the stack is installed and the worker is missing?"),
 so the target won't silently mutate it.
 
 Pass `-p:FuncCliEnsureWorkloadInstalled=true` to opt into a one-time pack +
@@ -462,7 +482,7 @@ loads.
 ### Bootstrapping richer scenarios
 
 The auto-install mode only installs the workload you picked. For end-to-end
-runs (`func start`) you also need a host and the matching language worker
+runs (`func run`) you also need a host and the matching language worker
 installed, since workload installs are not transitive today. Three recipes:
 
 - **Rebuild preinstalled workloads**: `eng/scripts/debug-workloads.ps1`

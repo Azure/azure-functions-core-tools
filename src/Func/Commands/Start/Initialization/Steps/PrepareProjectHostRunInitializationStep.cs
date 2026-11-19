@@ -82,9 +82,17 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         // on top because the CLI just resolved them; in particular, the resolved
         // FUNCTIONS_WORKER_RUNTIME overrides whatever local.settings.json declares so a stale
         // value can't steer the host into a confusing "wrong language" failure deep in startup.
-        var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
         LocalSettingsSnapshot localSettings = _localSettingsProvider.Get(project.WorkingDirectory.Info);
+        if (localSettings.IsEncrypted)
+        {
+            throw new GracefulException(
+                "Azure Functions CLI cannot start the Functions Host while local.settings.json is encrypted. "
+                + "Decrypt the file before trying again, "
+                + "or remove it if it is no longer needed.",
+                isUserError: true);
+        }
+
+        var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         MergeLocalSettingsValues(localSettings.Values, environmentVariables);
 
         foreach ((string name, string value) in context.State.HostEnvironmentVariables)

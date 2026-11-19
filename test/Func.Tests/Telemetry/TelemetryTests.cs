@@ -8,80 +8,100 @@ namespace Azure.Functions.Cli.Tests.Telemetry;
 
 public class TelemetryTests
 {
-    [Fact]
-    public void TryGetConnectionString_DefaultBuild_ReturnsFalse()
+    private const string InstrumentationKey = "11111111-1111-1111-1111-111111111111";
+    private const string ExpectedConnectionString = "InstrumentationKey=11111111-1111-1111-1111-111111111111";
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public void TryGetConnectionString_UnconfiguredKey_ReturnsFalse(string? key)
     {
-        // Default build has the all-zeros instrumentation key, so telemetry
-        // is not configured.
-        CliTelemetry.TryGetConnectionString(out var connectionString).Should().BeFalse();
+        bool result = CliTelemetry.TryGetConnectionString(key, null, null, out var connectionString);
+
+        result.Should().BeFalse();
         connectionString.Should().BeNull();
     }
 
     [Theory]
-    [InlineData(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar)]
-    [InlineData(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar)]
-    public void TryGetConnectionString_OptOutEnvVarSet_ReturnsFalse(string envVarName)
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    public void TryGetConnectionString_OptOutUnsetOrEmpty_ReturnsConnectionString(string? optOutValue, string? legacyOptOutValue)
     {
-        // Even with a non-default key, an opt-out via either the new or
-        // legacy env var must short-circuit telemetry.
-        using var optOut = new EnvVarScope(envVarName, "1");
+        bool result = CliTelemetry.TryGetConnectionString(InstrumentationKey, optOutValue, legacyOptOutValue, out var connectionString);
 
-        // We can't override the build-time key from a test, so we just
-        // assert the helper agrees the opt-out wins regardless of key state.
-        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
+        result.Should().BeTrue();
+        connectionString.Should().Be(ExpectedConnectionString);
     }
 
     [Theory]
-    [InlineData("0")]
-    [InlineData("false")]
-    [InlineData("FALSE")]
-    [InlineData("no")]
-    [InlineData("n")]
-    [InlineData("off")]
-    [InlineData("OFF")]
-    [InlineData("  off  ")]
-    [InlineData("\tfalse\n")]
-    public void TryGetConnectionString_OptOutFalseSentinels_DoNotOptOut(string value)
+    [InlineData("0", null)]
+    [InlineData(null, "0")]
+    [InlineData("false", null)]
+    [InlineData(null, "false")]
+    [InlineData("no", null)]
+    [InlineData(null, "no")]
+    [InlineData("n", null)]
+    [InlineData(null, "n")]
+    [InlineData("off", null)]
+    [InlineData(null, "off")]
+    [InlineData("FALSE", null)]
+    [InlineData(null, "FALSE")]
+    [InlineData("OfF", null)]
+    [InlineData(null, "OfF")]
+    [InlineData("  off  ", null)]
+    [InlineData(null, "  off  ")]
+    [InlineData("false", "off")]
+    public void TryGetConnectionString_OptOutFalseSentinels_ReturnsConnectionString(string? optOutValue, string? legacyOptOutValue)
     {
-        // The documented "off" sentinels must NOT be treated as opt-out.
-        // The default build still returns false because of the missing key,
-        // but the opt-out path itself should not be the reason.
-        using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
-        using var legacy = new EnvVarScope(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar, value);
+        bool result = CliTelemetry.TryGetConnectionString(InstrumentationKey, optOutValue, legacyOptOutValue, out var connectionString);
 
-        // Just exercising the path; result is gated by the build key.
-        _ = CliTelemetry.TryGetConnectionString(out _);
+        result.Should().BeTrue();
+        connectionString.Should().Be(ExpectedConnectionString);
+    }
+
+    [Fact]
+    public void TryGetConnectionString_TabAndNewlinePaddedFalseSentinels_ReturnsConnectionString()
+    {
+        bool result = CliTelemetry.TryGetConnectionString(InstrumentationKey, "\tFALSE\n", "\r\nOff\t", out var connectionString);
+
+        result.Should().BeTrue();
+        connectionString.Should().Be(ExpectedConnectionString);
     }
 
     [Theory]
-    [InlineData("1")]
-    [InlineData("true")]
-    [InlineData("yes")]
-    [InlineData("on")]
-    [InlineData("anything-else")]
-    public void TryGetConnectionString_OptOutTruthyValues_OptOut(string value)
+    [InlineData("1", null)]
+    [InlineData(null, "1")]
+    [InlineData("true", null)]
+    [InlineData(null, "true")]
+    [InlineData("yes", null)]
+    [InlineData(null, "yes")]
+    [InlineData("on", null)]
+    [InlineData(null, "on")]
+    [InlineData("anything-else", null)]
+    [InlineData(null, "anything-else")]
+    [InlineData(" ", null)]
+    [InlineData(null, " ")]
+    public void TryGetConnectionString_OptOutTruthyValues_ReturnsFalse(string? optOutValue, string? legacyOptOutValue)
     {
-        // Any value outside the documented "off" sentinels is treated as
-        // an opt-out, so we fail safe toward not collecting telemetry.
-        using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
+        bool result = CliTelemetry.TryGetConnectionString(InstrumentationKey, optOutValue, legacyOptOutValue, out var connectionString);
 
-        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
+        result.Should().BeFalse();
+        connectionString.Should().BeNull();
     }
 
-    private sealed class EnvVarScope : IDisposable
+    [Theory]
+    [InlineData("true", "off")]
+    [InlineData("off", "true")]
+    [InlineData("true", "true")]
+    public void TryGetConnectionString_EitherVariableOptsOut_ReturnsFalse(string optOutValue, string legacyOptOutValue)
     {
-        private readonly string _name;
-        private readonly string? _previous;
+        bool result = CliTelemetry.TryGetConnectionString(InstrumentationKey, optOutValue, legacyOptOutValue, out var connectionString);
 
-        public EnvVarScope(string name, string? value)
-        {
-            _name = name;
-            _previous = Environment.GetEnvironmentVariable(name);
-            Environment.SetEnvironmentVariable(name, value);
-        }
-
-        public void Dispose()
-            => Environment.SetEnvironmentVariable(_name, _previous);
+        result.Should().BeFalse();
+        connectionString.Should().BeNull();
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Console.Terminal;
 using Azure.Functions.Cli.Console.Theme;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -16,6 +17,7 @@ internal class SpectreInteractionService : IInteractionService
     private readonly IAnsiConsole _stdout;
     private readonly IAnsiConsole _stderr;
     private readonly ITheme _theme;
+    private IAnsiConsole? _managedInputConsole;
 
     public SpectreInteractionService(ITheme theme, IAnsiConsole? stdout = null, IAnsiConsole? stderr = null)
     {
@@ -36,6 +38,42 @@ internal class SpectreInteractionService : IInteractionService
         && CanSelect;
 
     private bool CanSelect => _stderr.Profile.Capabilities.Interactive && _stderr.Profile.Capabilities.Ansi;
+
+    public bool CanUseFullScreen(ITerminalSessionFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        return IsInteractive
+            && (_managedInputConsole is null || factory is ITerminalInputHandoff { CanHandoffManagedInput: true })
+            && factory.IsSupported(_stdout);
+    }
+
+    public ITerminalSession OpenFullScreen(ITerminalSessionFactory factory, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        cancellationToken.ThrowIfCancellationRequested();
+        List<TerminalInputEvent> pending = [];
+        if (_managedInputConsole is { } inputConsole)
+        {
+            if (factory is not ITerminalInputHandoff { CanHandoffManagedInput: true } handoff)
+            {
+                throw new PlatformNotSupportedException("Buffered prompt input cannot be transferred safely. Use --format=plain.");
+            }
+
+            foreach (TerminalInputEvent input in handoff.DrainManagedInput(inputConsole, cancellationToken))
+            {
+                if (pending.Count == 4096)
+                {
+                    throw new IOException("Too much pending keyboard input to enter full-screen mode safely. Re-run with --format=plain.");
+                }
+
+                pending.Add(input);
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ITerminalSession session = factory.Open(_stdout);
+        return pending.Count == 0 ? session : new PrefixedTerminalSession(session, pending);
+    }
 
     public void WriteLine(string text) => _stdout.WriteLine(text);
 
@@ -142,41 +180,27 @@ internal class SpectreInteractionService : IInteractionService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public async Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
+    public Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
+        => RunWithProgressAsync(statusMessage, (_, ct) => action(ct), cancellationToken);
+
+    public async Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default, bool writeCompletion = true)
     {
-        if (!IsInteractive)
-        {
-            _stderr.Write(new Paragraph($"{statusMessage}...", _theme.Muted).Append(Environment.NewLine));
-            return await action(cancellationToken);
-        }
-
-        T result = default!;
-        await _stderr.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync(statusMessage, async _ =>
-            {
-                result = await action(cancellationToken);
-            });
-
-        return result;
-    }
-
-    public async Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default)
-    {
-        await ShowStatusAsync(statusMessage, async ct =>
+        await RunWithProgressAsync(statusMessage, async (_, ct) =>
         {
             await action(ct);
             return 0;
-        }, cancellationToken);
+        }, cancellationToken, writeCompletion);
     }
 
     public async Task<T> RunWithProgressAsync<T>(
         string initialDescription,
         Func<IProgressContext, CancellationToken, Task<T>> action,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool writeCompletion = true)
     {
         ArgumentNullException.ThrowIfNull(initialDescription);
         ArgumentNullException.ThrowIfNull(action);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!IsInteractive)
         {
@@ -188,51 +212,57 @@ internal class SpectreInteractionService : IInteractionService
             return await action(logging, cancellationToken);
         }
 
-        T result = default!;
-        await _stderr.Progress()
-            .AutoRefresh(true)
-            .AutoClear(true)
-            .HideCompleted(true)
-            .Columns(
-                new TaskDescriptionColumn { Alignment = Justify.Left },
-                new ProgressBarColumn { Width = 30 },
-                new SpinnerColumn(Spinner.Known.Dots))
-            .StartAsync(async ctx =>
+        var task = new ProgressTask(0, Markup.Escape(initialDescription), maxValue: 1d, autoStart: false)
+        {
+            IsIndeterminate = true,
+        };
+        var display = new OperationProgressDisplay(initialDescription, task, _theme, _stderr.Profile.Capabilities.Unicode);
+        bool succeeded = false;
+        try
+        {
+            T result = default!;
+            // Live avoids the padding that Spectre's Progress renderer adds above and below each task.
+            await _stderr.Live(display)
+                .AutoClear(true)
+                .StartAsync(async ctx =>
+                {
+                    task.StartTask();
+                    ctx.Refresh();
+                    var live = new SpectreProgressContext(task, ctx.Refresh);
+                    Task<T> operation = action(live, cancellationToken);
+                    while (!operation.IsCompleted)
+                    {
+                        await Task.WhenAny(operation, Task.Delay(100));
+                        ctx.Refresh();
+                    }
+
+                    result = await operation;
+                });
+            succeeded = true;
+            return result;
+        }
+        finally
+        {
+            if (task.IsStarted)
             {
-                ProgressTask task = ctx.AddTask(initialDescription, autoStart: true, maxValue: 1d);
-                task.IsIndeterminate = true;
-
-                var live = new SpectreProgressContext(task);
-                result = await action(live, cancellationToken);
-
-                // Snap to 100% on success so the bar doesn't linger as a
-                // half-filled fragment when the action finishes without
-                // having called Report.
-                if (task.IsIndeterminate)
-                {
-                    task.IsIndeterminate = false;
-                    task.MaxValue = 1d;
-                    task.Value = 1d;
-                }
-                else if (task.MaxValue > 0)
-                {
-                    task.Value = task.MaxValue;
-                }
-
                 task.StopTask();
-            });
-
-        return result;
+                if (!succeeded || writeCompletion)
+                {
+                    _stderr.Write(display.BuildResult(succeeded));
+                }
+            }
+        }
     }
 
-    private sealed class SpectreProgressContext(ProgressTask task) : IProgressContext
+    private sealed class SpectreProgressContext(ProgressTask task, Action refresh) : IProgressContext
     {
         private readonly ProgressTask _task = task;
 
         public void SetDescription(string description)
         {
             ArgumentNullException.ThrowIfNull(description);
-            _task.Description = description;
+            _task.Description = Markup.Escape(description);
+            refresh();
         }
 
         public void SetTotal(double? total)
@@ -314,6 +344,7 @@ internal class SpectreInteractionService : IInteractionService
             return whenInputUnavailable;
         }
 
+        _managedInputConsole = _stdout;
         return await new ConfirmationPrompt(prompt) { DefaultValue = defaultValue }
             .ShowAsync(_stdout, cancellationToken);
     }
@@ -327,6 +358,7 @@ internal class SpectreInteractionService : IInteractionService
             return choiceList.FirstOrDefault() ?? string.Empty;
         }
 
+        _managedInputConsole = _stderr;
         return await new SelectionPrompt<string>()
             .Title(title)
             .EnableSearch()
@@ -348,6 +380,7 @@ internal class SpectreInteractionService : IInteractionService
 
         // The prompt requires at least one selection; users cancel with CTRL+C
         // (which surfaces as OperationCanceledException up the call stack).
+        _managedInputConsole = _stderr;
         List<MultiSelectionChoice> selected = await new MultiSelectionPrompt<MultiSelectionChoice>()
             .Title(title)
             .Required()
@@ -367,6 +400,7 @@ internal class SpectreInteractionService : IInteractionService
             return defaultValue ?? string.Empty;
         }
 
+        _managedInputConsole = _stderr;
         TextPrompt<string> textPrompt = new TextPrompt<string>(prompt).AllowEmpty();
         if (defaultValue is not null)
         {

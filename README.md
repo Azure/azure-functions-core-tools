@@ -5,9 +5,9 @@
 |main|[![Build Status](https://dev.azure.com/azfunc/public/_apis/build/status%2Fazure%2Fazure-functions-core-tools%2Fcoretools.public?repoName=Azure%2Fazure-functions-core-tools&branchName=main)](https://dev.azure.com/azfunc/public/_build/latest?definitionId=579&repoName=Azure%2Fazure-functions-core-tools&branchName=main) |
 |vnext|[![Build Status](https://dev.azure.com/azfunc/public/_apis/build/status%2Fazure%2Fazure-functions-core-tools%2Fcoretools.public?repoName=Azure%2Fazure-functions-core-tools&branchName=vnext)](https://dev.azure.com/azfunc/public/_build/latest?definitionId=579&repoName=Azure%2Fazure-functions-core-tools&branchName=vnext)|
 
-# Azure Functions Core Tools
+# Azure Functions CLI
 
-The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
+The Azure Functions CLI provides a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
 ## Installation
 
@@ -84,20 +84,27 @@ func <command> [path] [options]
 | `func version` | Display version information |
 | `func help [command]` | Display help for a command |
 
+`func run` uses a full-screen log dashboard in supported interactive terminals.
+Scroll with the mouse or keyboard, drag to select logs, and press Ctrl+C to copy
+a selection or stop the host when nothing is selected. Use `--no-tui` for
+streaming text or `--format=json` for NDJSON. See
+[output modes and controls](docs/func-start-output-modes.md) for history limits,
+clipboard behavior, and terminal compatibility.
+
 ## Architecture
 
-The function-template engine is implemented under `src/Func/Templates/Engine`
-on `Microsoft.TemplateEngine`. `func new` command integration is in progress;
-until available, scaffolding and `--list` return a nonzero exit code without
-modifying the target directory. `func init`, quickstarts, setup, and runtime
-execution remain available.
+The Template Engine infrastructure is implemented under `src/Func/Templates/Engine` using `Microsoft.TemplateEngine`. Command integration for `func new` is still in progress.
+
+Currently, `func new` reports scaffolding and `--list` temporarily unavailable and returns exit code 1 without modifying the target directory. The command skips first-run setup, so this error is returned without running setup.
+
+`func init`, Quickstart, setup, and Functions runtime execution remain available.
 
 The v5 CLI is a ground-up rebuild using:
 
 - **System.CommandLine 2.0.6** — command parsing (following the dotnet CLI model)
 - **Spectre.Console** — rich terminal output (tables, prompts, spinners)
 - **Dependency Injection** — Microsoft.Extensions.DependencyInjection
-- **.NET 10** — target framework
+- **.NET 11** — target framework
 - **Workload model** — core CLI + optional language workloads (dotnet, node, python, etc.)
 
 ## Project Structure
@@ -125,14 +132,15 @@ eng/
   scripts/                 # Build and validation scripts
   res/                     # Resources (icons, MSI assets)
 docs/
-  vnext.md                 # v5 design document
-  modernization.md         # Modernization design document
+  cli-architecture.md      # CLI architecture
+  repo-structure.md        # Repository navigation
+  templates/README.md      # Templates Architecture entry point (proposed)
 Azure.Functions.Cli.slnx   # Solution file
 ```
 
 ## Development
 
-**Prerequisites:** .NET 10 SDK (see `global.json` for the exact version)
+**Prerequisites:** .NET 11 SDK (see `global.json` for the exact version)
 
 ### Build
 
@@ -173,6 +181,7 @@ In an existing project, setup uses its configured runtime when `--features` is o
 Outside a configured project, interactive setup shows both the stack and friendly display names such as
 `.NET` and `Node.js`. Command-line arguments and configuration continue to use stack
 identifiers such as `dotnet` and `node`.
+In an existing project, setup uses its configured language stack when `--features` is omitted.
 `func setup --check` checks the same dependencies without installing them and returns
 a nonzero exit code when a required stack workload is missing.
 
@@ -242,6 +251,7 @@ Common runtime identifiers: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`
 
 ## Documentation
 
+- [Templates Architecture](docs/templates/README.md) — proposed design for `func init` and `func new`, document status and review gates; not implementation approval.
 - [Code and test Azure Functions locally](https://docs.microsoft.com/azure/azure-functions/functions-run-local)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Design proposals](proposed/)
@@ -250,10 +260,12 @@ Files under `proposed/` capture design intent while a design is being shaped and
 
 ## Telemetry
 
-The Azure Functions Core Tools collect usage data in order to help us improve your experience.
+The Azure Functions CLI collects usage data in order to help us improve your experience.
 The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft.
 
 You can opt-out of telemetry by setting the `FUNC_CLI_TELEMETRY_OPTOUT` environment variable to any value other than `no`, `n`, `0`, `false`, or `off`. The legacy `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` variable from Core Tools v4 is still honored.
+
+These values are case-insensitive and ignore surrounding whitespace. An unset or empty variable does not opt out; a whitespace-only value does. If either variable opts out, telemetry is disabled regardless of the other variable's value.
 
 [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement)
 

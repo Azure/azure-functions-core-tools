@@ -54,7 +54,7 @@ jobs:
 
   steps:
     - ${{ if eq(parameters.sign, true) }}:
-      - task: UseDotNet@2 # ESRP doesn't yet support net10 SDK
+      - task: UseDotNet@2 # ESRP tool requires the .NET 9 runtime (doesn't yet support newer SDKs)
         displayName: Install .NET 9 SDK (for esrp tool)
         inputs:
           packageType: sdk

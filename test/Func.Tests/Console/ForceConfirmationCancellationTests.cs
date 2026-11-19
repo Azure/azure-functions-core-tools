@@ -69,6 +69,7 @@ public class ForceConfirmationCancellationTests
         {
             var initializer = Substitute.For<IProjectInitializer>();
             initializer.Stack.Returns("python");
+            initializer.DisplayName.Returns("Python");
             initializer.SupportedLanguages.Returns(_ =>
             {
                 if (gitOnly && commandConstructed) cancellation.Cancel();

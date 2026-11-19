@@ -2,28 +2,31 @@
 
   <!-- abstractions -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
-    <PackageVersion Include="NuGet.Packaging" Version="6.13.2" />
-    <PackageVersion Include="NuGet.Protocol" Version="6.13.2" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="11.0.0" />
+    <PackageVersion Include="NuGet.Credentials" Version="8.0.0" />
+    <PackageVersion Include="NuGet.Packaging" Version="8.0.0" />
+    <PackageVersion Include="NuGet.Protocol" Version="8.0.0" />
     <PackageVersion Include="Semver" Version="3.0.0" />
     <PackageVersion Include="Spectre.Console" Version="0.49.1" />
     <PackageVersion Include="System.CommandLine" Version="2.0.6" />
     <PackageVersion Include="System.Reflection.MetadataLoadContext" Version="10.0.9" />
+    <!-- Transitive pin: NuGet.Packaging 8.x otherwise resolves Pkcs 8.0.1 (GHSA-846f-f764-76mx, GHSA-2fmv-rv2c-59x7). -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
     <PackageVersion Include="System.Text.Json" Version="10.0.9" />
   </ItemGroup>
 
   <!-- template engine -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.TemplateEngine.Abstractions" Version="10.0.301" />
-    <PackageVersion Include="Microsoft.TemplateEngine.Edge" Version="10.0.301" />
-    <PackageVersion Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" Version="10.0.301" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Abstractions" Version="11.0.100" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Edge" Version="11.0.100" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" Version="11.0.100" />
   </ItemGroup>
 
   <!-- telemetry -->
@@ -32,11 +35,12 @@
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
-    <PackageVersion Include="NuGet.Versioning" Version="6.13.2" />
+    <PackageVersion Include="NuGet.Versioning" Version="8.0.0" />
   </ItemGroup>
 
   <!-- tooling -->
   <ItemGroup>
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
     <PackageVersion Include="Microsoft.Build.Utilities.Core" Version="17.11.48" />
     <PackageVersion Include="Microsoft.Build.Framework" Version="17.11.48" />
@@ -50,16 +54,16 @@
        documentation aid. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.Functions.JavaWorker" Version="2.19.5" />
-    <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.16.0" />
-    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.5361" />
-    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.6" Version="4.0.5362" />
+    <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.16.1" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.5485" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.6" Version="4.0.5489" />
   <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.46.2" />
   </ItemGroup>
 
   <!-- host -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1054.200" />
-    <PackageVersion Include="System.Diagnostics.EventLog" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1055.100" />
+    <PackageVersion Include="System.Diagnostics.EventLog" Version="11.0.0" />
   </ItemGroup>
 
   <!-- test projects -->

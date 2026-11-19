@@ -18,10 +18,20 @@ namespace Azure.Functions.Cli.Projects;
 public static class CommonInitOptions
 {
     /// <summary>
+    /// Names the option that skips extension bundle configuration.
+    /// </summary>
+    public const string NoBundleOptionName = "--no-bundles";
+
+    /// <summary>
+    /// Names the option that selects the extension bundle release channel.
+    /// </summary>
+    public const string BundlesChannelOptionName = "--bundles-channel";
+
+    /// <summary>
     /// <c>--no-bundles</c>. Used by every stack that emits a default extension bundle entry
     /// in <c>host.json</c> (Node, Python, Go, ...).
     /// </summary>
-    public static Option<bool> NoBundle() => new("--no-bundles")
+    public static Option<bool> NoBundle() => new(NoBundleOptionName)
     {
         Description = "Skip writing the default extensionBundle block in host.json.",
         DefaultValueFactory = _ => false,
@@ -31,7 +41,7 @@ public static class CommonInitOptions
     /// <c>--bundles-channel</c> / <c>-c</c>. Selects the extension bundle release channel
     /// (<see cref="BundleChannel.Stable"/> by default).
     /// </summary>
-    public static Option<BundleChannel> BundlesChannel() => new("--bundles-channel", "-c")
+    public static Option<BundleChannel> BundlesChannel() => new(BundlesChannelOptionName, "-c")
     {
         Description = "Extension bundle release channel: Stable (default), Preview, or Experimental.",
         DefaultValueFactory = _ => BundleChannel.Stable,

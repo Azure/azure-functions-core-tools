@@ -1,0 +1,94 @@
+# End-to-end CLI performance
+
+Crank runs a BenchmarkDotNet harness that launches the **published,
+runtime-specific, self-contained, single-file `func` executable** once per
+operation. The initial command is `func version`, on Linux x64.
+
+## Run locally
+
+Install the SDK selected by the repository's `global.json`, PowerShell 7, and
+Git. Run on an x64 machine matching the target OS. The runner separately
+publishes the CLI and harness, then uses Crank to execute the staged harness;
+no globally installed `func` is used.
+
+```powershell
+pwsh ./perf/EndToEnd/run.ps1
+
+# Quick end-to-end qualification, not a useful performance sample:
+pwsh ./perf/EndToEnd/run.ps1 -Job dry -OutputDirectory ./out/perf-smoke
+
+# Select a command:
+pwsh ./perf/EndToEnd/run.ps1 -Command version -OutputDirectory ./out/perf-version
+
+# Rerun into an existing output directory, deleting its previous inputs and results:
+pwsh ./perf/EndToEnd/run.ps1 -Force
+```
+
+Each run needs a fresh output directory; pass `-Force` to delete the previous
+`input` and `results` directories instead. The default is `out/perf`. The runtime
+defaults to the current OS (`win-x64` or `linux-x64`); pass `-Runtime` to set it
+explicitly. Only `linux-x64` is part of the initial CI matrix. Use `-Port` if the
+default loopback agent port 5010 is occupied. The agent runs only for the invocation and is terminated
+in cleanup; do not expose it to other machines. Its temporary workspace is also
+removed in cleanup.
+
+## Measurement contract
+
+Each operation includes process creation, startup, command execution, output
+draining/validation, and process shutdown. Setup and unmeasured smoke execution
+precede BenchmarkDotNet warmup. Each child has a ten-second timeout; failures,
+invalid output, and missing timing results fail the run.
+
+The CLI uses an isolated home and empty workload/project directories,
+noninteractive redirected I/O, and disabled telemetry. Its update cache is
+seeded with `0.0.0`, preventing an unrelated GitHub update check from dominating
+the measurement. These are **fresh-process, warm-filesystem-cache** timings,
+not cold-cache or first-run measurements. They do not represent installations
+with workloads. Crank's in-process setting applies to the harness, not `func`.
+
+`results/results.json` contains Crank's combined BenchmarkDotNet results.
+The downloaded Markdown report shows mean, error, and standard deviation;
+JSON timing values use BenchmarkDotNet's nanosecond units.
+The `Invocation` column shows `func` and the actual arguments for each case;
+arguments requiring quoting use JSON string escaping. The `Command` column
+continues to show the case ID used by `-Command`.
+`results/provenance.json` records the commit, executable hash and size, RID,
+SDK/tool versions, selected commands, and measurement settings. Agent,
+benchmark, and controller logs are retained for diagnosis.
+
+Do not interpret harness allocation or process counters as CLI memory usage.
+Shared CI machines introduce noise: the pipeline collects observations and
+does not enforce regression thresholds or compare against a historical baseline.
+
+## Add a command
+
+Add one `CommandCase` to `CommandCase.All` in `CommandCase.cs`, with a unique
+name, an argument array, a stdout validation regex, and optionally an expected
+exit code. The shared launcher and pipeline discover every case automatically;
+`-Command` restricts a run to one case. Add fixture/setup support before adding
+commands that need an initialized project or workloads: the initial environment
+is intentionally empty. Long-running commands such as `start` require a
+different measurement contract and should not be added as finite command cases.
+
+The harness inherits the repository's root build targets, central package
+versions, and NuGet configuration. Local build outputs go under `out/bin` and
+`out/obj`, just like other repository projects. `run.ps1` publishes the
+self-contained harness and single-file `func` independently, placing `func`
+under `cli` beside the harness. Crank receives the published output.
+The agent runs both staged applications; it does not build either one or
+install an SDK/runtime for the benchmark job.
+
+The published CLI is staged beside the harness, uploaded without rebuilding,
+and launched by the harness from its exact path. Linux executable permissions
+are restored in unmeasured setup before the benchmark.
+
+## CI registration
+
+Create an Azure DevOps pipeline pointing to `eng/ci/performance.yml` on `vnext`,
+using the same repository and 1ES resource/pool permissions as `public-build.yml`.
+Adding YAML alone does not register or enable a pipeline.
+
+The pipeline runs nightly at 08:00 UTC on `vnext` and can be queued manually.
+There are no push or PR triggers. It publishes `perf_linux_x64` with the
+results and logs, including diagnostics on failure. A manual run measures the
+selected source revision. No external result database is required.

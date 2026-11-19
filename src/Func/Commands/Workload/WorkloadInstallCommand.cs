@@ -143,7 +143,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             allowUntrusted,
                             ct);
                 },
-                cancellationToken);
+                cancellationToken,
+                writeCompletion: false);
 
             string message = BuildSuccessMessage(result);
             if (result.AlreadyInstalled)

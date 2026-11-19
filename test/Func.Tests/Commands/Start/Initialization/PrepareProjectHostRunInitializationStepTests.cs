@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -15,6 +16,12 @@ namespace Azure.Functions.Cli.Tests.Commands.Start.Initialization;
 
 public class PrepareProjectHostRunInitializationStepTests : IDisposable
 {
+    private const string EncryptedSecretSentinel = "S1_SYNTHETIC_CIPHERTEXT_SENTINEL";
+    private const string EncryptedSettingsError =
+        "Azure Functions CLI cannot start the Functions Host while local.settings.json is encrypted. "
+        + "Decrypt the file before trying again, "
+        + "or remove it if it is no longer needed.";
+
     private readonly string _projectDir;
     private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
     private readonly IProcessEnvironment _processEnv = Substitute.For<IProcessEnvironment>();
@@ -45,6 +52,90 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         context.State.HostRunContext!.EnvironmentVariables["MyKey"].Should().Be("MyValue");
         _interaction.DidNotReceiveWithAnyArgs().WriteWarning(default!);
+    }
+
+    [Theory]
+    [InlineData("PrivateSetting")]
+    [InlineData(EncryptedSecretSentinel)]
+    public async Task EncryptedValues_FailBeforePreparationWithFixedValueFreeDiagnostic(string settingName)
+    {
+        string settingsPath = SetEncryptedLocalSettings(new() { [settingName] = EncryptedSecretSentinel });
+        byte[] originalBytes = File.ReadAllBytes(settingsPath);
+        DateTime originalWriteTime = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(settingsPath, originalWriteTime);
+        var project = new FakeProject(_projectDir);
+        var renderer = new RecordingRenderer();
+        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = new StartHostConfiguration { StartupNotice = "Startup notice must not run." },
+        };
+        StartInitializationStepContext context = NewContext(project, renderer, stackConfigurations: stackConfigurations);
+
+        Func<Task> action = () => NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        GracefulException exception = (await action.Should().ThrowExactlyAsync<GracefulException>()).Which;
+        exception.Message.Should().Be(EncryptedSettingsError);
+        exception.IsUserError.Should().BeTrue();
+        exception.VerboseMessage.Should().BeNull();
+        exception.InnerException.Should().BeNull();
+        exception.ToString().Should().NotContain(EncryptedSecretSentinel).And.NotContain(settingName);
+        project.PrepareCalled.Should().BeFalse();
+        context.State.HostRunContext.Should().BeNull();
+        renderer.Events.Should().BeEmpty();
+        _interaction.ReceivedCalls().Should().BeEmpty();
+        File.ReadAllBytes(settingsPath).Should().Equal(originalBytes);
+        File.GetLastWriteTimeUtc(settingsPath).Should().Be(originalWriteTime);
+        Directory.Exists(Path.Combine(_projectDir, CliConfigurationNames.ProjectConfigFolderName)).Should().BeFalse();
+        Directory.EnumerateFiles(_projectDir, "*", SearchOption.AllDirectories).Should().Equal(settingsPath);
+    }
+
+    [Fact]
+    public async Task EncryptedValues_ResolvedSourcesStillFailBeforePreparation()
+    {
+        SetEncryptedLocalSettings(new()
+        {
+            ["FUNCTIONS_WORKER_RUNTIME"] = EncryptedSecretSentinel,
+            ["ProcessKey"] = EncryptedSecretSentinel,
+            ["HostKey"] = EncryptedSecretSentinel,
+            ["BundleKey"] = EncryptedSecretSentinel,
+            ["StackKey"] = EncryptedSecretSentinel,
+        });
+        _processEnv.Get("ProcessKey").Returns("fromShell");
+        var project = new FakeProject(_projectDir);
+        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = new StartHostConfiguration
+            {
+                EnvironmentVariables = new Dictionary<string, string> { ["StackKey"] = "fromStack" },
+            },
+        };
+        StartInitializationStepContext context = NewContext(project, stackConfigurations: stackConfigurations);
+        context.State.HostEnvironmentVariables["HostKey"] = "fromHost";
+        context.State.BundleEnvVarsForHost["BundleKey"] = "fromBundle";
+
+        Func<Task> action = () => NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        (await action.Should().ThrowExactlyAsync<GracefulException>()).Which.Message.Should().Be(EncryptedSettingsError);
+        project.PrepareCalled.Should().BeFalse();
+        context.State.HostRunContext.Should().BeNull();
+        _interaction.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EncryptedFileWithoutValues_FailsBeforePreparationInEveryMode(bool demoMode)
+    {
+        SetEncryptedLocalSettings([]);
+        var project = new FakeProject(_projectDir);
+        StartInitializationStepContext context = NewContext(project, demoMode: demoMode);
+
+        Func<Task> action = () => NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        (await action.Should().ThrowExactlyAsync<GracefulException>()).Which.Message.Should().Be(EncryptedSettingsError);
+        project.PrepareCalled.Should().BeFalse();
+        context.State.HostRunContext.Should().BeNull();
+        _interaction.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
@@ -228,6 +319,15 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         context.State.HostRunContext!.EnvironmentVariables.ContainsKey("FUNCTIONS_ENABLE_DEBUGGER_WAIT").Should().BeFalse();
     }
 
+    private string SetEncryptedLocalSettings(Dictionary<string, string> values)
+    {
+        string path = Path.Combine(_projectDir, CliConfigurationNames.LocalSettingsFileName);
+        File.WriteAllText(path, JsonSerializer.Serialize(new { IsEncrypted = true, Values = values }));
+        LocalSettingsSnapshot snapshot = new LocalSettingsProvider().Get(new DirectoryInfo(_projectDir));
+        _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(snapshot);
+        return path;
+    }
+
     private void SetLocalSettings(Dictionary<string, string> values)
     {
         var snapshot = new LocalSettingsSnapshot { Values = values };
@@ -241,14 +341,15 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         FunctionsProject? project = null,
         IStartInitializationRenderer? renderer = null,
         string? stepId = null,
-        IReadOnlyDictionary<string, StartHostConfiguration>? stackConfigurations = null)
+        IReadOnlyDictionary<string, StartHostConfiguration>? stackConfigurations = null,
+        bool demoMode = true)
     {
         var options = new StartCommandOptions(
             WorkingDirectory.FromExplicit(_projectDir),
             Port: null, Cors: [], CorsCredentials: false, Functions: [],
             NoBuild: false, EnableAuth: false, RequestedProfileName: null, RequestedHostVersion: null,
             Offline: false, OutputMode: OutputMode.Plain, NoTui: true, LogFilePath: null,
-            DemoMode: true, DemoFunctionCount: 0, DemoSpeedMultiplier: 0.001, DemoAutoExit: true,
+            DemoMode: demoMode, DemoFunctionCount: 0, DemoSpeedMultiplier: 0.001, DemoAutoExit: true,
             StackHostConfigurations: stackConfigurations);
 
         var init = new StartInitializationContext(options, "5.0.0-test", IsInteractive: false, CanPrompt: false);
@@ -274,6 +375,8 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
     private class FakeProject(string directory) : FunctionsProject
     {
+        public bool PrepareCalled { get; private set; }
+
         public override WorkingDirectory WorkingDirectory { get; } = WorkingDirectory.FromExplicit(directory);
 
         public override string StackName => "node";
@@ -283,6 +386,12 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         public override bool SupportsExtensionBundles => true;
 
         public override FunctionsWorkerReference WorkerReference { get; } = FunctionsWorkerReference.FromWorkload("node");
+
+        public override Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
+        {
+            PrepareCalled = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ReportingProject(string directory) : FakeProject(directory)

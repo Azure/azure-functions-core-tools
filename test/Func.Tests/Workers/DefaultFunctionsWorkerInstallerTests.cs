@@ -22,13 +22,10 @@ public class DefaultFunctionsWorkerInstallerTests
 
     private readonly IWorkloadCatalog _workloadCatalog = Substitute.For<IWorkloadCatalog>();
     private readonly IWorkloadInstaller _workloadInstaller = Substitute.For<IWorkloadInstaller>();
-    private readonly IWorkloadPaths _workloadPaths = Substitute.For<IWorkloadPaths>();
     private readonly IWorkerConfigFileSystem _fileSystem = Substitute.For<IWorkerConfigFileSystem>();
 
     public DefaultFunctionsWorkerInstallerTests()
     {
-        _workloadPaths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(callInfo => Path.Combine(Path.GetTempPath(), "workloads", (string)callInfo[0], (string)callInfo[1]));
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
     }
 
@@ -119,6 +116,7 @@ public class DefaultFunctionsWorkerInstallerTests
         {
             PackageId = $"{WorkerPackageId}.win-x64",
             PackageVersion = "3.14.0",
+            PackageRoot = GetInstallDirectory("3.14.0", $"{WorkerPackageId}.win-x64"),
             Kind = WorkloadKind.Content,
             Aliases = ["node-worker"],
             DisplayName = WorkerPackageId,
@@ -219,16 +217,15 @@ public class DefaultFunctionsWorkerInstallerTests
     {
         var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()), NullLogger<DefaultFunctionsWorkerContentResolver>.Instance);
 
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(null!, _workloadInstaller, _workloadPaths, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, null!, _workloadPaths, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, null!, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, _workloadPaths, null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(null!, _workloadInstaller, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, null!, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     private DefaultFunctionsWorkerInstaller CreateInstaller()
     {
         var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()), NullLogger<DefaultFunctionsWorkerContentResolver>.Instance);
-        return new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, _workloadPaths, contentResolver);
+        return new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, contentResolver);
     }
 
     private static WorkloadEntry CreateWorkerEntry(
@@ -239,6 +236,7 @@ public class DefaultFunctionsWorkerInstallerTests
         {
             PackageId = packageId,
             PackageVersion = packageVersion,
+            PackageRoot = GetInstallDirectory(packageVersion, packageId),
             Kind = kind,
             Aliases = ["node-worker"],
             DisplayName = WorkerPackageId,

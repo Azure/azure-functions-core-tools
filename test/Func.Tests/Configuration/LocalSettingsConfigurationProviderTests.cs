@@ -8,6 +8,8 @@ namespace Azure.Functions.Cli.Tests.Configuration;
 
 public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 {
+    private const string EncryptedSecretSentinel = "S1_SYNTHETIC_CIPHERTEXT_SENTINEL";
+
     private readonly DirectoryInfo _dir = Directory.CreateTempSubdirectory("local-settings-configuration-");
     private readonly DirectoryInfo _userDir = Directory.CreateTempSubdirectory("user-settings-configuration-");
 
@@ -17,12 +19,15 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         _userDir.Delete(recursive: true);
     }
 
-    [Fact]
-    public void Build_ProjectsOnlyCliRelevantLocalSettings()
+    [Theory]
+    [InlineData("")]
+    [InlineData("\"IsEncrypted\":false,")]
+    public void Build_ProjectsOnlyCliRelevantLocalSettings(string encryptionMarker)
     {
         WriteSettings(
-            """
+            $$"""
             {
+              {{encryptionMarker}}
               "Values": {
                 "FUNCTIONS_WORKER_RUNTIME": "node",
                 "AzureWebJobsStorage": "UseDevelopmentStorage=true"
@@ -44,6 +49,77 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         configuration["HostStartup:Cors"].Should().Be("*");
         configuration["HostStartup:CorsCredentials"].Should().Be("True");
         configuration["AzureWebJobsStorage"].Should().BeNull();
+    }
+
+    [Fact]
+    public void Build_EncryptedValues_DoNotProvideRuntimeFallbackOrApplicationConfiguration()
+    {
+        WriteEncryptedSettings();
+        string path = Path.Combine(_dir.FullName, CliConfigurationNames.LocalSettingsFileName);
+        string originalContents = File.ReadAllText(path);
+
+        IConfigurationRoot configuration = new ConfigurationBuilder()
+            .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
+            .Build();
+        StackOptions options = new();
+        new StackOptionsSetup(configuration).Configure(options);
+
+        options.Runtime.Should().BeNull();
+        options.Language.Should().BeNull();
+        configuration["stack:runtime"].Should().BeNull();
+        configuration["PrivateSetting"].Should().BeNull();
+        configuration.AsEnumerable().Select(pair => pair.Value).Should().NotContain(EncryptedSecretSentinel);
+        File.ReadAllText(path).Should().Be(originalContents);
+        Directory.Exists(Path.Combine(_dir.FullName, CliConfigurationNames.ProjectConfigFolderName)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Build_EncryptedValues_DoNotBlockSafeRuntimeSources(bool safeRuntimeIsHigherPriority)
+    {
+        WriteEncryptedSettings();
+        Dictionary<string, string?> safeRuntime = new()
+        {
+            ["stack:runtime"] = "python",
+        };
+        var builder = new ConfigurationBuilder();
+        if (!safeRuntimeIsHigherPriority)
+        {
+            builder.AddInMemoryCollection(safeRuntime);
+        }
+
+        builder.Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()));
+        if (safeRuntimeIsHigherPriority)
+        {
+            builder.AddInMemoryCollection(safeRuntime);
+        }
+
+        IConfigurationRoot configuration = builder.Build();
+        StackOptions options = new();
+        new StackOptionsSetup(configuration).Configure(options);
+
+        options.Runtime.Should().Be("python");
+        configuration.AsEnumerable().Select(pair => pair.Value).Should().NotContain(EncryptedSecretSentinel);
+    }
+
+    [Fact]
+    public void CliConfigurationProvider_EncryptedValues_DoNotBlockUnrelatedProjectConfiguration()
+    {
+        WriteEncryptedSettings();
+        const string projectConfiguration = """{"defaultProfile":"flex","profiles":["project-profile"]}""";
+        WriteProjectConfig(projectConfiguration);
+        var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
+
+        IConfiguration configuration = configurationProvider.GetProjectConfiguration(_dir);
+
+        configuration["defaultProfile"].Should().Be("flex");
+        configuration["profiles:0"].Should().Be("project-profile");
+        configuration["stack:runtime"].Should().BeNull();
+        configuration.AsEnumerable().Select(pair => pair.Value).Should().NotContain(EncryptedSecretSentinel);
+        string projectConfigPath = Path.Combine(
+            _dir.FullName, CliConfigurationNames.ProjectConfigFolderName, CliConfigurationNames.ConfigFileName);
+        File.ReadAllText(projectConfigPath).Should().Be(projectConfiguration);
     }
 
     [Fact]
@@ -184,6 +260,18 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         secondConfiguration.Should().BeSameAs(firstConfiguration);
         secondConfiguration["defaultProfile"].Should().Be("flex");
     }
+
+    private void WriteEncryptedSettings()
+        => WriteSettings(
+            $$"""
+            {
+              "IsEncrypted": true,
+              "Values": {
+                "FUNCTIONS_WORKER_RUNTIME": "{{EncryptedSecretSentinel}}",
+                "PrivateSetting": "{{EncryptedSecretSentinel}}"
+              }
+            }
+            """);
 
     private void WriteSettings(string contents)
         => File.WriteAllText(Path.Combine(_dir.FullName, CliConfigurationNames.LocalSettingsFileName), contents);

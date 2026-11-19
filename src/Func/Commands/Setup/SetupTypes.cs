@@ -43,7 +43,7 @@ internal sealed record SetupDependency(
     // TODO: this should not be hardcoded in the CLI; discover the stack package
     // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
     // require a CLI release.
-    private static readonly HashSet<string> _stacks = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet", "java", "powershell" };
+    private static readonly HashSet<string> _stacks = [with(StringComparer.OrdinalIgnoreCase), "node", "python", "go", "dotnet", "java", "powershell"];
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
 
@@ -83,7 +83,7 @@ internal sealed record SetupDependency(
             versionRange,
             SetupRuntimes.RangeText(versionRange),
             ResolvedPackageId: null,
-            Optional: true);
+            Optional: SupportsStack(runtime));
 
     public static SetupDependency Bundle(string bundleId, VersionRange? versionRange, string? rangeText, BundleChannel channel)
         => new(

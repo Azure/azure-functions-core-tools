@@ -212,7 +212,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                     new WorkloadInstallProgressAdapter(ctx),
                     allowUntrusted,
                     ct),
-                cancellationToken);
+                cancellationToken,
+                writeCompletion: false);
 
             RenderSingle(result);
             return 0;
@@ -262,7 +263,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                         new WorkloadInstallProgressAdapter(ctx),
                         allowUntrusted,
                         ct),
-                    cancellationToken);
+                    cancellationToken,
+                    writeCompletion: false);
                 RenderSingle(result);
             }
             catch (Exception ex) when (
@@ -364,7 +366,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
     private static IReadOnlyList<UpdateTarget> BuildUpdateAllTargets(IReadOnlyList<WorkloadEntry> installed)
     {
         List<UpdateTarget> targets = [];
-        HashSet<string> logicalIds = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> logicalIds = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (WorkloadEntry entry in installed.Where(e => e.LogicalPackage is not null))
         {
             if (logicalIds.Add(entry.LogicalPackage!.PackageId))
@@ -374,7 +376,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         }
 
         // Logical and explicit ownership can coexist on one physical package and must move independently.
-        HashSet<string> explicitIds = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> explicitIds = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (WorkloadEntry entry in installed.Where(e => !e.IsImplicitlyInstalled))
         {
             if (explicitIds.Add(entry.PackageId))

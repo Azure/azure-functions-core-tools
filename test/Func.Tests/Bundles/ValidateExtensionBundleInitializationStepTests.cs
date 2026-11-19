@@ -195,6 +195,8 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("host.json is not valid JSON");
+        ex.Message.Should().Contain("Run 'func run' again after correcting the issue.");
+        ex.Message.Should().NotContain("func start");
         await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
     }
 
@@ -210,7 +212,28 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("host.json extensionBundle must include");
+        ex.Message.Should().Contain("Run 'func run' again after correcting the issue.");
+        ex.Message.Should().NotContain("func start");
         await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData("{ invalid", "host.json is not valid JSON")]
+    [InlineData("[]", "host.json root must be a JSON object")]
+    [InlineData("{\"extensionBundle\": {\"id\": \"example\"}}", "host.json extensionBundle must include")]
+    public async Task HostJsonReader_InvalidConfiguration_ReportsRepairWithoutCommandSpecificRetry(string content, string expectedError)
+    {
+        File.WriteAllText(Path.Combine(_projectDir, "host.json"), content);
+        HostJsonBundleSectionReader reader = new();
+
+        ExtensionBundleConfigurationException ex = (await FluentActions.Awaiting(
+            () => reader.ReadAsync(new DirectoryInfo(_projectDir), CancellationToken.None))
+            .Should().ThrowAsync<ExtensionBundleConfigurationException>()).Which;
+
+        ex.Message.Should().Contain(expectedError);
+        ex.Message.Should().EndWith("Fix host.json.");
+        ex.Message.Should().NotContain("func run");
+        ex.Message.Should().NotContain("func start");
     }
 
     private static ValidateExtensionBundleInitializationStep NewStep(IExtensionBundleResolver resolver)
@@ -254,7 +277,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
     private static ResolvedProfile CreateProfileWithBundleRange(string bundleRange)
     {
         var source = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
-        Dictionary<string, VersionRange> workerVersionRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerVersionRanges = [with(StringComparer.OrdinalIgnoreCase)];
 
         return new ResolvedProfile(
             "flex",

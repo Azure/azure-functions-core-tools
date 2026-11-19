@@ -19,6 +19,8 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal abstract class FuncCliCommand : Command
 {
+    private readonly Dictionary<Option, (string Stack, string Heading)?> _stackOptionHelp = [];
+
     /// <summary>
     /// Strongly-typed path argument for commands that operate on a project
     /// directory. Created per command instance via <see cref="AddPathArgument"/>
@@ -42,6 +44,34 @@ internal abstract class FuncCliCommand : Command
     protected virtual string? HelpFooterHint => null;
 
     internal string? GetHelpFooterHint() => HelpFooterHint;
+
+    internal string? GetOptionHelpHeading(Option option)
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        return _stackOptionHelp.TryGetValue(option, out (string Stack, string Heading)? owner) ? owner?.Heading : null;
+    }
+
+    /// <summary>
+    /// Associates canonical options with a stack heading, leaving options shared by multiple stacks ungrouped.
+    /// </summary>
+    protected void RegisterStackOptionHelp(string stack, string displayName, IEnumerable<Option> options)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        ArgumentNullException.ThrowIfNull(options);
+
+        foreach (Option option in options)
+        {
+            if (!_stackOptionHelp.TryGetValue(option, out (string Stack, string Heading)? owner))
+            {
+                _stackOptionHelp.Add(option, (stack, displayName));
+            }
+            else if (owner is null || !string.Equals(owner.Value.Stack, stack, StringComparison.OrdinalIgnoreCase))
+            {
+                _stackOptionHelp[option] = null;
+            }
+        }
+    }
 
     /// <summary>
     /// Executes the command asynchronously with cancellation support. Parent-only

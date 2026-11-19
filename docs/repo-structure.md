@@ -4,7 +4,7 @@ This document describes the Azure Functions Core Tools v5 codebase — projects,
 
 ## Overview
 
-The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-line-api) and [Spectre.Console](https://spectreconsole.net/), targeting **.NET 10**. It follows a **workload model** (similar to the `dotnet` CLI) where the base CLI provides core commands and infrastructure while language-specific functionality (templates, init, pack) is delivered via independently installable workload packages. The base CLI, the host that loads workloads, the public abstractions library, and the `func workload install` / `uninstall` commands are all in the tree today; NuGet feed-based acquisition lands in a follow-up PR.
+The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-line-api) and [Spectre.Console](https://spectreconsole.net/), targeting **.NET 11**. It follows a **workload model** (similar to the `dotnet` CLI) where the base CLI provides core commands and infrastructure while language-specific functionality (templates, init, pack) is delivered via independently installable workload packages. The base CLI, the host that loads workloads, the public abstractions library, and the `func workload install` / `uninstall` commands are all in the tree today; NuGet feed-based acquisition lands in a follow-up PR.
 
 ## Project Layout
 
@@ -47,6 +47,14 @@ workloads use `/src/Workloads/` and `/test/Workloads/`.
 
 ## Projects
 
+### Templates documentation and source
+
+Start with [Templates Architecture](templates/README.md) for the proposed `func init` and `func new` design, historical document status and approval gates.
+
+The existing Microsoft.TemplateEngine-based Template Engine factory/session and installed catalog projection live in `src/Func/Templates/Engine/`; `test/Func.Tests/Templates/Engine/` contains their tests. `src/Func/Commands/NewCommand.cs` is not connected to generation or listing. `src/Func/Commands/InitCommand.cs` still calls the initializers in `src/Workloads/Stacks/`.
+
+Additive Stack metadata lives in `src/Abstractions/Projects/IProjectStack.cs` and `src/Func/Projects/InstalledProjectStackCatalog.cs`. These source locations do not establish approval or Functions Host Runtime qualification of the proposed command integration.
+
 ### `src/Func` — The CLI Executable
 
 The main tool users install and run. Assembly name is `func`.
@@ -83,7 +91,7 @@ A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public
 
 | File | Purpose |
 |------|---------|
-| `global.json` | Pins .NET SDK 10.0.100, allows prerelease |
+| `global.json` | Pins .NET SDK 11.0.100, allows prerelease |
 | `Directory.Build.props` | Defines `RepoRoot`, `ArtifactsPath=out/`, publish/package paths |
 | `Directory.Build.targets` | Imports `eng/build/Engineering.targets` |
 | `Directory.Packages.props` | Enables Central Package Management, imports `eng/build/Packages.props` |

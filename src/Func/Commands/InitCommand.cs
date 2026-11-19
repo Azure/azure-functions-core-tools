@@ -96,18 +96,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
 
-        // Workload-contributed options are attached after built-ins so they
-        // appear as a clearly-grouped block in --help output. Multiple workloads
-        // may legitimately contribute the same option (e.g. --no-bundles for
-        // every stack that emits an extension bundle). The registry de-dupes
-        // by name and returns a single canonical instance to every workload,
-        // so the option appears once in --help and every workload that reads
-        // it back sees the same parsed value.
+        // The registry shares canonical instances across workloads; help uses
+        // their ownership to distinguish shared options from stack-specific ones.
         var registry = new InitOptionRegistry(this);
         foreach (IProjectInitializer initializer in _initializers)
         {
             registry.SetActiveStack(initializer.Stack);
-            initializer.GetInitOptions(registry);
+            IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
+            // Bundle options stay general even when only one bundle-using stack is installed.
+            RegisterStackOptionHelp(initializer.Stack, initializer.DisplayName,
+                options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
+                    && option.Name != CommonInitOptions.BundlesChannelOptionName));
         }
     }
 

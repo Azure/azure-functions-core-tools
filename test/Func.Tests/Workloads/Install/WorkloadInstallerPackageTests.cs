@@ -75,7 +75,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
     }
 
     [Fact]
-    public async Task InstallFromPackage_OnlyExtractsWorkloadJsonAndTools()
+    public async Task InstallFromPackage_WithoutTemplateRoot_ExtractsPayloadButNotNuGetBookkeeping()
     {
         string nupkg = BuildNupkg(extraFiles:
         [
@@ -83,6 +83,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             (WriteTempFile("readme.md", "# readme"), "readme.md"),
             (WriteTempFile("icon.png", "png"), "icon.png"),
             (WriteTempFile("notes.txt", "notes"), "docs/notes.txt"),
+            (WriteTempFile("template.txt", "undeclared"), "templates/template.txt"),
         ]);
 
         WorkloadInstaller installer = NewInstaller();
@@ -94,7 +95,11 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             .Select(path => Path.GetRelativePath(installDir, path).Replace(Path.DirectorySeparatorChar, '/'))
             .OrderBy(path => path, StringComparer.Ordinal)];
 
-        entries.Should().Equal(["tools", "tools/any", "tools/any/Test.dll", "workload.json"]);
+        entries.Should().Equal(
+        [
+            "Test.Workload.nuspec", "docs", "docs/notes.txt", "icon.png", "readme.md", "templates", "templates/template.txt",
+            "tools", "tools/any", "tools/any/Test.dll", "workload.json",
+        ]);
     }
 
     [Fact]

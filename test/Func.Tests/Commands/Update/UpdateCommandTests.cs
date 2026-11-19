@@ -5,6 +5,9 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Update;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Update;
 using NSubstitute;
 using Semver;
@@ -76,6 +79,39 @@ public sealed class UpdateCommandTests
         exitCode.Should().Be(0);
         await harness.Updater.Received(1)
             .UpdateAsync(_newerRelease, Arg.Any<IProgress<UpdateProgress>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InteractiveUpdate_WritesOnlyCommandCompletion()
+    {
+        var harness = new Harness();
+        harness.ReleaseFeed.GetLatestAsync(false, Arg.Any<CancellationToken>()).Returns(_newerRelease);
+        harness.Updater.UpdateAsync(_newerRelease, Arg.Any<IProgress<UpdateProgress>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var progress = call.Arg<IProgress<UpdateProgress>>();
+                progress.Report(new UpdateProgress(UpdatePhase.Downloading));
+                progress.Report(new UpdateProgress(UpdatePhase.Extracting));
+                return Task.CompletedTask;
+            });
+        using var stdout = new BufferedConsole(interactive: true, ansi: true, noColor: true);
+        using var stderr = new BufferedConsole(interactive: true, ansi: true, noColor: true);
+        var interaction = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        var command = new UpdateCommand(
+            harness.ReleaseFeed, harness.Updater, harness.MetadataReader, harness.VersionProvider, interaction);
+        var root = new RootCommand { command };
+
+        int exitCode = await root.Parse(["update", "--yes"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        interaction.IsInteractive.Should().BeTrue();
+        stderr.Output.Should()
+            .Contain("Downloading Azure Functions CLI 5.2.0...")
+            .And.Contain("Extracting update package...")
+            .And.NotContain("\u2713");
+        stdout.Output.Should().Contain("Azure Functions CLI updated to 5.2.0.");
+        stdout.Output.Count(character => character == '\u2713').Should().Be(1);
     }
 
     [Fact]
