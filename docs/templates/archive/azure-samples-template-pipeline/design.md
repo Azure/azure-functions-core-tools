@@ -126,7 +126,7 @@ projects:
 
 Each generated TemplateEngine identity is `<identity>.<shortName>`; the example produces `Azure.Functions.Templates.OpenAIExamples.functions-python-openai-chat` and `Azure.Functions.Templates.OpenAIExamples.functions-node-openai-chat`. Identities do not depend on array order, display name, root path, or release version. Changing `identity` or a project's `shortName` changes its template identity. Packaging rejects duplicate short names or generated identities case-insensitively.
 
-The root project uses `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. Consequently, `root: .` is valid only for a single-entry descriptor. The staged release must contain a regular `host.json` directly under every declared root.
+The repository root is `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. Consequently, `root: .` is valid only for a single-entry descriptor. Each declared root is a content boundary and must contain exactly one regular `host.json` in its filtered subtree, either directly under the root or in a descendant directory.
 
 The onboarding JSON Schema owns control-plane structure and rejects unknown fields. A separate centrally owned descriptor schema validates `.github/azure-functions-template.yaml`. Repository-wide onboarding validation owns central identity collisions, GitHub slug restrictions, SemVer validation, package-prefix policy, and license policy. Release packaging owns descriptor metadata, project path safety, canonical stack/language pairs, and TemplateEngine validation against the exact tagged content.
 
@@ -238,10 +238,12 @@ The authored file owns template metadata, project topology, parameters, conditio
 
 When the authored file is absent, `.github/azure-functions-template.yaml` supplies the metadata and disjoint roots for independently selectable synthesized templates. For each project entry, the packager:
 
-1. Requires `<root>/host.json` in the filtered release snapshot.
-2. Uses only that root's filtered subtree as the template's content, rebasing it so `<root>/host.json` becomes `host.json` at the generated output root. It does not copy sibling templates or other repository content outside that root, except for the required repository license.
+1. Searches the filtered subtree at and below the declared root for exactly one regular `host.json`, without following symbolic links. Zero or multiple matches fail package generation for the repository release. The diagnostic identifies the project and declared root and lists the matching relative paths, if any. Picking the first match, even in a deterministic order, could configure the wrong app.
+2. Uses only that root's filtered subtree as template content, preserving paths relative to that root. It does not copy sibling templates or other repository content outside that root, except for the required repository license.
 3. Generates one `.template.config/template.json` for that content root, with identity `<identity>.<shortName>`, the entry's `shortName` and `name`, and the descriptor's shared `description`.
-4. Adds `host.json` as the template's primary output and one mandatory trusted configuration finalization action referencing that output and carrying the entry's canonical stack and language.
+4. Adds the discovered `host.json` path relative to the declared root as the template's primary output and one mandatory trusted configuration finalization action referencing that output and carrying the entry's canonical stack and language. The action targets the directory containing the generated `host.json`.
+
+For example, `root: .` with a single `src/host.json` preserves `src/`, `azure.yaml`, and `infra/` in place and uses `src/host.json` as the primary output. A connector entry rooted at `office365App/polling` with a direct `host.json` still emits `host.json` at the generated output root. The search for that entry does not include sibling apps.
 
 Each generated template sets `tags.type` to `project` and emits its entry's canonical language tag. It defines no parameter symbols, replacements, or ordinary post-actions. Content and output-path validation also rejects links that would import content from outside the entry's root; being inside repository staging is not sufficient. Package inspection verifies exactly the expected generated template inventory and dry-runs each template separately to confirm content isolation.
 

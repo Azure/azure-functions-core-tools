@@ -252,7 +252,7 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 
 Each generated TemplateEngine identity SHALL be `<identity>.<shortName>`. The pipeline SHALL reject case-insensitive duplicate project short names or generated identities within the descriptor. Array order, display name, root path, and release version MUST NOT contribute to the generated identity; changing the namespace or short name changes template identity.
 
-`root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. Therefore `root: .` SHALL be accepted only in a single-entry descriptor. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
+`root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. Therefore `root: .` SHALL be accepted only in a single-entry descriptor. The declared stack and language SHALL be canonical and compatible. The pipeline SHALL search the filtered subtree at and below each declared root, without following symbolic links, for exactly one regular `host.json`. If there are zero or multiple matches, package generation for the repository release SHALL fail and identify the project, declared root, and any matching paths relative to that root.
 
 #### Scenario: Descriptor metadata is incomplete
 
@@ -281,14 +281,20 @@ Each generated TemplateEngine identity SHALL be `<identity>.<shortName>`. The pi
 
 #### Scenario: Root project is declared
 
-- **WHEN** a project uses `root: .`
+- **WHEN** a project uses `root: .` and the only matching file is the repository-root `host.json`
 - **THEN** the pipeline resolves its primary-output anchor as root `host.json`
 
 #### Scenario: Nested project is declared
 
-- **WHEN** a project uses `root: src/api`
+- **WHEN** a project uses `root: src/api` and `src/api/host.json` is the only match within that root
 - **THEN** the pipeline reads `src/api/host.json` as its source anchor
 - **AND** the independent template exposes that anchor as output-root `host.json`
+
+#### Scenario: Functions app is nested within the declared content root
+
+- **WHEN** a project uses `root: .` and its filtered subtree contains `azure.yaml`, `infra/`, and a single `src/host.json`
+- **THEN** the template preserves those paths and exposes `src/host.json` as its primary output
+- **AND** the trusted Functions configuration finalization action targets the generated `src/` directory
 
 #### Scenario: Project roots overlap
 
@@ -297,8 +303,13 @@ Each generated TemplateEngine identity SHALL be `<identity>.<shortName>`. The pi
 
 #### Scenario: Project host file is missing
 
-- **WHEN** the filtered release snapshot has no regular `host.json` directly under a declared project root
-- **THEN** package generation fails and identifies the project
+- **WHEN** the filtered subtree at and below a declared root has no matching regular `host.json`
+- **THEN** package generation fails and identifies the project and declared root
+
+#### Scenario: Project host file is ambiguous
+
+- **WHEN** a declared root contains both `host.json` and `src/app/host.json` after filtering
+- **THEN** package generation fails and reports the project, declared root, and both matching paths without choosing a match
 
 #### Scenario: Stack and language are incompatible
 
@@ -311,7 +322,7 @@ When the release snapshot contains `.github/azure-functions-template.yaml` and d
 
 Each generated template SHALL have its own `.template.config/template.json` and SHALL use only the entry's filtered root subtree as content, rebased to the template output root, plus the required repository root license file. Sibling template content and other files outside that subtree MUST NOT be included. Links that resolve outside the entry's content root SHALL be rejected even when their targets remain inside repository staging. Final package inspection SHALL verify exactly the expected generated template inventory.
 
-Each template SHALL add output-root `host.json` as a primary output and one mandatory trusted Functions project configuration finalization action referencing that output and supplying the entry's canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add one workload constraint, in the form defined by `template-engine-constraints`, for that entry's stack, not for sibling entries. A single template generating multiple Functions projects or using parameterized or conditional topology SHALL require authored configuration; the descriptor's array SHALL NOT combine entries into one template.
+Each template SHALL preserve paths relative to the declared root. It SHALL add the discovered `host.json` path relative to that root as a primary output and one mandatory trusted Functions project configuration finalization action referencing that output and supplying the entry's canonical stack and language. The action SHALL target the directory containing the generated `host.json`. The template SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add one workload constraint, in the form defined by `template-engine-constraints`, for that entry's stack, not for sibling entries. A single template generating multiple Functions projects or using parameterized or conditional topology SHALL require authored configuration; the descriptor's array SHALL NOT combine entries into one template.
 
 #### Scenario: Repository has no template configuration
 
