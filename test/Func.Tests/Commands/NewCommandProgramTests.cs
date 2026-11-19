@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 

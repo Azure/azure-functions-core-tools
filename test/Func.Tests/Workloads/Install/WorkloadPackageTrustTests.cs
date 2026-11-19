@@ -12,7 +12,6 @@ using NSubstitute;
 using NuGet.Packaging;
 using NuGet.Packaging.Signing;
 using NuGet.Versioning;
-using Xunit.Abstractions;
 using HashAlgorithmName = System.Security.Cryptography.HashAlgorithmName;
 using Rfc3161TimestampTokenInfo = System.Security.Cryptography.Pkcs.Rfc3161TimestampTokenInfo;
 

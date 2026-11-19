@@ -242,7 +242,7 @@ To opt in, supply the pre-provisioned archive and repeat the same contract:
 $env:FUNC_CLI_TEST_PREVIEW3_ARCHIVE = 'C:\preprovisioned\func-win-x64.zip'
 dotnet test .\test\Func.Tests\Func.Tests.csproj --no-build --no-restore `
   --filter "FullyQualifiedName~WorkloadProgramSmokeTests.WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray" `
-  --logger "console;verbosity=detailed"
+  --output Detailed
 ```
 
 The setting adds a separately reported Preview 3 baseline execution, with its release identity, archive path, expected and verified archive hashes,

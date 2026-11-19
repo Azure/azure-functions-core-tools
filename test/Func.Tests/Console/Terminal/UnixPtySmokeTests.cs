@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.CompilerServices;
+
 using Azure.Functions.Cli.Common.Processes;
 using Spectre.Console;
 
@@ -72,7 +74,8 @@ public class UnixPtySmokeTests
 
     private sealed class UnixPtyTheoryAttribute : TheoryAttribute
     {
-        public UnixPtyTheoryAttribute()
+        public UnixPtyTheoryAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1)
+            : base(sourceFilePath, sourceLineNumber)
         {
             if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
             {

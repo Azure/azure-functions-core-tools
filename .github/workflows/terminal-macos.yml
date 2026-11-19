@@ -87,7 +87,7 @@ jobs:
         run: >-
           dotnet test test/Func.Tests/Func.Tests.csproj -c Release -p:CI=true --verbosity quiet
           --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
-          --logger "trx;LogFileName=terminal-tests.trx"
+          --report-gh
           --results-directory out/test-results
       - name: Preserve native evidence
         if: always()

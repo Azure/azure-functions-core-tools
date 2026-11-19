@@ -11,13 +11,16 @@ These rules apply to every C# file under `test/`. They complement
 
 ## Stack
 
-- **xUnit** as the test framework. **NSubstitute** for mocking. Use
+- **xUnit v3** on **Microsoft.Testing.Platform** as the test framework.
+  **NSubstitute** for mocking. Use
   **AwesomeAssertions** for fluent assertions (the maintained fork of
   FluentAssertions, which moved to a paid licence). No MSTest, no Moq, no
   FluentAssertions.
 - Common test packages are enforced by `test/Directory.Build.props`. Don't
-  re-declare `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`,
+  re-declare `xunit.v3.mtp-v2`, the `Microsoft.Testing.Extensions.*` reporters,
   or `NSubstitute` in individual test csprojs.
+- Test projects are executables (`OutputType=Exe`); `global.json` selects the
+  Microsoft.Testing.Platform runner for `dotnet test`.
 
 ## Structure
 

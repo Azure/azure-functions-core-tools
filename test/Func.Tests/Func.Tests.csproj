@@ -4,6 +4,8 @@
     <TargetFramework>net11.0</TargetFramework>
     <AssemblyName>$(TopLevelNamespace).Tests</AssemblyName>
     <RootNamespace>$(AssemblyName)</RootNamespace>
+    <!-- Process tests launch func's own build output; the test host never runs it in-process. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
   </PropertyGroup>
 
   <ItemGroup>
