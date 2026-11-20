@@ -217,8 +217,9 @@ public class TerminalSessionTests
             writer.Release.Set();
             // Disposal may already be faulted; its independently owned cleanup still needs to finish.
             _ = session.DisposeAsync().AsTask();
-            await render.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
+            await Task.WhenAll(render, driver.Disposed.Task).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+#pragma warning restore xUnit1051
         }
 
         driver.RestoreCount.Should().Be(1);
@@ -315,10 +316,16 @@ public class TerminalSessionTests
         finally
         {
             writer.Release.Set();
-            await render.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            await session.DisposeAsync().AsTask().WaitAsync(
-                TimeSpan.FromSeconds(5),
-                TestContext.Current.CancellationToken);
+            try
+            {
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
+                await render.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            }
+            finally
+            {
+                await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+#pragma warning restore xUnit1051
+            }
         }
 
         writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
@@ -346,9 +353,11 @@ public class TerminalSessionTests
         finally
         {
             writer.Release.Set();
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
             await session.DisposeAsync().AsTask().WaitAsync(
                 TimeSpan.FromSeconds(5),
-                TestContext.Current.CancellationToken);
+                CancellationToken.None);
+#pragma warning restore xUnit1051
         }
 
         driver.RestoreCount.Should().Be(1);

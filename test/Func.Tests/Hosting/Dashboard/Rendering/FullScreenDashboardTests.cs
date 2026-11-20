@@ -355,7 +355,9 @@ public class FullScreenDashboardTests
         finally
         {
             release.Set();
-            await returned.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
+            await returned.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+#pragma warning restore xUnit1051
         }
     }
 
