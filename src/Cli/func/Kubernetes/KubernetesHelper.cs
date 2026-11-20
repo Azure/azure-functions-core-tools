@@ -409,6 +409,10 @@ namespace Azure.Functions.Cli.Kubernetes
                 else
                 {
                     baseAddress = await GetServiceIp(service);
+                    if (string.IsNullOrEmpty(baseAddress))
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"Warning: Could not get an address for service '{service.Metadata.Name}'. Skipping the invoke URLs."));
+                    }
                 }
 
                 var masterKey = funcKeys["host.master"];
@@ -442,7 +446,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         }
 
                         ColoredConsole.WriteLine($"\t{functionName} - [{VerboseColor(trigger.ToString())}]");
-                        if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate))
+                        if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate) && !string.IsNullOrEmpty(baseAddress))
                         {
                             var url = new Uri(new Uri($"http://{baseAddress}"), new Uri(functionsInfo.InvokeUrlTemplate).PathAndQuery).ToString();
                             if (showFunctionKey)
@@ -512,18 +516,30 @@ namespace Azure.Functions.Cli.Kubernetes
             return httpResponseMsg;
         }
 
-        private static async Task<string> GetServiceIp(ServiceV1 service, int retryCount = 12)
+        internal static async Task<string> GetServiceIp(
+            ServiceV1 service,
+            int retryCount = 12,
+            Func<string, string, string, bool, Task<(string Output, bool ResourceExists)>> resourceExists = null,
+            TimeSpan? retryDelay = null)
         {
+            resourceExists ??= ResourceExists;
             int currentRetry = 0;
             while (currentRetry++ < retryCount)
             {
-                (string output, bool serviceExists) = await ResourceExists("service", service.Metadata.Name, service.Metadata.Namespace, true);
+                (string output, bool serviceExists) = await resourceExists("service", service.Metadata.Name, service.Metadata.Namespace, true);
                 if (serviceExists)
                 {
                     service = TryParse<ServiceV1>(output);
-                    if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true && service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                    if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true)
                     {
-                        return service.Status.LoadBalancer.Ingress.First().Ip;
+                        // Some providers (e.g. Docker Desktop) only populate the hostname, and the ingress entry may be empty at first.
+                        var address = service.Status?.LoadBalancer?.Ingress?
+                            .Select(i => !string.IsNullOrWhiteSpace(i?.Ip) ? i.Ip : i?.Hostname)
+                            .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a));
+                        if (address != null)
+                        {
+                            return address;
+                        }
                     }
                     else if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == false && !string.IsNullOrEmpty(service?.Spec?.ClusterIp))
                     {
@@ -532,7 +548,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
 
                 ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {service.Metadata.Name}"));
-                await Task.Delay(5000);
+                await Task.Delay(retryDelay ?? TimeSpan.FromSeconds(5));
             }
 
             return string.Empty;
