@@ -46,7 +46,7 @@ internal sealed class Templater : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
-        return new([.. templates.Select(template => new FuncTemplateInfo(template))]);
+        return new([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
     }
 
     public void Dispose()

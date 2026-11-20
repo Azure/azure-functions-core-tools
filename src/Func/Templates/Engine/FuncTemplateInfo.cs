@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Parameters;
@@ -10,9 +11,17 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Adds a func-owned wrapper around template engine metadata.
 /// </summary>
-internal sealed class FuncTemplateInfo(ITemplateInfo template) : ITemplateInfo
+/// <remarks>
+/// Wraps engine metadata and its parsed func host configuration.
+/// </remarks>
+/// <param name="template">The underlying template engine metadata.</param>
+/// <param name="hostData">The parsed func host configuration.</param>
+internal sealed class FuncTemplateInfo(ITemplateInfo template, FuncTemplateHostData hostData)
+    : ITemplateInfo
 {
     public ITemplateInfo Template { get; } = template ?? throw new ArgumentNullException(nameof(template));
+
+    public FuncTemplateHostData HostData { get; } = hostData ?? throw new ArgumentNullException(nameof(hostData));
 
     public string? Author => Template.Author;
 
@@ -72,4 +81,19 @@ internal sealed class FuncTemplateInfo(ITemplateInfo template) : ITemplateInfo
         set => Template.HasScriptRunningPostActions = value;
     }
 #pragma warning restore CS0618
+
+    /// <summary>
+    /// Loads the selected func host configuration and wraps the template metadata.
+    /// </summary>
+    /// <exception cref="JsonException">The host configuration contains invalid metadata.</exception>
+    /// <exception cref="FileNotFoundException">The declared host configuration file is missing.</exception>
+    /// <exception cref="IOException">The template source cannot be mounted or the host configuration cannot be read.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to the host configuration is denied.</exception>
+    public static FuncTemplateInfo Create(ITemplateInfo template, IEngineEnvironmentSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return new(template, settings.ReadHostData(template));
+    }
 }
