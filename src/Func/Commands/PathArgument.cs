@@ -18,15 +18,18 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal sealed class PathArgument : Argument<WorkingDirectory>
 {
-    public PathArgument() : base("path")
+    /// <param name="releaseOptionTokens">
+    /// Leaves option-like tokens for a following <see cref="TemplateArgumentsArgument"/> instead of reporting them.
+    /// </param>
+    public PathArgument(bool releaseOptionTokens = false) : base("path")
     {
         Description = "The project directory to use (defaults to current directory)";
         Arity = ArgumentArity.ZeroOrOne;
-        CustomParser = ParseToken;
+        CustomParser = result => ParseToken(result, releaseOptionTokens);
         DefaultValueFactory = _ => WorkingDirectory.FromCwd();
     }
 
-    private static WorkingDirectory ParseToken(ArgumentResult result)
+    private static WorkingDirectory ParseToken(ArgumentResult result, bool releaseOptionTokens)
     {
         string? token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
         if (string.IsNullOrEmpty(token))
@@ -41,7 +44,15 @@ internal sealed class PathArgument : Argument<WorkingDirectory>
         // invocation when the parse result has errors.
         if (token.StartsWith('-'))
         {
-            result.AddError($"Unrecognized option '{token}'.");
+            if (releaseOptionTokens)
+            {
+                result.OnlyTake(0);
+            }
+            else
+            {
+                result.AddError($"Unrecognized option '{token}'.");
+            }
+
             return WorkingDirectory.FromCwd();
         }
 

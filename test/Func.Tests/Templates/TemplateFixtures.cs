@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
@@ -21,6 +22,7 @@ internal static class TemplateFixtures
     public const string ProjectTemplateShortName = "func-tests-project";
     public const string OtherTypeTemplateIdentity = "Func.Tests.OtherType";
     public const string UntypedTemplateIdentity = "Func.Tests.Untyped";
+    public const string ParameterTemplateIdentity = "Func.Tests.Parameters";
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -96,6 +98,93 @@ internal static class TemplateFixtures
 
         return packageDirectory;
     }
+
+    /// <summary>
+    /// Writes a folder package with one project template whose <c>func.host.json</c> names options for its parameters,
+    /// and returns its path.
+    /// </summary>
+    public static string WriteParameterPackage(string parentDirectory)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "parameter-templates");
+        WriteTemplate(
+            packageDirectory,
+            $$"""
+            {
+              "identity": "{{ParameterTemplateIdentity}}",
+              "name": "Func Tests Parameters",
+              "shortName": "func-tests-parameters",
+              "tags": { "type": "project" },
+              "symbols": {
+                "Framework": {
+                  "type": "parameter",
+                  "datatype": "choice",
+                  "choices": [ { "choice": "net8.0" }, { "choice": "net10.0" } ],
+                  "defaultValue": "net10.0"
+                },
+                "NoHttp": { "type": "parameter", "datatype": "bool", "defaultValue": "false" }
+              }
+            }
+            """,
+            ("host.json", """{ "version": "2.0" }"""),
+            ("func.host.json",
+            """
+            {
+              "symbolInfo": {
+                "Framework": { "longName": "framework", "shortName": "f" },
+                "NoHttp": { "longName": "no-http" }
+              }
+            }
+            """));
+
+        return packageDirectory;
+    }
+
+    /// <summary>
+    /// Writes a folder package with one project template tagged with <paramref name="language"/> whose <c>Framework</c>
+    /// choice parameter is bound to <c>--target-framework</c>/<c>-tfm</c>, and returns its path.
+    /// </summary>
+    public static string WriteProjectPackage(string parentDirectory, string identity, string language)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "project-template");
+        WriteTemplate(
+            packageDirectory,
+            $$"""
+            {
+              "identity": "{{identity}}",
+              "name": "{{identity}}",
+              "shortName": "{{identity}}",
+              "sourceName": "FuncProject",
+              "tags": { "type": "project", "language": "{{language}}" },
+              "symbols": {
+                "Framework": {
+                  "type": "parameter",
+                  "datatype": "choice",
+                  "choices": [ { "choice": "net10.0" }, { "choice": "net11.0" } ],
+                  "defaultValue": "net10.0",
+                  "replaces": "TARGET_FRAMEWORK"
+                }
+              }
+            }
+            """,
+            ("FuncProject.csproj", "<TargetFramework>TARGET_FRAMEWORK</TargetFramework>"),
+            ("func.host.json",
+            """
+            {
+              "symbolInfo": {
+                "Framework": { "longName": "target-framework", "shortName": "tfm" }
+              }
+            }
+            """));
+
+        return packageDirectory;
+    }
+
+    /// <summary>
+    /// Creates a templater factory over a unique, empty temp home, for tests that route through the template engine
+    /// but don't need any installed templates.
+    /// </summary>
+    public static TemplaterFactory CreateEmptyTemplaterFactory()
+        => new(new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), $"func-tests-templates-{Guid.NewGuid():N}")), []);
 
     /// <summary>
     /// Installs a folder package into the template engine settings at <paramref name="settingsLocation"/>.

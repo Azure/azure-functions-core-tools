@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.ObjectModel;
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -10,7 +11,10 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -59,7 +63,10 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly InstalledBundleScanner _bundleScanner;
+    private readonly ITemplaterFactory _templaterFactory;
+    private readonly TemplateParameterBinder _parameterBinder;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
+    private readonly Dictionary<string, IReadOnlyList<Option>> _stackOptions = [with(StringComparer.OrdinalIgnoreCase)];
 
     public InitCommand(
         IInteractionService interaction,
@@ -68,6 +75,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFunctionsProjectResolver projectResolver,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
+        ITemplaterFactory templaterFactory,
+        TemplateParameterBinder parameterBinder,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
@@ -77,6 +86,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
+        ArgumentNullException.ThrowIfNull(templaterFactory);
+        ArgumentNullException.ThrowIfNull(parameterBinder);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
@@ -85,12 +96,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _projectResolver = projectResolver;
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
+        _templaterFactory = templaterFactory;
+        _parameterBinder = parameterBinder;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
 
-        AddPathArgument();
+        AddPathArgument(captureTemplateArguments: true);
         Options.Add(StackOption);
         Options.Add(NameOption);
         Options.Add(LanguageOption);
@@ -103,6 +116,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             registry.SetActiveStack(initializer.Stack);
             IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
+            _stackOptions[initializer.Stack] = options;
             // Bundle options stay general even when only one bundle-using stack is installed.
             RegisterStackOptionHelp(initializer.Stack, initializer.DisplayName,
                 options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
@@ -130,7 +144,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
-        workingDirectory.CreateIfNotExists();
         bool force = parseResult.GetValue(ForceOption);
         string? language = parseResult.GetValue(LanguageOption);
         if (!string.IsNullOrWhiteSpace(language))
@@ -282,6 +295,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             language = resolved;
         }
 
+        // Bind template options before anything is written, so an invalid option leaves the directory untouched.
+        using Templater? templater = adoptExisting || healExisting || string.IsNullOrWhiteSpace(language)
+            ? null
+            : _templaterFactory.Create(new TemplateEngineContext(workingDirectory));
+        FuncTemplateInfo? template = templater is null ? null : await FindProjectTemplateAsync(templater, language!, cancellationToken);
+        IReadOnlyDictionary<string, string> templateParameters = BindTemplateParameters(template, initializer, parseResult);
+
+        workingDirectory.CreateIfNotExists();
+
         if (force)
         {
             if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))
@@ -333,7 +355,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             Language: language,
             Force: force);
 
-        await initializer.InitializeAsync(context, parseResult, cancellationToken);
+        // Stacks without a project template keep using their initializer.
+        if (template is null)
+        {
+            await initializer.InitializeAsync(context, parseResult, cancellationToken);
+        }
+        else
+        {
+            await InstantiateProjectTemplateAsync(templater!, template, context, templateParameters, cancellationToken);
+        }
 
         _interaction.WriteLine(l => l
             .Success("✓ ")
@@ -344,6 +374,78 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
 
         return 0;
+    }
+
+    private static async Task<FuncTemplateInfo?> FindProjectTemplateAsync(Templater templater, string language, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await templater.FindProjectTemplateAsync(language, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
+    }
+
+    // Tokens init doesn't declare are template options, so they are only valid when a project template is used.
+    private IReadOnlyDictionary<string, string> BindTemplateParameters(FuncTemplateInfo? template, IProjectInitializer initializer, ParseResult parseResult)
+    {
+        IReadOnlyList<string> templateArguments = TemplateArgumentsArgument!.GetTokens(parseResult);
+        if (template is null)
+        {
+            string? token = templateArguments.FirstOrDefault(argument => argument != "--");
+            return token is null
+                ? ReadOnlyDictionary<string, string>.Empty
+                : throw new GracefulException(
+                    token.StartsWith('-') ? $"Unrecognized option '{token}'." : $"Unrecognized argument '{token}'.",
+                    isUserError: true);
+        }
+
+        try
+        {
+            return _parameterBinder.Bind(template, parseResult, templateArguments, _stackOptions[initializer.Stack]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
+    }
+
+    private static async Task InstantiateProjectTemplateAsync(
+        Templater templater,
+        FuncTemplateInfo template,
+        InitContext context,
+        IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken)
+    {
+        ITemplateCreationResult result = await templater.InstantiateAsync(
+            template,
+            context.ProjectName,
+            context.WorkingDirectory.Info.FullName,
+            parameters,
+            context.Force,
+            cancellationToken);
+
+        if (result.Status != CreationResultStatus.Success)
+        {
+            throw new GracefulException(DescribeCreationFailure(template, result), isUserError: true);
+        }
+    }
+
+    private static string DescribeCreationFailure(FuncTemplateInfo template, ITemplateCreationResult result)
+    {
+        if (result.Status == CreationResultStatus.DestructiveChangesDetected)
+        {
+            string files = string.Join(", ", result.CreationEffects?.FileChanges
+                .Where(c => c.ChangeKind != ChangeKind.Create)
+                .Select(c => c.TargetRelativePath) ?? []);
+
+            return $"Cannot initialize the project because these files already exist: {files}. "
+                + "Use --force to replace the directory contents.";
+        }
+
+        return $"Failed to initialize the project from template '{template.Identity}': {result.ErrorMessage ?? result.Status.ToString()}";
     }
 
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
