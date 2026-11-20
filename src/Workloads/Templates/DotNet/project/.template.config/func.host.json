@@ -1,6 +1,6 @@
 {
   "symbolInfo": {
-    "Framework": { "longName": "framework" },
+    "Framework": { "longName": "target-framework", "shortName": "tfm" },
     "NoHttp": { "longName": "no-http" },
     "NoTelemetry": { "longName": "no-telemetry" }
   }
