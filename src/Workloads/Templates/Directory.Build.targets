@@ -1,0 +1,10 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- Template projects only export their files to referencing projects; skip copying them to their own output. -->
+    <PrepareForRunDependsOn />
+  </PropertyGroup>
+
+</Project>

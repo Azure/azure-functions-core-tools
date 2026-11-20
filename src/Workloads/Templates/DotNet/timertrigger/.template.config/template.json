@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Timer" ],
+  "identity": "Azure.Functions.Cli.DotNet.TimerTrigger.CSharp",
+  "name": "Azure Functions timer trigger (C#)",
+  "description": "A timer trigger that runs every five minutes.",
+  "shortName": "timertrigger",
+  "tags": {
+    "language": "C#",
+    "stack": "dotnet",
+    "type": "item"
+  },
+  "sourceName": "TimerFunction",
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "Company.Function",
+      "description": "The namespace for the function.",
+      "replaces": "FunctionNamespace"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "TimerFunction.cs" }
+  ],
+  "postActions": [
+    {
+      "description": "Add the timer extension package.",
+      "actionId": "B17581D1-C5C9-4489-8F0A-004BE667B814",
+      "continueOnError": false,
+      "args": {
+        "referenceType": "package",
+        "reference": "Microsoft.Azure.Functions.Worker.Extensions.Timer",
+        "version": "4.3.1",
+        "projectFileExtensions": ".csproj"
+      },
+      "manualInstructions": [
+        { "text": "Add Microsoft.Azure.Functions.Worker.Extensions.Timer version 4.3.1 to your .csproj and configure AzureWebJobsStorage for the timer schedule monitor." }
+      ]
+    }
+  ]
+}

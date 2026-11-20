@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(TestRoot)Helpers/Templates/TestHelpers.Templates.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
