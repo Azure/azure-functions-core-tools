@@ -239,7 +239,7 @@ public class DotNetSourceProjectTests : IDisposable
         GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(context, default))
             .Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Be("'dotnet build' failed: NETSDK1045: The current .NET SDK does not support targeting .NET 10.0. [MyApp.csproj]");
+        ex.Message.Should().Be($"'dotnet build' failed: {diagnostic}");
         ex.Message.Should().NotContain("KeyNotFoundException");
         ex.Message.Should().NotContain("more error");
         reporter.Logs.Should().Equal(
@@ -272,13 +272,27 @@ public class DotNetSourceProjectTests : IDisposable
         GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
             .Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Be("'dotnet build' failed: CS1002: ; expected (+1 more error(s); see build output above)");
+        ex.Message.Should().Be("'dotnet build' failed: Program.cs(1,1): error CS1002: ; expected (+1 more error(s)). Run 'dotnet build' in the project folder for details.");
+        ex.Message.Should().NotContain("see build output above");
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_keeps_same_diagnostic_at_different_locations_distinct()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(1, "", "", "build MyApp.csproj"),
+            outputLines: ["Program.cs(1,1): error CS1002: ; expected", "Program.cs(2,1): error CS1002: ; expected", "Program.cs(2,1): error CS1002: ; expected"]);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be("'dotnet build' failed: Program.cs(1,1): error CS1002: ; expected (+1 more error(s)). Run 'dotnet build' in the project folder for details.");
     }
 
     [Theory]
-    [InlineData("MyApp.csproj : error NU1301: Unable to load the service index for source.", "NU1301: Unable to load the service index for source.")]
-    [InlineData("error CS1002: ; expected", "CS1002: ; expected")]
-    public async Task PrepareForHostRunAsync_surfaces_stderr_diagnostic(string line, string diagnostic)
+    [InlineData("MyApp.csproj : error NU1301: Unable to load the service index for source.")]
+    [InlineData("error CS1002: ; expected")]
+    public async Task PrepareForHostRunAsync_surfaces_stderr_diagnostic(string line)
     {
         string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
         SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(1, "", "", "build MyApp.csproj"),
@@ -287,7 +301,7 @@ public class DotNetSourceProjectTests : IDisposable
         GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
             .Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Be($"'dotnet build' failed: {diagnostic}");
+        ex.Message.Should().Be($"'dotnet build' failed: {line}");
     }
 
     [Theory]
@@ -303,7 +317,7 @@ public class DotNetSourceProjectTests : IDisposable
         GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
             .Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Be("'dotnet build' failed: A required build input is missing.");
+        ex.Message.Should().Be($"'dotnet build' failed: {line.Trim()}");
     }
 
     [Fact]
@@ -319,7 +333,7 @@ public class DotNetSourceProjectTests : IDisposable
         GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
             .Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Be("'dotnet build' failed: CS1002: ; expected (+2 more error(s); see build output above)");
+        ex.Message.Should().Be("'dotnet build' failed: error CS1002: ; expected (+2 more error(s)). Run 'dotnet build' in the project folder for details.");
     }
 
     [Fact]

@@ -72,8 +72,7 @@ internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirect
                     }
                     else
                     {
-                        string message = match.Groups["message"].Value.Trim();
-                        string diagnostic = code.Length == 0 ? message : $"{code}: {message}";
+                        string diagnostic = line.Trim();
                         if (seenDiagnostics.Add(diagnostic))
                         {
                             diagnostics.Add(diagnostic);
@@ -120,7 +119,7 @@ internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirect
                         message = $"'dotnet build' failed: {diagnostics[0]}";
                         if (diagnostics.Count > 1)
                         {
-                            message += $" (+{diagnostics.Count - 1} more error(s); see build output above)";
+                            message += $" (+{diagnostics.Count - 1} more error(s)). Run 'dotnet build' in the project folder for details.";
                         }
                     }
                     else
