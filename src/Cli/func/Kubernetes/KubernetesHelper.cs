@@ -409,6 +409,10 @@ namespace Azure.Functions.Cli.Kubernetes
                 else
                 {
                     baseAddress = await GetServiceIp(service);
+                    if (string.IsNullOrEmpty(baseAddress))
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"Warning: Could not get an address for service '{service.Metadata.Name}'. Skipping the invoke URLs."));
+                    }
                 }
 
                 var masterKey = funcKeys["host.master"];
@@ -442,7 +446,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         }
 
                         ColoredConsole.WriteLine($"\t{functionName} - [{VerboseColor(trigger.ToString())}]");
-                        if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate))
+                        if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate) && !string.IsNullOrEmpty(baseAddress))
                         {
                             var url = new Uri(new Uri($"http://{baseAddress}"), new Uri(functionsInfo.InvokeUrlTemplate).PathAndQuery).ToString();
                             if (showFunctionKey)
