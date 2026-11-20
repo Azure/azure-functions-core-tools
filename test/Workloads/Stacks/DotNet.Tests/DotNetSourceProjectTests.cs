@@ -213,7 +213,113 @@ public class DotNetSourceProjectTests : IDisposable
 
         ex.Message.Should().Contain("dotnet build");
         ex.Message.Should().Contain("exit 1");
+        ex.Message.Should().Contain("Run 'dotnet build' in the project folder for details.");
+        ex.Message.Should().NotContain("MSBuild crashed");
         ex.IsUserError.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_surfaces_deduplicated_diagnostic_before_crash()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        string diagnostic = $"{projectFile}(166,5): error NETSDK1045: The current .NET SDK does not support targeting .NET 10.0. [MyApp.csproj]";
+        string[] outputLines = [diagnostic, diagnostic];
+        string[] errorLines =
+        [
+            "MSBUILD : error MSB1025: An internal failure occurred while running MSBuild.",
+            "Unhandled exception: System.Collections.Generic.KeyNotFoundException: The given key 'Build' was not present in the dictionary.",
+            "   at Microsoft.Build.CommandLine.MSBuildApp.Execute(String[] commandLine)"
+        ];
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(-532462766, "", "", "build MyApp.csproj"),
+            outputLines, errorLines);
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateHostRunContext();
+        context.Reporter = reporter;
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(context, default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be("'dotnet build' failed: NETSDK1045: The current .NET SDK does not support targeting .NET 10.0. [MyApp.csproj]");
+        ex.Message.Should().NotContain("KeyNotFoundException");
+        ex.Message.Should().NotContain("more error");
+        reporter.Logs.Should().Equal(
+            outputLines.Select(line => (line, FunctionsProjectReportSeverity.Info))
+                .Concat(errorLines.Select(line => (line, FunctionsProjectReportSeverity.Error))));
+    }
+
+    [Theory]
+    [InlineData("Unhandled exception: System.Collections.Generic.KeyNotFoundException: The given key 'Build' was not present in the dictionary.")]
+    [InlineData("MSBUILD : error MSB1025: An internal failure occurred while running MSBuild.")]
+    public async Task PrepareForHostRunAsync_reports_msbuild_crash_without_actionable_diagnostics(string line)
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(-532462766, "", "", "build MyApp.csproj"),
+            outputLines: [line]);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be("'dotnet build' failed (exit -532462766): MSBuild crashed before reporting a build result. Run 'dotnet build' in the project folder for details.");
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_surfaces_first_of_multiple_diagnostics()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(1, "", "", "build MyApp.csproj"),
+            outputLines: ["Program.cs(1,1): error CS1002: ; expected", "Program.cs(2,1): error CS0103: The name 'missing' does not exist in the current context"]);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be("'dotnet build' failed: CS1002: ; expected (+1 more error(s); see build output above)");
+    }
+
+    [Theory]
+    [InlineData("MyApp.csproj : error NU1301: Unable to load the service index for source.", "NU1301: Unable to load the service index for source.")]
+    [InlineData("error CS1002: ; expected", "CS1002: ; expected")]
+    public async Task PrepareForHostRunAsync_surfaces_stderr_diagnostic(string line, string diagnostic)
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(1, "", "", "build MyApp.csproj"),
+            errorLines: [line]);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be($"'dotnet build' failed: {diagnostic}");
+    }
+
+    [Theory]
+    [InlineData("MyApp.csproj(1,1): error : A required build input is missing.")]
+    [InlineData("error : A required build input is missing.")]
+    [InlineData("  error : A required build input is missing.")]
+    public async Task PrepareForHostRunAsync_surfaces_uncoded_diagnostic(string line)
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(1, "", "", "build MyApp.csproj"),
+            outputLines: [line]);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be("'dotnet build' failed: A required build input is missing.");
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_deduplicates_concurrent_stdout_and_stderr_diagnostics()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        string[] repeatedDiagnostics = [.. Enumerable.Repeat("error CS1002: ; expected", 100)];
+        SetupStreamingFailure("--getTargetResult:Build", new DotnetCliException(1, "", "", "build MyApp.csproj"),
+            outputLines: [.. repeatedDiagnostics, "error CS0103: Unknown name"],
+            errorLines: [.. repeatedDiagnostics, "error NU1301: Unable to load the service index"],
+            concurrentOutput: true);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => CreateProject(projectFile).PrepareForHostRunAsync(CreateHostRunContext(), default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Be("'dotnet build' failed: CS1002: ; expected (+2 more error(s); see build output above)");
     }
 
     [Fact]
@@ -339,16 +445,42 @@ public class DotNetSourceProjectTests : IDisposable
             });
     }
 
-    private void SetupStreamingFailure(string targetResultArg, Exception exception)
+    private void SetupStreamingFailure(string targetResultArg, Exception exception, string[]? outputLines = null, string[]? errorLines = null, bool concurrentOutput = false)
     {
         _dotnetCli
-            .When(x => x.RunStreamingAsync(
+            .RunStreamingAsync(
                 Arg.Is<IReadOnlyList<string>>(args => args.Contains(targetResultArg)),
                 Arg.Any<string?>(),
                 Arg.Any<Action<string>?>(),
                 Arg.Any<Action<string>?>(),
-                Arg.Any<CancellationToken>()))
-            .Do(_ => throw exception);
+                Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                Action<string>? onOutput = callInfo.ArgAt<Action<string>?>(2);
+                Action<string>? onError = callInfo.ArgAt<Action<string>?>(3);
+
+                if (concurrentOutput)
+                {
+                    await Task.WhenAll(
+                        Task.Run(() => WriteLines(onOutput, outputLines)),
+                        Task.Run(() => WriteLines(onError, errorLines)));
+                }
+                else
+                {
+                    WriteLines(onOutput, outputLines);
+                    WriteLines(onError, errorLines);
+                }
+
+                throw exception;
+            });
+
+        static void WriteLines(Action<string>? callback, string[]? lines)
+        {
+            foreach (string line in lines ?? [])
+            {
+                callback?.Invoke(line);
+            }
+        }
     }
 
     private static string GetResultFilePath(IReadOnlyList<string> args)
