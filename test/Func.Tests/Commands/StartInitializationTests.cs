@@ -817,7 +817,10 @@ public class StartInitializationTests : IDisposable
     {
         using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        await using var renderer = new CompactStartInitializationRenderer(
+            new TestInteractionService(),
+            "5.0.0-test",
+            console);
         var startedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
         var resolveProfileStep = new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile");
         var resolveStartedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, resolveProfileStep);
