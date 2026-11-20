@@ -12,10 +12,10 @@ The control plane lives separately from both Azure-Samples and Azure Functions C
 https://dev.azure.com/azfunc/internal/_git/func-templates
 |
 +-- src/
-|   +-- Quickstarts/
+|   +-- SampleOnboarding/
 |   |   `-- *.yaml
 |   `-- Schema/
-|       +-- quickstart.schema.json
+|       +-- sample-onboarding.schema.json
 |       `-- azure-functions-template.schema.json
 `-- eng/
     `-- ci/
@@ -50,12 +50,12 @@ The Azure Functions CLI, general template discovery, quickstart catalog generati
 
 ### YAML files form one logical source manifest
 
-Onboarding sources use this shape:
+The onboarding registry covers approved QuickStart and connector sample repositories. Onboarding sources use this shape:
 
 ```yaml
 schemaVersion: 1
 
-quickstarts:
+samples:
   - id: python-openai-chat
     repository: Azure-Samples/functions-python-openai-chat
     packageId: Azure.Functions.Templates.PythonOpenAIChat
@@ -68,7 +68,7 @@ quickstarts:
     licenseExpression: MIT
 ```
 
-`schemaVersion`, `quickstarts`, `id`, `repository`, `packageId`, and `release.minimumVersion` are always required. Onboarding contains no template metadata or project paths.
+`schemaVersion`, `samples`, `id`, `repository`, `packageId`, and `release.minimumVersion` are always required. Onboarding contains no template metadata or project paths.
 
 Onboarding defaults are resolved before validation:
 

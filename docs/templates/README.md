@@ -8,5 +8,3 @@ The discovery foundation is not yet integrated with `func init` or `func new`. `
 - [Implementation](implementation.md) — existing infrastructure, remaining work, and validation.
 
 Earlier designs and investigations are preserved in the [archive](archive/).
-
-The [sample onboarding naming proposal](sample-onboarding.md) covers the separate producer registry; it does not change the CLI architecture.

@@ -2,43 +2,43 @@
 
 ## Purpose
 
-Defines how Azure-Samples quickstart releases are onboarded, converted into safe `FuncTemplate` NuGet packages, staged, approved, and published to NuGet.org.
+Defines how releases from approved Azure-Samples repositories are onboarded, converted into safe `FuncTemplate` NuGet packages, staged, approved, and published to NuGet.org.
 
 ## ADDED Requirements
 
 ### Requirement: The func-templates repository owns the packaging control plane
 
-The system SHALL use the `func-templates` repository in the `internal` project of the `azfunc` Azure DevOps organization as the source of truth for quickstart onboarding and release automation. It SHALL keep onboarding YAML under `src/Quickstarts/`, the onboarding JSON Schema at `src/Schema/quickstart.schema.json`, the source synthesis-descriptor JSON Schema at `src/Schema/azure-functions-template.schema.json`, and pipeline definitions under `eng/ci/`.
+The system SHALL use the `func-templates` repository in the `internal` project of the `azfunc` Azure DevOps organization as the source of truth for sample onboarding and release automation. It SHALL keep onboarding YAML under `src/SampleOnboarding/`, the onboarding JSON Schema at `src/Schema/sample-onboarding.schema.json`, the source synthesis-descriptor JSON Schema at `src/Schema/azure-functions-template.schema.json`, and pipeline definitions under `eng/ci/`.
 
 #### Scenario: Repository layout is validated
 
 - **WHEN** the control-plane repository is validated
-- **THEN** onboarding sources are read from `src/Quickstarts/*.yaml`
-- **AND** the schemas are read from `src/Schema/quickstart.schema.json` and `src/Schema/azure-functions-template.schema.json`
+- **THEN** onboarding sources are read from `src/SampleOnboarding/*.yaml`
+- **AND** the schemas are read from `src/Schema/sample-onboarding.schema.json` and `src/Schema/azure-functions-template.schema.json`
 - **AND** `eng/ci/validate-onboarding.yaml` and `eng/ci/publish-releases.yaml` define the validation and publication pipelines
 
 ### Requirement: Onboarding is PR-reviewed YAML
 
-Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL contain `schemaVersion: 1` and a `quickstarts` array containing zero or more onboarding entries. The scanner SHALL combine every matching file into one logical onboarding manifest. Filenames and the file containing an entry MUST NOT contribute to entry identity.
+Each file directly under `src/SampleOnboarding/` with the `.yaml` extension SHALL contain `schemaVersion: 1` and a `samples` array containing zero or more onboarding entries. The scanner SHALL combine every matching file into one logical onboarding manifest. Filenames and the file containing an entry MUST NOT contribute to entry identity.
 
 #### Scenario: Multiple onboarding files are combined
 
-- **WHEN** multiple `.yaml` files contain valid quickstart entries
+- **WHEN** multiple `.yaml` files contain valid sample onboarding entries
 - **THEN** the system validates and processes their entries as one logical manifest
 
 #### Scenario: Empty onboarding file is accepted
 
-- **WHEN** a valid onboarding file contains an empty `quickstarts` array
+- **WHEN** a valid onboarding file contains an empty `samples` array
 - **THEN** validation succeeds for that file
 
 #### Scenario: Nested and alternate-extension files are not scanned
 
-- **WHEN** a YAML file is nested below `src/Quickstarts/` or uses an extension other than `.yaml`
+- **WHEN** a YAML file is nested below `src/SampleOnboarding/` or uses an extension other than `.yaml`
 - **THEN** the onboarding scanner does not treat it as an onboarding source
 
 ### Requirement: The onboarding schema is strict
 
-Every onboarding file SHALL validate against `src/Schema/quickstart.schema.json`. The schema SHALL reject unknown properties and SHALL define required values, types, formats, allowed values, and defaults for schema version 1.
+Every onboarding file SHALL validate against `src/Schema/sample-onboarding.schema.json`. The schema SHALL reject unknown properties and SHALL define required values, types, formats, allowed values, and defaults for schema version 1.
 
 #### Scenario: Unknown field is rejected
 
