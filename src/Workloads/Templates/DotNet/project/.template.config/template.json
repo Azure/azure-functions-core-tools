@@ -8,6 +8,7 @@
   "shortName": "func-dotnet",
   "tags": {
     "language": "C#",
+    "stack": "dotnet",
     "type": "project"
   },
   "sourceName": "FunctionsProject",

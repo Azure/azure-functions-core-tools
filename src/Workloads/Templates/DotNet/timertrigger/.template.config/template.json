@@ -8,6 +8,7 @@
   "shortName": "timertrigger",
   "tags": {
     "language": "C#",
+    "stack": "dotnet",
     "type": "item"
   },
   "sourceName": "TimerFunction",

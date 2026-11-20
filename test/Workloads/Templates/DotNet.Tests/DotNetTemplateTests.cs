@@ -136,6 +136,7 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         ITemplateInfo template = await _host.GetTemplateAsync(shortName);
         template.TagsCollection["type"].Should().Be(type);
         template.TagsCollection["language"].Should().Be("C#");
+        template.TagsCollection["stack"].Should().Be("dotnet");
         return template;
     }
 
