@@ -58,7 +58,7 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         program.Contains("APPLICATIONINSIGHTS_CONNECTION_STRING").Should().Be(!noTelemetry);
         if (!noHttp)
         {
-            File.ReadAllText(Path.Combine(output, "HelloWorld.cs")).Should().Contain("namespace Sample.App;", "Hello, world!");
+            File.ReadAllText(Path.Combine(output, "HelloWorld.cs")).Should().ContainAll("namespace Sample.App;", "Hello, world!");
         }
 
         using var host = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "host.json")));
@@ -78,7 +78,7 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         Directory.Exists(Path.Combine(output, ".template.config")).Should().BeFalse();
         foreach (string file in Directory.EnumerateFiles(output))
         {
-            File.ReadAllText(file).Should().NotContain("#if", "#endif", "FunctionsProject", "NoHttp", "NoTelemetry");
+            File.ReadAllText(file).Should().NotContainAny("#if", "#endif", "FunctionsProject", "NoHttp", "NoTelemetry");
         }
     }
 
@@ -110,15 +110,15 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
 
         result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
         string source = File.ReadAllText(Path.Combine(result.OutputBaseDirectory!, "MyFunction.cs"));
-        source.Should().Contain("namespace Example.Functions;", "public sealed class MyFunction", "[Function(nameof(MyFunction))]");
+        source.Should().ContainAll("namespace Example.Functions;", "public sealed class MyFunction", "[Function(nameof(MyFunction))]");
         source.Should().NotContain("FunctionNamespace");
         if (shortName == "httptrigger")
         {
-            source.Should().Contain("HttpRequest", "IActionResult", "Hello, world!");
+            source.Should().ContainAll("HttpRequest", "IActionResult", "Hello, world!");
         }
         else
         {
-            source.Should().Contain("[TimerTrigger(\"0 */5 * * * *\")]", "ILogger<MyFunction>");
+            source.Should().ContainAll("[TimerTrigger(\"0 */5 * * * *\")]", "ILogger<MyFunction>");
         }
 
         IPostAction action = result.CreationResult!.PostActions.Should().ContainSingle().Subject;
