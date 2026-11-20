@@ -119,19 +119,68 @@ public sealed class SetupAutomationContractTests
     }
 
     [Fact]
-    public async Task ResolveFeaturesAsync_NormalInteractiveRun_OffersBuiltInStacksAndUsesSelection()
+    public async Task ResolveFeaturesAsync_NormalInteractiveRun_OffersBuiltInStacksWithFriendlyLabels()
     {
         Harness harness = CreateHarness();
 
-        SetupFeaturePlan? plan = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
+        _ = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
 
         harness.Interaction.PromptCount.Should().Be(1);
-        harness.Interaction.MultiSelectionChoices.Should().ContainSingle().Which.Select(choice => choice.Value)
-            .Should().Equal("dotnet", "go", "java", "node", "powershell", "python");
+        harness.Interaction.MultiSelectionChoices.Should().ContainSingle().Which.Should().Equal(
+            new MultiSelectionChoice("dotnet", ".NET"),
+            new MultiSelectionChoice("go", "Go"),
+            new MultiSelectionChoice("java", "Java"),
+            new MultiSelectionChoice("node", "Node.js"),
+            new MultiSelectionChoice("powershell", "PowerShell"),
+            new MultiSelectionChoice("python", "Python"));
+    }
+
+    [Theory]
+    [InlineData("dotnet", "dotnet-isolated", false, false)]
+    [InlineData("go", "go", true, true)]
+    [InlineData("java", "java", true, true)]
+    [InlineData("node", "node", true, true)]
+    [InlineData("powershell", "powershell", true, true)]
+    [InlineData("python", "python", true, true)]
+    public async Task ResolveFeaturesAsync_NormalInteractiveRun_UsesSelectedStackIdentifier(
+        string stack, string profileRuntime, bool installWorker, bool includeExtensionBundle)
+    {
+        Harness harness = CreateHarness();
+        harness.Interaction.SelectedFeatures = [stack];
+
+        SetupFeaturePlan? plan = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
+
         plan.Should().NotBeNull();
-        plan!.Features.Should().Equal("node");
-        plan.WorkerRuntimes.Should().Equal("node");
-        plan.IncludeExtensionBundle.Should().BeTrue();
+        plan!.Features.Should().Equal(stack);
+        plan.RuntimeFeatures.Should().ContainSingle().Which.Should()
+            .BeEquivalentTo(new SetupRuntimeFeature(stack, profileRuntime, installWorker));
+        plan.WorkerRuntimes.Should().Equal(installWorker ? [stack] : []);
+        plan.IncludeExtensionBundle.Should().Be(includeExtensionBundle);
+    }
+
+    [Theory]
+    [InlineData("dotnet", ".NET")]
+    [InlineData("go", "Go")]
+    [InlineData("java", "Java")]
+    [InlineData("node", "Node.js")]
+    [InlineData("powershell", "PowerShell")]
+    [InlineData("python", "Python")]
+    public async Task ResolveFeaturesAsync_InstalledStack_UsesFriendlyLabelAndExcludesFromPicker(string stack, string displayName)
+    {
+        Harness harness = CreateHarness();
+        harness.Store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+            [new WorkloadEntry
+            {
+                PackageId = SetupDependency.Stack(stack).PackageId,
+                PackageVersion = "1.0.0",
+                Kind = WorkloadKind.Workload,
+            }]);
+
+        _ = await harness.Features.ResolveFeaturesAsync(Options(), CancellationToken.None);
+
+        harness.Interaction.Lines.Should().Contain(line => line.Contains($"[✓] {stack} ({displayName})", StringComparison.Ordinal));
+        harness.Interaction.MultiSelectionChoices.Should().ContainSingle().Which.Should().HaveCount(5)
+            .And.NotContain(choice => choice.Value == stack || choice.Label == displayName);
     }
 
     [Theory]
@@ -379,12 +428,14 @@ public sealed class SetupAutomationContractTests
 
         public int PromptCount { get; private set; }
 
+        public IReadOnlyList<string> SelectedFeatures { get; set; } = ["node"];
+
         public override async Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(
             string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
         {
             PromptCount++;
             await base.PromptForMultiSelectionAsync(title, choices, cancellationToken);
-            return ["node"];
+            return SelectedFeatures;
         }
     }
 }

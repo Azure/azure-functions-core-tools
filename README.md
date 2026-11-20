@@ -177,6 +177,10 @@ func setup --features java --yes
 func setup --features powershell --yes
 ```
 
+In an existing project, setup uses its configured runtime when `--features` is omitted.
+Outside a configured project, interactive setup shows both the stack and friendly display names such as
+`.NET` and `Node.js`. Command-line arguments and configuration continue to use stack
+identifiers such as `dotnet` and `node`.
 In an existing project, setup uses its configured language stack when `--features` is omitted.
 `func setup --check` checks the same dependencies without installing them and returns
 a nonzero exit code when a required stack workload is missing.

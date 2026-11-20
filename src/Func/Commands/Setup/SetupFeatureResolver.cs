@@ -199,13 +199,15 @@ internal sealed class SetupFeatureResolver(
         List<string> installedStacks = [];
         foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
         {
+            string displayName = SetupDependency.StackDisplayName(stack);
+
             if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
             {
-                installedStacks.Add(stack);
+                installedStacks.Add($"{stack} ({displayName})");
             }
             else
             {
-                promptChoices.Add(new MultiSelectionChoice(stack, stack));
+                promptChoices.Add(new MultiSelectionChoice(stack, displayName));
             }
         }
 
