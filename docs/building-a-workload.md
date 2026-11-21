@@ -185,7 +185,10 @@ The CLI validates this declaration and persists it in the installed workload reg
 The declaration alone does not install a TemplateEngine package.
 Content, meta, and RID-pointer manifests cannot declare a non-null `templateRoot`.
 For SDK-generated manifests, set `<WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>`
-in the workload project. To bundle files from another project, add
+in the workload project. For multi-RID runtime workloads, the SDK omits the root
+from the generated pointer manifest and retains it in each implementation manifest;
+the authored property remains available for content layout.
+To bundle files from another project, add
 `Pack="true"` to its `ProjectReference`. The workload SDK packs that project's
 copy-to-output items, using each item's `TargetPath` as its package path. Add
 `TargetPathPrefix` to the same reference to place those items under a directory
