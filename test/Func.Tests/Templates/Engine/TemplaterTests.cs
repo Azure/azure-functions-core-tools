@@ -148,6 +148,50 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task FindItemTemplatesAsync_ReturnsOnlyItemTemplatesForLanguage()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteItemPackage(Path.Combine(_root, "csharp"), "Func.Tests.CSharpItem", "Http", "C#"), _hive);
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteItemPackage(Path.Combine(_root, "fsharp"), "Func.Tests.FSharpItem", "Http", "F#"), _hive);
+        await TemplateFixtures.InstallAsync(CsharpProjectPackage("project", "Func.Tests.CSharp"), _hive);
+        using Templater templater = CreateTemplater();
+
+        IReadOnlyList<ITemplateInfo> templates = await templater.FindItemTemplatesAsync("c#");
+
+        templates.Select(t => t.Identity).Should().Equal("Func.Tests.CSharpItem");
+    }
+
+    [Theory]
+    [InlineData("Func.Tests.CSharpItem", 1)]
+    [InlineData("FUNC-TESTS-ITEM", 1)]
+    [InlineData("http", 1)]
+    [InlineData("timer", 0)]
+    public async Task FindItemTemplatesAsync_Reference_MatchesIdentityShortNameOrName(string reference, int expectedCount)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteItemPackage(_root, "Func.Tests.CSharpItem", "Http", "C#"), _hive);
+        using Templater templater = CreateTemplater();
+
+        IReadOnlyList<ITemplateInfo> templates = await templater.FindItemTemplatesAsync("C#", reference);
+
+        templates.Should().HaveCount(expectedCount);
+    }
+
+    [Fact]
+    public async Task FindItemTemplatesAsync_ExactIdentityOutranksAnotherTemplatesName()
+    {
+        await TemplateFixtures.InstallAsync(
+            TemplateFixtures.WriteItemPackage(Path.Combine(_root, "target"), "Func.Tests.Http", "Target", "C#"), _hive);
+        await TemplateFixtures.InstallAsync(
+            TemplateFixtures.WriteItemPackage(Path.Combine(_root, "other"), "Func.Tests.Other", "Func.Tests.Http", "C#"), _hive);
+        using Templater templater = CreateTemplater();
+
+        IReadOnlyList<ITemplateInfo> byIdentity = await templater.FindItemTemplatesAsync("C#", "Func.Tests.Http");
+        IReadOnlyList<ITemplateInfo> bySharedShortName = await templater.FindItemTemplatesAsync("C#", "func-tests-item");
+
+        byIdentity.Select(t => t.Identity).Should().Equal("Func.Tests.Http");
+        bySharedShortName.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task InstantiateAsync_WritesProjectUsingNameAndParameters()
     {
         using Templater templater = await CreateCsharpProjectTemplaterAsync();

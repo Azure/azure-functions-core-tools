@@ -77,7 +77,7 @@ func <command> [path] [options]
 | Command | Description |
 |---------|-------------|
 | `func init [path]` | Initialize a new Azure Functions project |
-| `func new [path]` | Function scaffolding is temporarily unavailable |
+| `func new [path]` | Create a new function from a template |
 | `func run [path]` | Start the Functions host locally (alias: `func start`) |
 | `func workload install <id>` | Install a language workload |
 | `func workload list` | List installed workloads |
@@ -93,9 +93,9 @@ clipboard behavior, and terminal compatibility.
 
 ## Architecture
 
-The Template Engine infrastructure is implemented under `src/Func/Templates/Engine` using `Microsoft.TemplateEngine`. Command integration for `func new` is still in progress.
+The Template Engine infrastructure is implemented under `src/Func/Templates/Engine` using `Microsoft.TemplateEngine`. `func init` and `func new` use matching installed templates.
 
-Currently, `func new` reports scaffolding and `--list` temporarily unavailable and returns exit code 1 without modifying the target directory. The command skips first-run setup, so this error is returned without running setup.
+`func new` requires a project initialized with `func init` and creates a function from an installed item template for the project language. `func new --list` is temporarily unavailable and returns exit code 1 without modifying the target directory.
 
 `func init`, Quickstart, setup, and Functions runtime execution remain available.
 
