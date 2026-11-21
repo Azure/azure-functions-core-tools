@@ -37,10 +37,11 @@ public class DashboardFailureTests
         LifecycleStream source = new();
         DashboardPipeline pipeline = new(new DashboardState(), source, renderer);
         Task<int> run = pipeline.RunAsync(CancellationToken.None);
-        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         renderer.Fault(failure);
-        Exception? result = await Record.ExceptionAsync(() => run.WaitAsync(TimeSpan.FromSeconds(5)));
+        Exception? result = await Record.ExceptionAsync(() => run.WaitAsync(
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         result.Should().BeSameAs(failure);
         source.Shutdown.Should().BeTrue();

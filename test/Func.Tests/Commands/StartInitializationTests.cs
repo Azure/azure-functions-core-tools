@@ -817,7 +817,10 @@ public class StartInitializationTests : IDisposable
     {
         using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        await using var renderer = new CompactStartInitializationRenderer(
+            new TestInteractionService(),
+            "5.0.0-test",
+            console);
         var startedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
         var resolveProfileStep = new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile");
         var resolveStartedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, resolveProfileStep);
@@ -842,11 +845,11 @@ public class StartInitializationTests : IDisposable
 
         await renderer.OnEventAsync(startedEvent, CancellationToken.None);
         await renderer.OnEventAsync(resolveStartedEvent, CancellationToken.None);
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
         await renderer.OnEventAsync(resolveCompletedEvent, CancellationToken.None);
         await renderer.OnEventAsync(installStartedEvent, CancellationToken.None);
         await renderer.OnEventAsync(installProgressEvent, CancellationToken.None);
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
         await renderer.OnEventAsync(installCompletedEvent, CancellationToken.None);
         var runInfo = new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET");
         var eventStream = new InMemoryHostEventStream();
@@ -1034,7 +1037,7 @@ public class StartInitializationTests : IDisposable
             int renderedFrameCount = 0;
             for (int attempt = 0; attempt < 20 && renderedFrameCount < 2; attempt++)
             {
-                await Task.Delay(100);
+                await Task.Delay(100, TestContext.Current.CancellationToken);
                 output = writer.ToString();
                 renderedFrameCount = spinner.Frames.Distinct().Count(frame => output.Contains(frame, StringComparison.Ordinal));
             }
@@ -1080,12 +1083,12 @@ public class StartInitializationTests : IDisposable
             await WaitForOutputAsync(writer, output => output.Contains("Resolve worker", StringComparison.Ordinal));
 
             Task<bool> confirmTask = renderer.ConfirmAsync("Install?", defaultValue: true, CancellationToken.None);
-            await promptStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            await promptStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
             string outputDuringPrompt = writer.ToString();
             int statusIndex = outputDuringPrompt.LastIndexOf("Resolve worker", StringComparison.Ordinal);
             int promptIndex = outputDuringPrompt.LastIndexOf("Install?", StringComparison.Ordinal);
 
-            await Task.Delay(300);
+            await Task.Delay(300, TestContext.Current.CancellationToken);
 
             (statusIndex >= 0).Should().BeTrue($"Expected status output before prompt. Output: {outputDuringPrompt}");
             (promptIndex > statusIndex).Should().BeTrue($"Expected prompt to render after status output. Output: {outputDuringPrompt}");

@@ -26,7 +26,7 @@ public class VersionCommandTests
         var command = new VersionCommand(_interaction, _versionProvider);
         var parseResult = command.Parse([]);
 
-        var exitCode = await parseResult.InvokeAsync();
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().ContainSingle();

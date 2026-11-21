@@ -43,7 +43,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         string nupkg = BuildNupkg();
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeTrue();
         result.Entry.Should().BeSameAs(priorEntry);
@@ -62,7 +63,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         string nupkg = BuildNupkg();
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
         File.Exists(stalePath).Should().BeFalse();
@@ -89,7 +91,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
             .Returns(new WorkloadOwnershipRemovalResult(true, true, null));
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg, force: true);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            nupkg, force: true, cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
         result.Entry.PackageId.Should().Be("test.workload");
@@ -149,7 +152,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
             .Returns(new WorkloadOwnershipRemovalResult(true, true, entry));
 
         WorkloadInstaller installer = NewInstaller();
-        bool removed = await installer.UninstallAsync("test.workload", "1.0.0");
+        bool removed = await installer.UninstallAsync("test.workload", "1.0.0", TestContext.Current.CancellationToken);
 
         removed.Should().BeTrue();
         Directory.Exists(installDir).Should().BeFalse();
@@ -162,7 +165,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         Directory.CreateDirectory(installDir);
         WorkloadInstaller installer = NewInstaller();
 
-        bool removed = await installer.UninstallAsync("test.workload", "1.0.0");
+        bool removed = await installer.UninstallAsync("test.workload", "1.0.0", TestContext.Current.CancellationToken);
 
         removed.Should().BeFalse();
         Directory.Exists(installDir).Should().BeTrue();
@@ -195,7 +198,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
 
         WorkloadInstaller installer = NewInstaller();
         bool removed = await installer.UninstallAsync(
-            "example.workload", "1.0.0", WorkloadOwnershipKind.Logical);
+            "example.workload", "1.0.0", WorkloadOwnershipKind.Logical, TestContext.Current.CancellationToken);
 
         removed.Should().BeTrue();
         await _store.Received(1).RemoveOwnershipAsync(
@@ -259,7 +262,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
 
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
-            pointerId, version: null, source: null, includePrerelease: false, exact: true, force: false);
+            pointerId, version: null, source: null, includePrerelease: false, exact: true, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be(implementationId);
         await _store.Received(1).MoveLogicalOwnershipAsync(
@@ -313,7 +317,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
 
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
         WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
-            pointerId, version: null, source: null, includePrerelease: false, exact: true, force: false);
+            pointerId, version: null, source: null, includePrerelease: false, exact: true, force: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be(implementationId);
         await _store.Received(1).AddOwnershipAsync(
@@ -425,7 +430,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         ]);
 
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(pointerPath);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            pointerPath, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be("example.workload.win-x64");
         await _store.Received(1).MoveLogicalOwnershipAsync(
@@ -466,7 +472,8 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         ]);
 
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
-        WorkloadInstallResult result = await installer.InstallFromPackageAsync(pointerPath);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(
+            pointerPath, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageId.Should().Be(implementationId);
         await _store.Received(1).AddOwnershipAsync(

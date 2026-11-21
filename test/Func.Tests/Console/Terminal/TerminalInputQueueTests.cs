@@ -52,7 +52,8 @@ public class TerminalInputQueueTests
         Func<Task> write = () => blocked;
         await write.Should().ThrowAsync<OperationCanceledException>();
         queue.Complete();
-        await using var reader = queue.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using var reader = queue.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         (await reader.MoveNextAsync()).Should().BeTrue();
         reader.Current.Key.KeyChar.Should().Be('q');
         (await reader.MoveNextAsync()).Should().BeFalse();
@@ -64,7 +65,8 @@ public class TerminalInputQueueTests
         TerminalInputQueue queue = new();
         queue.Complete(new IOException("read failed"));
         queue.Complete();
-        await using var reader = queue.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using var reader = queue.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         Func<Task> read = async () => await reader.MoveNextAsync();
         await read.Should().ThrowAsync<IOException>().WithMessage("read failed");
     }

@@ -39,7 +39,9 @@ public class NewCommandTests
         var command = new NewCommand(_interaction);
         ParseResult result = command.Parse(["--list", "--format", format]);
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(1);
         _interaction.AllOutput.Should().Contain("temporarily unavailable");
@@ -117,8 +119,11 @@ public class NewCommandTests
         if (exists)
         {
             Directory.CreateDirectory(configDirectory);
-            await File.WriteAllTextAsync(configPath, config);
-            await File.WriteAllTextAsync(Path.Combine(directory, "host.json"), "{}");
+            await File.WriteAllTextAsync(configPath, config, TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(directory, "host.json"),
+                "{}",
+                TestContext.Current.CancellationToken);
             Directory.CreateDirectory(Path.Combine(directory, "empty"));
         }
 
@@ -131,7 +136,9 @@ public class NewCommandTests
                 args = [.. args, "--force"];
             }
 
-            int exitCode = await command.Parse(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            int exitCode = await command.Parse(args).InvokeAsync(
+                new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+                TestContext.Current.CancellationToken);
 
             exitCode.Should().Be(1);
             _interaction.AllOutput.Should().Contain("temporarily unavailable");
@@ -140,8 +147,9 @@ public class NewCommandTests
             {
                 Directory.GetFileSystemEntries(directory, "*", SearchOption.AllDirectories)
                     .Should().BeEquivalentTo([configDirectory, configPath, Path.Combine(directory, "host.json"), Path.Combine(directory, "empty")]);
-                (await File.ReadAllTextAsync(configPath)).Should().Be(config);
-                (await File.ReadAllTextAsync(Path.Combine(directory, "host.json"))).Should().Be("{}");
+                (await File.ReadAllTextAsync(configPath, TestContext.Current.CancellationToken)).Should().Be(config);
+                (await File.ReadAllTextAsync(
+                    Path.Combine(directory, "host.json"), TestContext.Current.CancellationToken)).Should().Be("{}");
             }
         }
         finally

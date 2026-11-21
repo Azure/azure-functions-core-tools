@@ -35,8 +35,8 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -71,7 +71,7 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -85,8 +85,8 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -111,7 +111,9 @@ public sealed class FirstRunCoordinatorTests
         FirstRunCoordinator coordinator = CreateCoordinator();
 
         int? firstRunExitCode = await coordinator.EnsureFirstRunPromptedAsync(commandName, parseResult, CancellationToken.None);
-        int exitCode = firstRunExitCode ?? await parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = firstRunExitCode ?? await parseResult.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(1);
         _interaction.Lines.Should().Contain(line =>
@@ -119,9 +121,9 @@ public sealed class FirstRunCoordinatorTests
             && line.Contains("temporarily unavailable"));
         _interaction.Lines.Should().NotContain(line => line.Contains("`func setup`"));
         _interaction.ConfirmCalls.Should().Be(0);
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
-        await _stateStore.DidNotReceiveWithAnyArgs().GetStateAsync(default);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
+        await _stateStore.DidNotReceiveWithAnyArgs().GetStateAsync(TestContext.Current.CancellationToken);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -137,7 +139,7 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -165,7 +167,7 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -197,7 +199,7 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(1);
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
 
@@ -281,7 +283,7 @@ public sealed class FirstRunCoordinatorTests
         int? result = await coordinator.EnsureFirstRunPromptedAsync("init", Parse("init"), CancellationToken.None);
 
         result.Should().BeNull();
-        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
 
@@ -310,7 +312,7 @@ public sealed class FirstRunCoordinatorTests
         result.Should().BeNull();
         _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("`func setup`"));
         _interaction.ConfirmCalls.Should().Be(0);
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

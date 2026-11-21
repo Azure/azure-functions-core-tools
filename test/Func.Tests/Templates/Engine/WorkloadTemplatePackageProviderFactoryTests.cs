@@ -19,17 +19,19 @@ public sealed class WorkloadTemplatePackageProviderFactoryTests
             new("first-root", "first.workload", "1.0.0", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)),
             new("second-root", "second.workload", "2.0.0", new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)),
         ];
-        source.GetRootsAsync(default).Returns(Task.FromResult<IReadOnlyList<WorkloadTemplateRoot>>(roots));
+        source.GetRootsAsync(
+            TestContext.Current.CancellationToken).Returns(Task.FromResult<IReadOnlyList<WorkloadTemplateRoot>>(roots));
         WorkloadTemplatePackageProviderFactory factory = new(source);
         ITemplatePackageProvider provider = factory.CreateProvider(Substitute.For<IEngineEnvironmentSettings>());
 
-        IReadOnlyList<ITemplatePackage> packages = await provider.GetAllTemplatePackagesAsync(default);
+        IReadOnlyList<ITemplatePackage> packages = await provider.GetAllTemplatePackagesAsync(
+            TestContext.Current.CancellationToken);
 
         provider.Factory.Should().BeSameAs(factory);
         packages.Select(package => package.MountPointUri).Should().Equal(roots.Select(root => root.Path));
         packages.Select(package => package.LastChangeTime).Should().Equal(roots.Select(root => root.LastChangeTime));
         packages.Should().AllSatisfy(package => package.Provider.Should().BeSameAs(provider));
-        await source.Received(1).GetRootsAsync();
+        await source.Received(1).GetRootsAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

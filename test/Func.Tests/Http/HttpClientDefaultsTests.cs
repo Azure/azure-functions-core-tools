@@ -27,7 +27,7 @@ public sealed class HttpClientDefaultsTests
         IHttpClientFactory factory = provider.GetRequiredService<IHttpClientFactory>();
         HttpClient client = factory.CreateClient("TestClient");
 
-        await client.GetAsync("https://example.com");
+        await client.GetAsync("https://example.com", TestContext.Current.CancellationToken);
 
         capturedUserAgent.Should().NotBeNull();
         capturedUserAgent.Should().StartWith("AzureFunctionsCli/");
@@ -53,7 +53,7 @@ public sealed class HttpClientDefaultsTests
         IHttpClientFactory factory = provider.GetRequiredService<IHttpClientFactory>();
         HttpClient client = factory.CreateClient(string.Empty);
 
-        await client.GetAsync("https://example.com");
+        await client.GetAsync("https://example.com", TestContext.Current.CancellationToken);
 
         capturedUserAgent.Should().NotBeNull();
         capturedUserAgent.Should().StartWith("AzureFunctionsCli/");
@@ -78,7 +78,7 @@ public sealed class HttpClientDefaultsTests
         IHttpClientFactory factory = provider.GetRequiredService<IHttpClientFactory>();
         HttpClient client = factory.CreateClient("VersionCheck");
 
-        await client.GetAsync("https://example.com");
+        await client.GetAsync("https://example.com", TestContext.Current.CancellationToken);
 
         capturedUserAgent.Should().NotBeNull();
         // Format: AzureFunctionsCli/{version} ({os})

@@ -47,7 +47,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         result.Message.Should().Be("No extension bundle declared");
         context.State.BundleEnvVarsForHost.Should().BeEmpty();
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
         result.Message.Should().Be("No extension bundle declared");
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         ex.Message.Should().Contain("host.json is not valid JSON");
         ex.Message.Should().Contain("Run 'func run' again after correcting the issue.");
         ex.Message.Should().NotContain("func start");
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         ex.Message.Should().Contain("host.json extensionBundle must include");
         ex.Message.Should().Contain("Run 'func run' again after correcting the issue.");
         ex.Message.Should().NotContain("func start");
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Theory]

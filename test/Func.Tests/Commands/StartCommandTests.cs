@@ -274,7 +274,9 @@ public class StartCommandTests : IDisposable
             + "--cors http://localhost,http://example --cors-credentials";
         var result = root.Parse(commandLine);
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         string[] expectedWarnings = outputMode == "compact"
@@ -332,7 +334,9 @@ public class StartCommandTests : IDisposable
         var root = Parser.CreateCommand(services);
 
         int exitCode = await root.Parse($"run \"{_tempDir}\" --format=plain")
-            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            .InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+                TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().Contain(line =>
@@ -362,7 +366,8 @@ public class StartCommandTests : IDisposable
         var root = Parser.CreateCommand(services);
 
         int exitCode = await root.Parse($"run \"{_tempDir}\"").InvokeAsync(
-            new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         interaction.Received().WriteWarning(
@@ -395,7 +400,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain --demo");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         await _initializationRunner.Received(1).RunAsync(
@@ -427,7 +434,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         options.Received(1).Get(new DirectoryInfo(_tempDir).FullName);
@@ -462,7 +471,9 @@ public class StartCommandTests : IDisposable
         string projectDirectory = Environment.CurrentDirectory;
         var result = root.Parse($"start \"{projectDirectory}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         options.DidNotReceive().Get(Arg.Any<string>());
@@ -494,7 +505,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         TestFunctionsProject project = initializationResult.Project.Should().BeOfType<TestFunctionsProject>().Subject;
@@ -526,7 +539,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(11);
         TestFunctionsProject project = initializationResult.Project.Should().BeOfType<TestFunctionsProject>().Subject;
@@ -562,7 +577,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().Contain("WARNING: Project cleanup failed: cleanup failed");

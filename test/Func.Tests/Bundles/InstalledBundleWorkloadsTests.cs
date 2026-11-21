@@ -20,7 +20,8 @@ public class InstalledBundleWorkloadsTests
             new WorkloadEntry { PackageId = "azure.functions.cli.workloads.extensionbundles", PackageVersion = "4.35.0", Kind = WorkloadKind.Content },
             new WorkloadEntry { PackageId = "Azure.Functions.Cli.Workloads.ExtensionBundles", PackageVersion = "4.36.0", Kind = WorkloadKind.Content },
         ]);
-        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store).ListInstalledAsync();
+        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store).ListInstalledAsync(
+            TestContext.Current.CancellationToken);
 
         result.Count.Should().Be(2);
         result.Should().Contain(r => r.PackageVersion == "4.35.0");
@@ -41,7 +42,8 @@ public class InstalledBundleWorkloadsTests
                 Kind = WorkloadKind.Workload,
             },
         ]);
-        (await new InstalledBundleWorkloads(store).ListInstalledAsync()).Should().BeEmpty();
+        (await new InstalledBundleWorkloads(store).ListInstalledAsync(
+            TestContext.Current.CancellationToken)).Should().BeEmpty();
     }
 
     [Fact]
@@ -59,7 +61,8 @@ public class InstalledBundleWorkloadsTests
                 Kind = WorkloadKind.Content,
             },
         ]);
-        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store).ListInstalledAsync();
+        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store).ListInstalledAsync(
+            TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle().Which.InstallDirectory.Should().Be("/home/.func/workloads/bundles/4.35.0");
     }
