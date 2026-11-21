@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests;
 

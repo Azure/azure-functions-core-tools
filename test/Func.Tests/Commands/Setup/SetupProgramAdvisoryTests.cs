@@ -9,7 +9,6 @@ using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
 

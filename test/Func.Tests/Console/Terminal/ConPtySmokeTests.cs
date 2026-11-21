@@ -3,10 +3,10 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Azure.Functions.Cli.Common.Processes;
-using Azure.Functions.Cli.Console.Terminal;
 using Microsoft.Win32.SafeHandles;
 using Spectre.Console;
 
@@ -59,7 +59,8 @@ public sealed partial class ConPtySmokeTests
 
     private sealed class ConPtyTheoryAttribute : TheoryAttribute
     {
-        public ConPtyTheoryAttribute()
+        public ConPtyTheoryAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1)
+            : base(sourceFilePath, sourceLineNumber)
         {
             if (!OperatingSystem.IsWindows())
             {

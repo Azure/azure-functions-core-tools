@@ -78,9 +78,12 @@ extends:
               projects: test/Func.Tests/Func.Tests.csproj
               arguments: >-
                 -c Release --no-restore -p:CI=true
+                --report-azdo --publish-azdo-test-results
                 --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
+              publishTestResults: false
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
         - job: terminal_linux
           displayName: Linux terminal qualification
           steps:
@@ -102,6 +105,9 @@ extends:
               projects: test/Func.Tests/Func.Tests.csproj
               arguments: >-
                 -c Release --no-restore -p:CI=true
+                --report-azdo --publish-azdo-test-results
                 --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
+              publishTestResults: false
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
