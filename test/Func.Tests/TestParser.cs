@@ -77,6 +77,8 @@ internal static class TestParser
         services.AddSingleton(Substitute.For<Cli.Bundles.IInstalledBundleWorkloads>());
         services.AddSingleton<Cli.Bundles.InstalledBundleScanner>();
         services.AddSingleton(Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
+        services.AddSingleton(Substitute.For<Cli.Templates.Engine.ITemplaterFactory>());
+        services.AddSingleton<Cli.Templates.Engine.TemplateParameterBinder>();
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
 
         // InitCommand reads local.settings.json to drive adoption decisions.

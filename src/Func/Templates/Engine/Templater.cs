@@ -4,13 +4,14 @@
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Command-scoped entry point for discovering templates installed in the func template engine.
+/// Command-scoped entry point for discovering and instantiating templates installed in the func template engine.
 /// </summary>
-internal sealed class Templater : IDisposable
+internal class Templater : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
@@ -41,12 +42,68 @@ internal sealed class Templater : IDisposable
     /// <summary>
     /// Lists the templates installed in the func template engine.
     /// </summary>
+    /// <exception cref="System.Text.Json.JsonException">An installed template's <c>func.host.json</c> is not valid.</exception>
     public async Task<TemplateResolutionResult> ListAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
         return new([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
+    }
+
+    /// <summary>
+    /// Finds the installed project template for <paramref name="language"/>.
+    /// </summary>
+    /// <returns>The matching template, or <c>null</c> when none is installed.</returns>
+    /// <exception cref="InvalidOperationException">More than one installed project template matches the language.</exception>
+    /// <exception cref="System.Text.Json.JsonException">An installed template's <c>func.host.json</c> is not valid.</exception>
+    /// <exception cref="FileNotFoundException">A declared template host configuration file is missing.</exception>
+    /// <exception cref="IOException">A template source cannot be mounted or its host configuration cannot be read.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to a template host configuration is denied.</exception>
+    public virtual async Task<FuncTemplateInfo?> FindProjectTemplateAsync(string language, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(language);
+
+        TemplateResolutionResult result = await ListAsync(cancellationToken);
+        List<FuncTemplateInfo> matches = [.. result.Templates.Where(t => HasTag(t, "type", "project") && HasTag(t, "language", language))];
+
+        return matches.Count switch
+        {
+            0 => null,
+            1 => matches[0],
+            _ => throw new InvalidOperationException(
+                $"Multiple project templates match language '{language}': {string.Join(", ", matches.Select(t => t.Identity))}."),
+        };
+    }
+
+    /// <summary>
+    /// Instantiates <paramref name="template"/> into <paramref name="outputPath"/>.
+    /// </summary>
+    /// <param name="template">The template to instantiate.</param>
+    /// <param name="name">The name substituted into the template, or <c>null</c> to use the output directory name.</param>
+    /// <param name="outputPath">The directory to write the generated files to.</param>
+    /// <param name="parameters">Template parameter values.</param>
+    /// <param name="force">True to overwrite existing files instead of reporting a destructive change.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    public async Task<ITemplateCreationResult> InstantiateAsync(
+        FuncTemplateInfo template,
+        string? name,
+        string outputPath,
+        IReadOnlyDictionary<string, string> parameters,
+        bool force,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        string fallbackName = Path.GetFileName(Path.TrimEndingDirectorySeparator(outputPath));
+        var inputParameters = parameters.ToDictionary(p => p.Key, p => (string?)p.Value);
+        TemplateCreator creator = new(_settings);
+        return await creator.InstantiateAsync(
+            template.Template, name, fallbackName, outputPath, inputParameters, forceCreation: force, cancellationToken: cancellationToken);
     }
 
     public void Dispose()
@@ -60,4 +117,7 @@ internal sealed class Templater : IDisposable
         _packageManager.Dispose();
         _settings.Dispose();
     }
+
+    private static bool HasTag(ITemplateInfo template, string tagName, string value)
+        => template.TagsCollection.TryGetValue(tagName, out string? actual) && string.Equals(actual, value, StringComparison.OrdinalIgnoreCase);
 }

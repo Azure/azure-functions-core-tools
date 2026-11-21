@@ -50,11 +50,28 @@ public class PathArgumentTests
         parseResult.Errors.Should().NotBeEmpty();
     }
 
+    [Theory]
+    [InlineData(new[] { "myproj", "--framework", "net8.0" }, "myproj", new[] { "--framework", "net8.0" })]
+    [InlineData(new[] { "--framework", "net8.0", "--no-http" }, null, new[] { "--framework", "net8.0", "--no-http" })]
+    [InlineData(new[] { "--", "--framework", "x" }, null, new[] { "--", "--framework", "x" })]
+    [InlineData(new[] { "myproj", "--", "x" }, "myproj", new[] { "--", "x" })]
+    [InlineData(new[] { "myproj" }, "myproj", new string[0])]
+    public void CaptureTemplateArguments_KeepsUndeclaredTokensInOrder(string[] args, string? expectedPath, string[] expectedTokens)
+    {
+        var cmd = new TestableCommand(captureTemplateArguments: true);
+
+        var parseResult = cmd.Parse(args);
+
+        parseResult.Errors.Should().BeEmpty();
+        parseResult.GetValue(cmd.PathArgument!)!.OriginalPath.Should().Be(expectedPath);
+        cmd.TemplateArgumentsArgument!.GetTokens(parseResult).Should().Equal(expectedTokens);
+    }
+
     private sealed class TestableCommand : FuncCliCommand
     {
-        public TestableCommand() : base("testable", "Testable command for [path] parsing.")
+        public TestableCommand(bool captureTemplateArguments = false) : base("testable", "Testable command for [path] parsing.")
         {
-            AddPathArgument();
+            AddPathArgument(captureTemplateArguments);
         }
 
         protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
