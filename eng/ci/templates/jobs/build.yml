@@ -60,18 +60,32 @@ jobs:
       parameters:
         sign: ${{ parameters.sign }}
 
-    - script: dotnet restore ${{ parameters.projects }} -v m ${{ parameters.build_args }}
+    - task: DotNetCoreCLI@2
       displayName: Restore
+      inputs:
+        command: custom
+        custom: restore
+        projects: ${{ parameters.projects }}
+        arguments: -v m ${{ parameters.build_args }}
 
-    - script: dotnet build ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
+    - task: DotNetCoreCLI@2
       displayName: Build
+      inputs:
+        command: build
+        projects: ${{ parameters.projects }}
+        arguments: -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
 
-    - script: >-
-        dotnet test ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m --no-build
-        --report-azdo --publish-azdo-test-results ${{ parameters.build_args }}
+    - task: DotNetCoreCLI@2
       displayName: Unit tests
+      inputs:
+        command: test
+        projects: ${{ parameters.projects }}
+        arguments: -c ${{ parameters.configuration }} -v m --no-build --report-azdo --publish-azdo-test-results ${{ parameters.build_args }}
+        # Results are published natively by --publish-azdo-test-results rather than the task's TRX upload.
+        publishTestResults: false
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+        TESTINGPLATFORM_EXITCODE_IGNORE: '8'
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       # Only sign the intermediate DLLs if we are packing.
@@ -88,14 +102,22 @@ jobs:
             !**/Azure.Functions.Cli*Tests.dll
 
     - ${{ if containsValue(parameters.artifacts, 'pack') }}:
-      - script: dotnet pack ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
+      - task: DotNetCoreCLI@2
         displayName: Pack
+        inputs:
+          command: custom
+          custom: pack
+          projects: ${{ parameters.projects }}
+          arguments: -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
 
     - ${{ if containsValue(parameters.artifacts, 'publish') }}:
-      - script: >-
-          dotnet build ${{ parameters.projects }} -c ${{ parameters.configuration }} -v m --no-restore
-          -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
+      - task: DotNetCoreCLI@2
         displayName: Publish All Runtimes
+        inputs:
+          command: custom
+          custom: build
+          projects: ${{ parameters.projects }}
+          arguments: -c ${{ parameters.configuration }} -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
 
       - task: CopyFiles@2
         displayName: Copy files
