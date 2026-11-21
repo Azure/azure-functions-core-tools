@@ -1,5 +1,12 @@
 # Azure.Functions.Cli.Workloads.DotNet
 
+## Bundled templates
+
+The workload package includes the project, HTTP trigger, and timer trigger templates
+from `Workloads.Templates.DotNet` under `content/templates`. Its generated
+`workload.json` declares that directory as `templateRoot` so the CLI template engine
+can discover the templates after workload installation.
+
 ## Target frameworks
 
 `func init` supports C# and F# projects targeting `net10.0` (the default).

@@ -7,10 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="**"
-          Exclude="bin/**;obj/**;$(MSBuildProjectFile)"
-          TargetPath="content/templates/%(Identity)"
-          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="**" Exclude="bin/**;obj/**;$(MSBuildProjectFile)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

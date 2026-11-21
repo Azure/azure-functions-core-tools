@@ -21,7 +21,7 @@
     <!-- Ensure the workload packages are created for each runtime identifier (if there are any to create). -->
     <GenerateNuspecDependsOn>$(GenerateNuspecDependsOn);_ValidateWorkload;SetWorkloadPackageType;_CreateRIDSpecificWorkloadPackages</GenerateNuspecDependsOn>
     <TargetsForTfmSpecificContentInPackage Condition="!$(CreateRidSpecificWorkloadPackages) OR '$(RuntimeIdentifier)' != ''">$(TargetsForTfmSpecificContentInPackage);PackWorkload</TargetsForTfmSpecificContentInPackage>
-    <PackWorkloadDependsOn>_IncludeWorkloadCopyLocal;$(PackWorkloadDependsOn)</PackWorkloadDependsOn>
+    <PackWorkloadDependsOn>_IncludeWorkloadCopyLocal;_IncludePackedProjectReferenceItems;$(PackWorkloadDependsOn)</PackWorkloadDependsOn>
     <PackWorkloadDependsOn Condition="'$(NoBuild)' == 'true'">_PreventProjectReferencesFromBuilding;$(PackWorkloadDependsOn)</PackWorkloadDependsOn>
   </PropertyGroup>
 
@@ -94,6 +94,17 @@
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="$(_WorkloadPackageContentRoot)" />
       <TfmSpecificPackageFile Include="@(_WorkloadCopyLocal)" PackagePath="$(_WorkloadPackageContentRoot)%(_WorkloadCopyLocal.TargetPath)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+  Include the copy-to-output items of project references marked with Pack="true" in the package.
+  Each item's (TargetPathPrefix-rebased) TargetPath is used as its package-relative path.
+  -->
+  <Target Name="_IncludePackedProjectReferenceItems" DependsOnTargets="ResolveProjectReferenceCopyItems">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(ProjectReferenceCopyItem)" PackagePath="%(ProjectReferenceCopyItem.TargetPath)"
+        Condition="'%(ProjectReferenceCopyItem.Pack)' == 'true'" />
     </ItemGroup>
   </Target>
 

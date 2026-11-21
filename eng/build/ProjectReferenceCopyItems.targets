@@ -1,0 +1,55 @@
+<Project>
+
+  <!--
+  ProjectReference metadata:
+    TargetPathPrefix: rebases the referenced project's copy-to-output items under this relative directory.
+
+  The default copy-to-output collection drops reference metadata, so prefixed references are excluded from it (Private=false)
+  and their items are collected and rebased here instead.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Update="@(ProjectReference)">
+      <Private Condition="'%(ProjectReference.TargetPathPrefix)' != ''">false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <GetCopyToOutputDirectoryItemsDependsOn>$(GetCopyToOutputDirectoryItemsDependsOn);_AddPrefixedProjectReferenceCopyItems</GetCopyToOutputDirectoryItemsDependsOn>
+  </PropertyGroup>
+
+  <!--
+  Collect the copy-to-output items of project references marked with TargetPathPrefix or Pack="true".
+  Items keep their reference's metadata and have TargetPath rebased under TargetPathPrefix.
+  -->
+  <Target Name="ResolveProjectReferenceCopyItems" DependsOnTargets="PrepareProjectReferences" Returns="@(ProjectReferenceCopyItem)">
+    <ItemGroup>
+      <_ProjectReferenceWithCopyItems Include="@(_MSBuildProjectReferenceExistent)"
+        Condition="'%(_MSBuildProjectReferenceExistent.TargetPathPrefix)' != '' OR '%(_MSBuildProjectReferenceExistent.Pack)' == 'true'" />
+    </ItemGroup>
+
+    <MSBuild Projects="@(_ProjectReferenceWithCopyItems)"
+             Targets="GetCopyToOutputDirectoryItems"
+             BuildInParallel="$(BuildInParallel)"
+             Properties="%(_ProjectReferenceWithCopyItems.SetConfiguration);%(_ProjectReferenceWithCopyItems.SetPlatform);%(_ProjectReferenceWithCopyItems.SetTargetFramework)"
+             RemoveProperties="%(_ProjectReferenceWithCopyItems.GlobalPropertiesToRemove)$(_GlobalPropertiesToRemoveFromProjectReferences)"
+             Condition="'@(_ProjectReferenceWithCopyItems)' != ''">
+      <Output TaskParameter="TargetOutputs" ItemName="_ProjectReferenceCopyItemUnprefixed" />
+    </MSBuild>
+
+    <ItemGroup>
+      <ProjectReferenceCopyItem Include="@(_ProjectReferenceCopyItemUnprefixed)"
+        TargetPath="$([MSBuild]::EnsureTrailingSlash('%(_ProjectReferenceCopyItemUnprefixed.TargetPathPrefix)'))%(_ProjectReferenceCopyItemUnprefixed.TargetPath)" />
+      <_ProjectReferenceWithCopyItems Remove="@(_ProjectReferenceWithCopyItems)" />
+      <_ProjectReferenceCopyItemUnprefixed Remove="@(_ProjectReferenceCopyItemUnprefixed)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Feed prefixed items into the transitive copy-to-output items, which are recognized by their MSBuildSourceProjectFile. -->
+  <Target Name="_AddPrefixedProjectReferenceCopyItems" DependsOnTargets="ResolveProjectReferenceCopyItems">
+    <ItemGroup>
+      <_NoneWithTargetPath Include="@(ProjectReferenceCopyItem)" Condition="'%(ProjectReferenceCopyItem.TargetPathPrefix)' != ''" />
+    </ItemGroup>
+  </Target>
+
+</Project>

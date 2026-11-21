@@ -7,7 +7,8 @@
   <ItemGroup>
     <ProjectReference Include="$(TestRoot)Helpers/Templates/TestHelpers.Templates.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj"
-                      ReferenceOutputAssembly="false" />
+                      ReferenceOutputAssembly="false"
+                      TargetPathPrefix="content/templates" />
   </ItemGroup>
 
 </Project>

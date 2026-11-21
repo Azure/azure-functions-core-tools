@@ -62,6 +62,40 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         JsonElement entryPoint = doc.RootElement.GetProperty("entryPoint");
         entryPoint.GetProperty("assemblyPath").GetString().Should().Be("My.Workload.dll");
         entryPoint.GetProperty("type").GetString().Should().Be("My.Namespace.MyWorkload");
+        doc.RootElement.TryGetProperty("templateRoot", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Execute_WorkloadWithTemplateRoot_WritesTemplateRoot()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
+            entryPointAssemblyPath: "My.Workload.dll", entryPointType: "My.Namespace.MyWorkload");
+        task.TemplateRoot = "content/templates";
+
+        task.Execute().Should().BeTrue();
+
+        using JsonDocument doc = ParseOutput(outputPath);
+        doc.RootElement.GetProperty("templateRoot").GetString().Should().Be("content/templates");
+    }
+
+    [Theory]
+    [InlineData("content")]
+    [InlineData("meta")]
+    [InlineData("rid-pointer")]
+    public void Execute_NonWorkloadWithTemplateRoot_Fails(string kind)
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind);
+        task.TemplateRoot = "content/templates";
+        if (kind == "rid-pointer")
+        {
+            task.InnerPackages = [CreateTaskItem("My.Package.win-x64", "win-x64")];
+        }
+
+        task.Execute().Should().BeFalse();
+
+        File.Exists(outputPath).Should().BeFalse();
     }
 
     [Fact]
