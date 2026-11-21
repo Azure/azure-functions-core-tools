@@ -17,7 +17,7 @@ First prove one item template through `func new`, then one project template thro
 | Source | Authority and limitation |
 |---|---|
 | [Fabio's October 30 draft](CLI-v5-Templates-Object-Model-Fabio-Draft-2026-10-30.md) | Starting ownership model and proposed contracts; names and signatures are not approved APIs. Francisco supplied the captured copy, not a historical Git blob. |
-| [Execution plan](CLI-v5-Templates-Engine-Redesign-Execution-Plan-2026-10-30.md) | Current coordination, accepted cleanup baseline, Phase 3 findings F1-F6, and gates. |
+| [Execution plan](CLI-v5-Templates-Engine-Redesign-Execution-Plan-2026-10-30.md) | Historical direction, accepted cleanup baseline and baseline findings F1-F6. |
 | [Architecture Reset](CLI-v5-Templates-Architecture-Reset-Clean.md) and [Working Design](CLI-v5-Templates-Working-Design.md) | Historical investigation and behavior evidence only; competing object model, extraction, content, and retirement sequence are not implementation authority. The Working Design's research links do not resolve in this checkout; its cited source assertions are not independently reverified here. |
 | Current source at the candidate commit | `src\Func\Templates\Engine\`, `src\Func\Commands\InitCommand.cs`, `NewCommand.cs`, workload initializers, `Program.cs`, and existing test assertions were inspected statically. No product code was executed. |
 

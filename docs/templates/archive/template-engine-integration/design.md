@@ -1,4 +1,4 @@
-> **MIXED: existing factory/session/catalog infrastructure and historical future contracts.** The opening baseline and API shapes below are checkpoint evidence, not a current source inventory. Mandatory list-shaped groups, projection-driven conditional evaluation, force/post-action request policy and full-ID widening do not govern the proposed first slice. See [Templates Architecture](../../README.md) and the [Phase 6 authority map](../../architecture.md#normative-authority); command-facing resolution/invocation remain unimplemented.
+> **HISTORICAL integration design with retained discovery infrastructure.** The factory, host context, command-scoped `Templater`, and persistent engine hive exist; the separate session abstraction, catalog projection, and custom constraint helpers were removed. Baseline statements and API shapes below are checkpoint evidence, not current source inventory. See [Templates Architecture](../../README.md) for native cache/identity behavior and [scope](../../architecture.md#normative-authority); command integration remains pending.
 
 ## Context
 

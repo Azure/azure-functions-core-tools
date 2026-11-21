@@ -1,4 +1,4 @@
-> **DEFERRED historical package-lifecycle proposal.** The new public install/update/uninstall, feed and cross-source replacement flows below require separate authorization; they are not first-slice prerequisites. Workload-delivered local registration remains an unresolved production seam, not item-command acquisition. See [Templates Architecture](../../README.md); package provenance and safety requirements are retained as future evidence.
+> **DEFERRED historical package-lifecycle proposal.** The old `func new` management command family is superseded by the future `func templates` direction. Standalone acquisition will use the engine's managed provider; workload roots already use its read-only workload provider. Both share the persistent CLI hive and engine cache. No standalone lifecycle command is part of the current slice. See [Templates Architecture](../../README.md); retain the original requirements below as historical evidence.
 
 ## Why
 
