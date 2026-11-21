@@ -1,4 +1,4 @@
-> **HISTORICAL task list, not the current implementation backlog.** Do not execute the positional-template/`--path`, upward-search, lifecycle or public dry-run tasks below from this checklist. Some factory/catalog/type helpers already exist; unchecked boxes do not establish missing source behavior. [Templates Architecture](../../README.md) links to the proposed first-slice authority and approval gates; original checkboxes are preserved.
+> **HISTORICAL task list, not the current implementation backlog.** Do not execute positional-template/`--path`, upward-search, lifecycle or public dry-run tasks from this checklist. The factory and discovery API exist; the old catalog and constraint helpers were removed. [Templates Architecture](../../README.md) describes the initial .NET/HTTP slice and native engine delegation. Original checkboxes are preserved.
 
 ## 1. Template Integration Prerequisites
 

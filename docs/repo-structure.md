@@ -51,7 +51,9 @@ workloads use `/src/Workloads/` and `/test/Workloads/`.
 
 Start with [Templates Architecture](templates/README.md) for the proposed `func init` and `func new` design, historical document status and approval gates.
 
-The existing Microsoft.TemplateEngine-based Template Engine factory/session and installed catalog projection live in `src/Func/Templates/Engine/`; `test/Func.Tests/Templates/Engine/` contains their tests. `src/Func/Commands/NewCommand.cs` is not connected to generation or listing. `src/Func/Commands/InitCommand.cs` still calls the initializers in `src/Workloads/Stacks/`.
+The existing Microsoft.TemplateEngine-based `Templater` and its factory live in `src/Func/Templates/Engine/`; `test/Func.Tests/Templates/Engine/` contains their tests. `src/Func/Commands/NewCommand.cs` is not connected to generation or listing. `src/Func/Commands/InitCommand.cs` still calls the initializers in `src/Workloads/Stacks/`.
+
+Workload roots feed the engine through a read-only provider. Engine settings and the persistent template cache still use the CLI-home `templates` hive. Standalone `func templates` management is future work using that same hive, not a second catalog.
 
 Additive Stack metadata lives in `src/Abstractions/Projects/IProjectStack.cs` and `src/Func/Projects/InstalledProjectStackCatalog.cs`. These source locations do not establish approval or Functions Host Runtime qualification of the proposed command integration.
 

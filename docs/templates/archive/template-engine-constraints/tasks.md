@@ -1,4 +1,4 @@
-> **HISTORICAL checklist mixing existing helpers, missing command wiring and deferred producer/install work.** Unchecked validator/evaluator tasks do not establish absence of those helpers; they are not yet a registered command path. Packaging and lifecycle tasks are not first-slice prerequisites. See [Templates Architecture](../../README.md) for Phase 6's proposed safety contract and owner decisions; all checkboxes are preserved.
+> **HISTORICAL constraint checklist, not the current implementation backlog.** The previous validator/evaluator helpers were removed. Custom constraints are a separate increment from the initial .NET/HTTP slice. See [Templates Architecture](../../README.md) for current scope and native engine delegation. Original checkboxes are preserved as history, not instructions to recreate those helpers.
 
 ## 1. Constraint Types
 
