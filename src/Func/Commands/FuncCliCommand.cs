@@ -116,9 +116,9 @@ internal abstract class FuncCliCommand : Command
     /// Adds the optional [path] argument to this command. Call from the constructor
     /// of commands that operate on a project directory.
     /// </summary>
-    protected void AddPathArgument()
+    protected void AddPathArgument(bool allowOptionLikeToken = false)
     {
-        PathArgument = new PathArgument();
+        PathArgument = new PathArgument(allowOptionLikeToken);
         Arguments.Add(PathArgument);
     }
 

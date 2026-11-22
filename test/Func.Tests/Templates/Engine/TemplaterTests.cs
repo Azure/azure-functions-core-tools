@@ -53,6 +53,32 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ListProjectTemplatesAsync_UsesEngineTypeAndLanguageFilters()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ListProjectTemplatesAsync("python", CancellationToken.None);
+
+        result.Templates.Select(template => template.Identity).Should().Equal(TemplateFixtures.ProjectTemplateIdentity);
+    }
+
+    [Fact]
+    public async Task ListProjectTemplatesAsync_ReturnsMultipleApplicableTemplates()
+    {
+        string packageDirectory = TemplateFixtures.WriteInitProjectPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ListProjectTemplatesAsync("python", CancellationToken.None);
+
+        result.Templates.Select(template => template.Identity).Should().BeEquivalentTo(
+            TemplateFixtures.InitProjectTemplateIdentity,
+            $"{TemplateFixtures.InitProjectTemplateIdentity}.Alternative");
+    }
+
+    [Fact]
     public async Task ListAsync_LoadsFuncHostDataOnDiscoveryAndCacheReload()
     {
         string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);

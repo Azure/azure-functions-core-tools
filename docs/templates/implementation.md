@@ -1,6 +1,6 @@
 # Implementing the Template Engine
 
-**Status:** Proposed implementation plan
+**Status:** Local `func init` proof of concept; not release-qualified
 
 This document describes the existing CLI v5 infrastructure, what remains to be implemented, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) describes the proposed behavior and safety boundaries.
 
@@ -8,19 +8,20 @@ This document describes the existing CLI v5 infrastructure, what remains to be i
 
 The current CLI includes:
 
-- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, an isolated CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`. The factory passes DI-registered `ITemplateComponent` instances directly to the host; no separate engine-session abstraction is used.
+- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, an isolated CLI template hive, filtered project-template discovery, native dry-run validation, and instantiation through `TemplatePackageManager` and `TemplateCreator`. The factory passes DI-registered `ITemplateComponent` instances directly to the host; no separate engine-session abstraction is used.
 - `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata and retain the original engine template. `HostConfigPlace` is available, but its file is not read yet.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
+- `func init` uses a template when project candidates are found for the resolved language and exactly one has the `func-{stack}` short name. It binds the selected template's host aliases to native parameter definitions, ignores stale host symbols, and leaves omitted values to Template Engine defaults. With no candidates, it falls back to the existing Stack initializer; when candidates exist without a unique default, it fails.
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
 - Test-only local template registration in isolated hives. Workload installation does not yet register its template folders in the CLI template hive.
 
-The discovery foundation is not yet integrated with `func init` or `func new`. It does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
+This proof of concept uses installed content already present in the CLI hive; workload installation does not yet register production template folders. `func new`, general template selection, selected-content integrity checks, private rendering, and approved post-action behavior remain out of scope. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 
 ### Existing initialization limitations
 
-The current `func init` path has known safety limitations: it can create the destination before validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail.
+The existing Stack initializer path retains its safety limitations: it can create the destination before all validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail. The template path validates with Template Engine dry-run before force confirmation, cleanup, generation, or configuration writes, and refuses planned overwrites unless `--force` is used.
 
 These behaviors belong to the existing implementation. The proposed template-based path must correct them before replacing an initializer.
 
@@ -28,19 +29,17 @@ Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Comma
 
 ## Next implementation steps
 
-The first increment provides an internal installed-template discovery API, but it is not exposed through CLI commands. Add the remaining behavior in small steps.
+The local proof of concept exposes one template-backed `func init` route. Remaining work should stay separate from this narrow integration.
 
-1. **Build on the discovery API.** The factory creates a `Templater` with command context and DI-registered engine components. It lists installed templates as `FuncTemplateInfo` values in a `TemplateResolutionResult`. Add selection and invocation APIs when a command needs them. Keep the original engine template available for later use, and do not add group or catalog types before they have a consumer.
+1. **Qualify the init path.** Exercise actual supported Stack templates and verify parameters, generated project resolution, force behavior, cancellation, and `.git` preservation on supported platforms. The current tests use local fixture templates.
 
-2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove Stack filtering, exact selection, parameter evaluation, and invocation against selected content. If a command needs func-specific metadata, read it through `HostConfigPlace`. Use multiple metadata variants to expose filtering and ambiguity behavior.
+2. **Connect production content.** Register workload-owned template folders in the CLI hive on install and remove or replace them on uninstall/update. Verify cache invalidation; discovery must not install packages or force a full cache rebuild on each command.
 
-3. **Integrate the CLI commands.** Preserve `func init` adoption/repair and current Stack behavior. Add one template-based project route and one `func new` item route for the same Stack. Keep unmigrated initializers working.
+3. **Implement `func new` separately.** Preserve its existing public command surface, resolve the initialized project context, and validate item collisions before publication. Keep the Quickstart route separate.
 
-4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
+4. **Strengthen publication safety.** The current init route relies on dry-run effects before generation and retains the existing directory-clearing policy for `--force`. A broader private-render and guarded-publication flow needs explicit review and cross-platform validation before release.
 
-5. **Connect production content.** Once template content owners and workload owners confirm the template folder layout, make workload install register its template folders with Microsoft.TemplateEngine in the CLI hive, and make uninstall and update remove or replace them. After integration, `func init` and `func new` use those registrations and the engine's cache without registering content themselves. Verify cache invalidation, and do not make discovery install packages or force a full cache rebuild on every command.
-
-6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
+5. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
 Steps 3 and 4 form one safe command increment: no integrated route may change a destination before the guarded publication requirements are in place.
 
@@ -77,7 +76,7 @@ Engine work with isolated representative content does not need to wait for the e
 
 ## Tests and acceptance
 
-These are acceptance criteria for future integration, not a claim that the end-to-end journey or release qualification has completed.
+These are acceptance criteria for release qualification, not a claim that the complete end-to-end journey has completed.
 
 ### First working journey
 

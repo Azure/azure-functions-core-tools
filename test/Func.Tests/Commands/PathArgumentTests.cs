@@ -50,11 +50,36 @@ public class PathArgumentTests
         parseResult.Errors.Should().NotBeEmpty();
     }
 
+    [Theory]
+    [InlineData(new[] { "MyApp", "--no-http", "--target-framework", "net10.0" }, "MyApp")]
+    [InlineData(new[] { "--no-http", "--target-framework", "net10.0" }, null)]
+    public void TolerantCommand_DoesNotTreatLeadingUnknownOptionAsPath(string[] args, string? expectedPath)
+    {
+        var cmd = new TolerantCommand();
+        var parseResult = cmd.Parse(args);
+
+        parseResult.Errors.Should().BeEmpty();
+        parseResult.UnmatchedTokens.Should().Equal(args[1..]);
+        parseResult.GetValue(cmd.PathArgument!)!.OriginalPath.Should().Be(expectedPath);
+    }
+
     private sealed class TestableCommand : FuncCliCommand
     {
         public TestableCommand() : base("testable", "Testable command for [path] parsing.")
         {
             AddPathArgument();
+        }
+
+        protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+            => Task.FromResult(0);
+    }
+
+    private sealed class TolerantCommand : FuncCliCommand
+    {
+        public TolerantCommand() : base("tolerant", "Tolerant command for template parsing.")
+        {
+            TreatUnmatchedTokensAsErrors = false;
+            AddPathArgument(allowOptionLikeToken: true);
         }
 
         protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)

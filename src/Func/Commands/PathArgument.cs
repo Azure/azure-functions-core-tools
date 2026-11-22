@@ -18,15 +18,18 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal sealed class PathArgument : Argument<WorkingDirectory>
 {
-    public PathArgument() : base("path")
+    private readonly bool _allowOptionLikeToken;
+
+    public PathArgument(bool allowOptionLikeToken = false) : base("path")
     {
+        _allowOptionLikeToken = allowOptionLikeToken;
         Description = "The project directory to use (defaults to current directory)";
         Arity = ArgumentArity.ZeroOrOne;
         CustomParser = ParseToken;
         DefaultValueFactory = _ => WorkingDirectory.FromCwd();
     }
 
-    private static WorkingDirectory ParseToken(ArgumentResult result)
+    private WorkingDirectory ParseToken(ArgumentResult result)
     {
         string? token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
         if (string.IsNullOrEmpty(token))
@@ -34,14 +37,13 @@ internal sealed class PathArgument : Argument<WorkingDirectory>
             return WorkingDirectory.FromCwd();
         }
 
-        // Tokens that start with '-' are almost certainly mistyped options
-        // (`func start --bad-flag`). Surfacing this as an unrecognized option
-        // is friendlier than silently treating "--bad-flag" as a path. The
-        // returned sentinel is unused — System.CommandLine short-circuits
-        // invocation when the parse result has errors.
         if (token.StartsWith('-'))
         {
-            result.AddError($"Unrecognized option '{token}'.");
+            if (!_allowOptionLikeToken)
+            {
+                result.AddError($"Unrecognized option '{token}'.");
+            }
+
             return WorkingDirectory.FromCwd();
         }
 
