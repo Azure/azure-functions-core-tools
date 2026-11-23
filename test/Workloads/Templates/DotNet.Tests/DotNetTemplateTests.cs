@@ -13,9 +13,9 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
 {
     private readonly TemplateTestHost _host = new(Path.Combine(AppContext.BaseDirectory, "content", "templates"));
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    public Task DisposeAsync() => _host.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _host.DisposeAsync();
 
     [Theory]
     [InlineData(false, false)]
