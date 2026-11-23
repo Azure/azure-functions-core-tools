@@ -37,7 +37,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
         return new PackageSource(DefaultSourceUrl, DefaultSourceName);
     }
 
-    private static PackageSource Build(string value)
+    internal static PackageSource Build(string value, string packageKind = "Workload")
     {
         // Only http(s) V3 NuGet feeds are supported as workload sources.
         // To install from a local .nupkg, pass the file path positionally to
@@ -49,7 +49,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
         }
 
         throw new ArgumentException(
-            $"Source '{value}' is not a supported NuGet feed. Workload sources must be an absolute http(s) URL pointing at a V3 service index.",
+            $"Source '{value}' is not a supported NuGet feed. {packageKind} sources must be an absolute http(s) URL pointing at a V3 service index.",
             nameof(value));
     }
 }

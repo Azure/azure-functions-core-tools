@@ -90,6 +90,34 @@ public sealed class FirstRunCoordinatorTests
     }
 
     [Theory]
+    [InlineData("templates search", false)]
+    [InlineData("templates install test.templates", false)]
+    [InlineData("templates uninstall test.templates", false)]
+    [InlineData("templates search", true)]
+    [InlineData("templates install test.templates", true)]
+    [InlineData("templates uninstall test.templates", true)]
+    public async Task Templates_SkipFirstRunStateSetupAndPrompts(string invocation, bool markerPresent)
+    {
+        _stateStore.GetStateAsync(Arg.Any<CancellationToken>())
+            .Returns(markerPresent ? FirstRunState.MarkerWithoutWorkloads : FirstRunState.NeverPrompted);
+        var root = TestParser.CreateRoot(_interaction);
+        ParseResult parseResult = root.Parse(invocation);
+        parseResult.Errors.Should().BeEmpty();
+        string commandName = CommandNameResolver.ResolveCommandName(parseResult, root);
+        commandName.Should().StartWith("templates ");
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync(commandName, parseResult, CancellationToken.None);
+
+        result.Should().BeNull();
+        _interaction.ConfirmCalls.Should().Be(0);
+        _interaction.Lines.Should().BeEmpty();
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        await _stateStore.DidNotReceiveWithAnyArgs().GetStateAsync(default);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+    }
+
+    [Theory]
     [InlineData("new", false)]
     [InlineData("new --list", false)]
     [InlineData("new --force", false)]

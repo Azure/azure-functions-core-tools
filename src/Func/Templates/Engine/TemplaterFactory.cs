@@ -24,10 +24,11 @@ internal sealed class TemplaterFactory(
     private readonly IEnumerable<ITemplateComponent> _components = components
         ?? throw new ArgumentNullException(nameof(components));
 
+    public string HivePath => Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
+
     public Templater Create(TemplateEngineContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(context, settingsLocation, _components);
+        return new Templater(context, HivePath, _components);
     }
 }

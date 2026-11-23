@@ -214,6 +214,8 @@ PublishScripts/
 *.snupkg
 # The packages folder can be ignored because of Package Restore
 **/[Pp]ackages/*
+!src/Func/Templates/Packages/*.cs
+!test/Func.Tests/Templates/Packages/*.cs
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
 # Uncomment if necessary however generally it will be regenerated when needed

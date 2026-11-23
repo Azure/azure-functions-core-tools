@@ -58,9 +58,11 @@ These are responsibilities and useful object-model concepts, not a requirement t
 
 ## Installed templates and discovery
 
-`Templater.ListAsync` currently lists templates already installed in the configured CLI hive. The API does not provide template registration or installation, and no CLI command uses it yet.
+`Templater` exposes engine primitives for listing and managed package operations. `TemplatePackageService` orchestrates package validation and transactional mutation; `TemplateHiveTransaction` owns snapshot and recovery. As with workload operations, template package operations do not coordinate concurrent CLI processes that share a func home.
 
-In the proposed flow, `func init` and `func new` create a `Templater` and use the registered workload templates. Microsoft.TemplateEngine manages the cache; its creation, reuse, and invalidation behavior still need to be verified.
+Package acquisition uses ambient `NuGet.Config` sources and an optional additional feed selected by `--source` or `FUNC_CLI_TEMPLATES_SOURCE`. HTTP feeds are filtered. The CLI downloads the exact version to a temporary directory and verifies it in-process without requiring the .NET SDK; integrity and configured trusted signers are always enforced, and certificate-chain trust follows NuGet's `signatureValidationMode` so default (`accept`) installs work on Windows, Linux, and macOS. The engine's built-in NuGet installer copies the local `.nupkg` into the hive, so temporary downloads can be cleaned up after installation. The installed archive is validated before transaction commit; failures restore the previous hive. The engine records a local NuGet package without `NuGetSource`; package identity and version alone determine no-op or replacement behavior. There is no separate installer.
+
+In the proposed flow, `func init` and `func new` use the factory's coordinated discovery entry point for registered templates. Microsoft.TemplateEngine manages the cache; focused package integration tests verify refresh during installation, replacement, and uninstall without a separate forced rebuild.
 
 The planned command integration supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
 
@@ -178,11 +180,16 @@ Do not report planned output as completed changes.
 
 ## Content and workload ownership
 
+Standalone NuGet template packages are managed through
+[`func templates`](package-management.md). They share the func template hive
+with discovery but remain separately owned from workload-provided template
+roots. Template package uninstall does not remove workload content.
+
 Workload installation does not yet register template folders in the CLI hive. The proposed design packages and distributes templates through workloads that provide them. Leverage Microsoft.TemplateEngine for registration, mounting, scanning, and caching instead of building func-specific versions of those features.
 
 During workload installation, the installer would register the workload's template folders with Microsoft.TemplateEngine in the CLI hive, using the engine's own package registration, before reporting the templates ready. Uninstall would remove the registrations, and update would replace the old folders with the new ones. Registering the same workload version again should have no extra effect, so a failed install can be retried safely.
 
-In the proposed flow, `func init` and `func new` would create a `Templater` and use those registrations without registering content themselves. The engine would populate and use its cache from the registered folders. Verify cache refresh and invalidation behavior rather than assuming which folders are rescanned. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
+In the proposed flow, `func init` and `func new` would use coordinated factory discovery without registering content themselves. The engine would populate and use its cache from the registered folders. Verify cache refresh and invalidation behavior rather than assuming which folders are rescanned. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
 
 Using a separate folder for each installed workload version may help the engine detect updates; that behavior needs verification. If a registered folder is missing or cannot be read, the planned integration should report that the templates are unavailable and explain how to repair the workload; it should not show an empty list as success. If a registration fails, keep the previous working registration where possible. Discovery should not scan arbitrary folders or download content.
 
@@ -202,7 +209,7 @@ This document defines the proposed initial contract. Archived task lists are not
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
 | Engine integration | Retain host context, catalog metadata, explicit group identity, func-host aliases, fail-closed eligibility and exact invocation. Projection-driven conditional evaluation and full-ID widening are superseded. General selection frameworks and authored action plumbing are deferred. |
 | Constraints | Raw validation, fail-closed evaluation and selected-content checks are proposed for selection and invocation; they are not implemented in the discovery foundation. Installer/update preflight and producer-specific rules are deferred with those workflows. |
-| Package lifecycle | User-facing template package install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; workload template registration is a separate proposed integration. |
+| Package lifecycle | The approved `func templates search/install/uninstall` surface uses bounded search and ambient-plus-additional NuGet install feeds, with transactional validation and recovery. Workload template registration remains a separate proposed integration. |
 | Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 

@@ -6,5 +6,7 @@ The discovery foundation is not yet integrated with `func init` or `func new`. `
 
 - [Architecture](architecture.md) — current foundation, proposed design, and component responsibilities.
 - [Implementation](implementation.md) — existing infrastructure, remaining work, and validation.
+- [Template package management](package-management.md) — approved `func templates`
+  search, install, and uninstall design, including the dedicated template feed.
 
 Earlier designs and investigations are preserved in the [archive](archive/).

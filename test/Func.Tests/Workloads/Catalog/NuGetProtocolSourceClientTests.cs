@@ -243,4 +243,21 @@ public sealed class NuGetProtocolSourceClientTests
         SourceRepository repo = TestRepository.Build(_source, findResource);
         return new NuGetProtocolSourceClient(repo);
     }
+
+    [Fact]
+    public void ParseV3Hits_TemplateFilterDoesNotChangeDefaultWorkloadFiltering()
+    {
+        var response = JObject.Parse("""
+            {"data":[
+              {"id":"templates.test","version":"1.0.0","packageTypes":["FuncTemplate"]},
+              {"id":"workloads.test","version":"1.0.0","packageTypes":["FuncCliWorkload"]},
+              {"id":"untyped.test","version":"1.0.0"}
+            ]}
+            """);
+
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source, "FuncTemplate")
+            .Select(r => r.PackageId).Should().Equal("templates.test", "untyped.test");
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source)
+            .Select(r => r.PackageId).Should().Equal("workloads.test", "untyped.test");
+    }
 }
