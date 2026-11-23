@@ -14,7 +14,7 @@ The current code provides a command-scoped `Templater` with an isolated settings
 
 Host metadata uses the dotnet host JSON shape: `symbolInfo` supplies parameter aliases and presentation flags, with `usageExamples` and template-level `isHidden` alongside it. `HostData.SymbolInfo` exposes a read-only dictionary of `FuncTemplateSymbol` values keyed by symbol name. Loading prefers the engine's cached `ITemplateInfoHostJsonCache.HostData` content and falls back to the selected `HostConfigPlace` through the engine mount when cached content is unavailable. An absent configuration yields empty metadata; malformed metadata or an unreadable declared file fails explicitly.
 
-`func init` consumes discovery to select a unique project template by language, bind its CLI options, and instantiate its original engine template. It falls back to the existing Stack initializer when no project template matches; adoption and repair retain their existing paths. Active workloads expose declared `templateRoot` directories through a read-only engine package provider, without separate registration. `func new` remains unintegrated. Metadata loading does not itself add constraint evaluation, and guarded private rendering is not implemented. The rest of this document describes proposed work beyond this init integration.
+`func init` consumes discovery to select a unique project template by language, bind its CLI options, and instantiate its original engine template. It falls back to the existing Stack initializer when no project template matches; adoption and repair retain their existing paths. Active workloads expose declared `templateRoot` directories through a read-only engine package provider, without separate registration. `func new` selects and instantiates installed item templates for the initialized project's language. Workload packaging does not emit `templateRoot` yet. Metadata loading does not itself add constraint evaluation, and guarded private rendering is not implemented. The rest of this document describes proposed work beyond these integrations.
 
 <a id="end-to-end-proof"></a>
 
@@ -44,7 +44,7 @@ The proposed command-facing flow is:
 | Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Keep engine resources within the command-scoped templater. |
 | Content producers and workload installation | Build and package templates. The engine provider exposes active workloads' declared template roots; workload packaging is separate work. |
 
-The proposed CLI flow captures the command, project, and bundle context once. The current `Templater` accepts a context and passes it and the DI-registered engine components to the func host. `ListAsync` discovers templates, `FindProjectTemplateAsync` selects by project kind and language, and `InstantiateAsync` delegates parameter evaluation and direct output to Microsoft.TemplateEngine.
+The proposed CLI flow captures the command, project, and bundle context once. The current `Templater` accepts a context and passes it and the DI-registered engine components to the func host. `ListAsync` discovers templates, `FindProjectTemplateAsync` and `FindItemTemplatesAsync` select by kind and language, and `InstantiateAsync` delegates parameter evaluation and direct output to Microsoft.TemplateEngine.
 
 `FuncTemplateInfo` keeps the original engine template available as `Template` and forwards its metadata, including `HostConfigPlace`. Its factory parses host configuration before construction, and the read-only `HostData` remains usable without an open mount. `TemplateResolutionResult` currently holds the discovered candidates; it does not group or select them. Catalogs, groups, and resolved templates remain design concepts for later work, not current types.
 
@@ -58,9 +58,9 @@ These are responsibilities and useful object-model concepts, not a requirement t
 
 ## Installed templates and discovery
 
-`Templater.ListAsync` lists templates from active workloads' declared roots and packages installed in the configured CLI hive. It does not install or register templates. `func init` consumes this API; `func new` does not yet.
+`Templater.ListAsync` lists templates from active workloads' declared roots and packages installed in the configured CLI hive. It does not install or register templates. `func init` and `func new` reach it through `FindProjectTemplateAsync` and `FindItemTemplatesAsync`.
 
-Microsoft.TemplateEngine manages the persistent cache. The current init integration uses that discovery path without rebuilding the cache or installing templates itself.
+Microsoft.TemplateEngine manages the persistent cache. The current init and new integrations use that discovery path without rebuilding the cache or installing templates themselves.
 
 The planned command integration supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
 
@@ -74,7 +74,7 @@ Ordinary listing should exclude hidden items while retaining diagnostics for una
 
 ## Selection and parameters
 
-Selection and parameter evaluation are not implemented. The proposed design allows a template to be selected by an explicit identifier or through an interactive choice. Selection must preserve the user's choice:
+Advanced selection and parameter evaluation are not implemented. The proposed design allows a template to be selected by an explicit identifier or through an interactive choice. Selection must preserve the user's choice:
 
 - A full template ID identifies one specific candidate. If that candidate is unavailable or incompatible, report the problem; never substitute a related variant.
 - Short names and aliases may identify groups of related templates. Ambiguity must be resolved explicitly, not by an arbitrary first match.
@@ -103,7 +103,7 @@ If the installed engine cannot evaluate a required template feature, reject that
 
 ## Selected content and rendering
 
-The current init route invokes the selected template directly through Microsoft.TemplateEngine. The selected-content validation and private rendering described below remain proposed work.
+The current init and new routes invoke the selected template directly through Microsoft.TemplateEngine. The selected-content validation and private rendering described below remain proposed work.
 
 Before a template can be invoked or its parameters prompted for, validate its configuration, metadata, and assets. Reject unsafe paths, unreadable or unsupported content, and assets that exceed the configured size or expansion limits.
 
@@ -143,7 +143,7 @@ Diagnose readable malformed CLI configuration without force. Explicit force may 
 
 ## `func new`
 
-`func new` currently skips first-run setup. Its handler reports that template generation and listing are temporarily unavailable; it does not check whether the target is an initialized Functions project or modify it.
+`func new` currently requires `.func/config.json`, resolves the project, and instantiates an installed item template for the project language, selected by exact identity first, otherwise by name or short name. It prompts for the template and function name when interactive, and fails on existing files unless `--force` is set. Template listing (`--list`) is still unavailable.
 
 The proposed `func new` path adds a function to an existing, initialized Functions project. If the project has not been initialized, the command should fail with an actionable error directing the user to run `func init` first. It should not initialize the project automatically.
 

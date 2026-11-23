@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Console;
 
@@ -45,10 +46,11 @@ internal sealed class FirstRunCoordinator(
     // inspection gesture, not a real first command. "update" must inspect its
     // installation metadata before any setup activity. "workload" covers every
     // `func workload ...` subcommand: a user reaching for those is already
-    // managing their setup directly. `init` still prompts, but the unavailable
-    // `new` command must report its failure without running setup.
+    // managing their setup directly. `init` and `new` stay off the skip list
+    // intentionally; the spec wants the prompt there too. Non-prompting
+    // `func new` modes are handled after parsing below.
     private static readonly HashSet<string> _skippedRootCommands =
-        [with(StringComparer.OrdinalIgnoreCase), "new", "setup", "update", "version", "workload"];
+        [with(StringComparer.OrdinalIgnoreCase), "setup", "update", "version", "workload"];
 
     private static readonly HashSet<string> _skippedTokens =
         [with(StringComparer.OrdinalIgnoreCase), "--help", "-h", "-?", "/?", "--version", "-v"];
@@ -131,7 +133,9 @@ internal sealed class FirstRunCoordinator(
             return true;
         }
 
-        return false;
+        // `func new` must honour --non-interactive, and --list never creates anything that needs setup.
+        return parseResult.CommandResult.Command is NewCommand newCommand
+            && (parseResult.GetValue(newCommand.NonInteractiveOption) || parseResult.GetValue(newCommand.ListOption));
     }
 
     private async Task<int?> HandleFirstRunAsync(string commandName, CancellationToken cancellationToken)
@@ -173,7 +177,7 @@ internal sealed class FirstRunCoordinator(
 
         // After a successful setup we always short-circuit the user's original
         // command. The workload loader snapshots templates/bundles/host metadata
-        // at host build time, so anything the user typed (init, run,
+        // at host build time, so anything the user typed (init, new, run,
         // start, quickstart, ...) is operating against the pre-install view
         // and would either fail outright ("no project here") or silently use
         // stale metadata. Asking them to re-run is the only safe answer until

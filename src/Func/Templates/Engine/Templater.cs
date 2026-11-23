@@ -65,8 +65,7 @@ internal class Templater : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(language);
 
-        TemplateResolutionResult result = await ListAsync(cancellationToken);
-        List<FuncTemplateInfo> matches = [.. result.Templates.Where(t => HasTag(t, "type", "project") && HasTag(t, "language", language))];
+        List<FuncTemplateInfo> matches = await FindTemplatesAsync("project", language, cancellationToken);
 
         return matches.Count switch
         {
@@ -75,6 +74,28 @@ internal class Templater : IDisposable
             _ => throw new InvalidOperationException(
                 $"Multiple project templates match language '{language}': {string.Join(", ", matches.Select(t => t.Identity))}."),
         };
+    }
+
+    /// <summary>
+    /// Finds the installed item templates for <paramref name="language"/>, optionally narrowed to the template whose
+    /// identity matches <paramref name="reference"/>, or, when no identity matches, to those whose short name or name does.
+    /// </summary>
+    /// <returns>The matching templates; empty when none is installed.</returns>
+    public async Task<IReadOnlyList<FuncTemplateInfo>> FindItemTemplatesAsync(
+        string language, string? reference = null, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(language);
+
+        List<FuncTemplateInfo> matches = await FindTemplatesAsync("item", language, cancellationToken);
+        if (reference is null)
+        {
+            return matches;
+        }
+
+        List<FuncTemplateInfo> identityMatches =
+            [.. matches.Where(t => string.Equals(t.Identity, reference, StringComparison.OrdinalIgnoreCase))];
+        return identityMatches.Count > 0 ? identityMatches : [.. matches.Where(t => IsNamedBy(t, reference))];
     }
 
     /// <summary>
@@ -117,6 +138,16 @@ internal class Templater : IDisposable
         _packageManager.Dispose();
         _settings.Dispose();
     }
+
+    private async Task<List<FuncTemplateInfo>> FindTemplatesAsync(string type, string language, CancellationToken cancellationToken)
+    {
+        TemplateResolutionResult result = await ListAsync(cancellationToken);
+        return [.. result.Templates.Where(t => HasTag(t, "type", type) && HasTag(t, "language", language))];
+    }
+
+    private static bool IsNamedBy(ITemplateInfo template, string reference)
+        => string.Equals(template.Name, reference, StringComparison.OrdinalIgnoreCase)
+            || template.ShortNameList.Contains(reference, StringComparer.OrdinalIgnoreCase);
 
     private static bool HasTag(ITemplateInfo template, string tagName, string value)
         => template.TagsCollection.TryGetValue(tagName, out string? actual) && string.Equals(actual, value, StringComparison.OrdinalIgnoreCase);
