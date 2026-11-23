@@ -71,9 +71,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(
         };
     }
 
-    private static StartInitializationStepResult UseInstalledHost(
-        StartInitializationStepContext context,
-        HostWorkloadResolution.Installed installed)
+    private static StartInitializationStepResult UseInstalledHost(StartInitializationStepContext context, HostWorkloadResolution.Installed installed)
     {
         context.State.HostWorkload = installed.Workload;
         string explicitText = installed.ExplicitlyRequested ? "requested " : string.Empty;
@@ -81,8 +79,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(
     }
 
     private StartInitializationStepResult ScheduleHostInstall(
-        StartInitializationStepContext context,
-        HostWorkloadResolution.InstallRequired installRequired)
+        StartInitializationStepContext context, HostWorkloadResolution.InstallRequired installRequired)
     {
         if (context.Options.Offline)
         {

@@ -65,19 +65,16 @@ internal sealed class EnsureAzuriteInitializationStep(
             ManagedAzuriteResult.Disabled disabled => StartInitializationStepResult.Completed(disabled.Reason),
             ManagedAzuriteResult.UserManaged userManaged => StartInitializationStepResult.Completed(userManaged.Reason),
             ManagedAzuriteResult.Started started => UseStartedAzurite(context, started),
-            ManagedAzuriteResult.Failed failed
-                => throw new GracefulException(failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail),
+            ManagedAzuriteResult.Failed failed => throw new GracefulException(
+                failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail),
         };
     }
 
-    private static StartInitializationStepResult UseStartedAzurite(
-        StartInitializationStepContext context,
-        ManagedAzuriteResult.Started started)
+    private static StartInitializationStepResult UseStartedAzurite(StartInitializationStepContext context, ManagedAzuriteResult.Started started)
     {
         context.State.ManagedAzurite = ManagedAzuriteHandle.Owning(started.Process, started.Mode);
         context.State.AzuritePaths = started.Paths;
-        return StartInitializationStepResult.Completed(
-            $"Started managed Azurite ({started.Mode}). Data directory: {started.Paths.DataDirectory}");
+        return StartInitializationStepResult.Completed($"Started managed Azurite ({started.Mode}). Data directory: {started.Paths.DataDirectory}");
     }
 
     private string? ResolveStorageConnectionString(FunctionsProjectHostRunContext hostRunContext)

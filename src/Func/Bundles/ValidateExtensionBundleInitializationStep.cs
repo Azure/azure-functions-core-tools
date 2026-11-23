@@ -85,9 +85,7 @@ internal sealed class ValidateExtensionBundleInitializationStep : FuncStartIniti
         };
     }
 
-    private StartInitializationStepResult UseResolvedBundle(
-        StartInitializationStepContext context,
-        ExtensionBundleResolution.Resolved resolved)
+    private StartInitializationStepResult UseResolvedBundle(StartInitializationStepContext context, ExtensionBundleResolution.Resolved resolved)
     {
         context.State.BundleDownloadPath = resolved.Path;
         context.State.BundleVersion = resolved.Version;

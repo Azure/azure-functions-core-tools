@@ -65,8 +65,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         IFunctionsWorker worker = result switch
         {
             FunctionsWorkerResolutionResult.Resolved resolved => resolved.Worker,
-            FunctionsWorkerResolutionResult.NotResolved failed
-                => throw ReportWorkerResolutionFailure(failed.Failure, context, workerVersionRanges),
+            FunctionsWorkerResolutionResult.NotResolved failed => throw ReportWorkerResolutionFailure(failed.Failure, context, workerVersionRanges),
         };
 
         ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: worker.WorkerRuntime, project.StackDisplayName);
@@ -178,16 +177,10 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
     }
 
     private GracefulException ReportWorkerResolutionFailure(
-        FunctionsWorkerResolutionFailure failure,
-        StartInitializationStepContext context,
-        IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
+        FunctionsWorkerResolutionFailure failure, StartInitializationStepContext context, IReadOnlyDictionary<string, VersionRange> versionRanges)
     {
-        Log.WorkerResolutionFailed(
-            _logger,
-            context.State.ResolvedProfile?.Name ?? "(none)",
-            string.Join(", ", workerVersionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}")),
-            failure.GetType().Name,
-            failure.Message);
+        string ranges = string.Join(", ", versionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+        Log.WorkerResolutionFailed(_logger, context.State.ResolvedProfile?.Name ?? "(none)", ranges, failure.GetType().Name, failure.Message);
         return CreateWorkerResolutionException(failure, context);
     }
 
