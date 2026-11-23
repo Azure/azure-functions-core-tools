@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Common;
 /// <summary>
 /// Pure filesystem helpers for directory state checks and cleanup.
 /// Shared by commands that scaffold into a user-supplied directory
-/// (init, quickstart).
+/// (init).
 /// </summary>
 internal static class DirectoryGuard
 {

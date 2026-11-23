@@ -239,7 +239,6 @@ public sealed class FirstRunCoordinatorTests
     [InlineData("init")]
     [InlineData("start")]
     [InlineData("run")]
-    [InlineData("quickstart")]
     public async Task ShortCircuitsWithReRunHint_AfterSuccessfulSetup(string commandName)
     {
         _interaction.ConfirmResponse = true;
@@ -354,7 +353,6 @@ public sealed class FirstRunCoordinatorTests
         root.Subcommands.Add(new Command("init"));
         root.Subcommands.Add(new Command("new"));
         root.Subcommands.Add(new Command("run"));
-        root.Subcommands.Add(new Command("quickstart"));
 
         return root.Parse(args);
     }

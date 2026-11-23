@@ -40,6 +40,7 @@ public class ParserTests
 
         names.Should().Contain("version");
         names.Should().Contain("help");
+        names.Should().NotContain("quickstart");
     }
 
     [Fact]

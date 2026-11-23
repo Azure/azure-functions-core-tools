@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Profile;
-using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Update;
 using Azure.Functions.Cli.Commands.Workload;
@@ -70,11 +69,6 @@ internal static class BuiltInCommands
         services.AddSingleton<WorkloadSearchCommand>();
         services.AddSingleton<WorkloadPruneCommand>();
         services.AddSingleton<FuncCliCommand, WorkloadCommand>();
-
-        // Quickstart command and subcommands
-        services.AddSingleton<FuncCliCommand, QuickstartCommand>();
-        services.AddSingleton<QuickstartListCommand>();
-        services.AddSingleton<QuickstartInfoCommand>();
 
         return services;
     }
