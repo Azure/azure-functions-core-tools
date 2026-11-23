@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.Reflection;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
 
@@ -12,8 +13,17 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// <summary>
 /// Scaffolds a Python (v2 model) Functions project and merges the default extension bundle into <c>host.json</c>.
 /// </summary>
-internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProjectInitializer
+internal sealed partial class PythonProjectInitializer(PythonProjectStack stack) : IProjectInitializer
 {
+    internal const string PackageManagerOptionName = "--package-manager";
+    internal const string UvValue = "uv";
+    internal const string PipValue = "pip";
+    internal const string DefaultProjectName = "function-app";
+
+    // Lower bound written to `requires-python`; the `.python-version` pin is platform-specific
+    // (see PythonSupportedVersions).
+    internal const string MinimumPythonVersion = "3.10";
+
     private static readonly Assembly _assembly = typeof(PythonProjectInitializer).Assembly;
 
     private readonly PythonProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
@@ -32,6 +42,14 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
 
     public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;
 
+    public Option<string> PackageManagerOption { get; private set; } = default!;
+
+    // Seam so tests control whether uv appears to be installed.
+    internal Func<string?> FindUv { get; set; } = UvLocator.Find;
+
+    // Seam so tests control the platform the `.python-version` pin is chosen for.
+    internal Func<string> GetRuntimeIdentifier { get; set; } = PythonSupportedVersions.GetCurrentRuntimeIdentifier;
+
     public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
@@ -40,7 +58,14 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
 
         BundlesChannelOption = registry.GetOrAdd(CommonInitOptions.BundlesChannel());
 
-        return [NoBundleOption, BundlesChannelOption];
+        Option<string> packageManager = new(PackageManagerOptionName)
+        {
+            Description = $"Python package manager: {UvValue} or {PipValue} (default: {UvValue} if installed, otherwise {PipValue}).",
+        };
+        packageManager.AcceptOnlyFromAmong(UvValue, PipValue);
+        PackageManagerOption = registry.GetOrAdd(packageManager);
+
+        return [NoBundleOption, BundlesChannelOption, PackageManagerOption];
     }
 
     public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
@@ -59,21 +84,48 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
         bool force = context.Force;
         bool noBundle = parseResult.GetValue(NoBundleOption);
         BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
+        bool useUv = ResolvePackageManager(parseResult.GetValue(PackageManagerOption)) == PythonPackageManager.Uv;
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "function_app.py"),
             ProjectFiles.ReadTemplate(_assembly, "function_app.py"),
             force);
 
-        ProjectFiles.WriteIfMissing(
-            Path.Combine(root, "requirements.txt"),
-            ProjectFiles.ReadTemplate(_assembly, "requirements.txt"),
-            force);
+        if (useUv)
+        {
+            // uv owns the environment; requirements.txt is exported from uv.lock on `func run`.
+            ProjectFiles.WriteIfMissing(
+                Path.Combine(root, PythonPackageManagerDetector.PyProjectFileName),
+                ProjectFiles.ReadTemplate(_assembly, "pyproject.toml")
+                    .Replace("{{ProjectName}}", SanitizeProjectName(context.WorkingDirectory.Info.Name), StringComparison.Ordinal)
+                    .Replace("{{MinimumPythonVersion}}", MinimumPythonVersion, StringComparison.Ordinal),
+                force);
 
-        ProjectFiles.WriteIfMissing(
-            Path.Combine(root, "getting_started.md"),
-            ProjectFiles.ReadTemplate(_assembly, "getting_started.md"),
-            force);
+            // The worker payload may not be installed yet, so pin from the per-RID fallback table.
+            string pythonVersion = PythonSupportedVersions.GetDefault(PythonSupportedVersions.GetFallback(GetRuntimeIdentifier()));
+            ProjectFiles.WriteIfMissing(
+                Path.Combine(root, ".python-version"),
+                ProjectFiles.ReadTemplate(_assembly, "python-version")
+                    .Replace("{{DefaultPythonVersion}}", pythonVersion, StringComparison.Ordinal),
+                force);
+
+            ProjectFiles.WriteIfMissing(
+                Path.Combine(root, "getting_started.md"),
+                ProjectFiles.ReadTemplate(_assembly, "getting_started.uv.md"),
+                force);
+        }
+        else
+        {
+            ProjectFiles.WriteIfMissing(
+                Path.Combine(root, PythonPackageManagerDetector.RequirementsFileName),
+                ProjectFiles.ReadTemplate(_assembly, "requirements.txt"),
+                force);
+
+            ProjectFiles.WriteIfMissing(
+                Path.Combine(root, "getting_started.md"),
+                ProjectFiles.ReadTemplate(_assembly, "getting_started.md"),
+                force);
+        }
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, ".gitignore"),
@@ -101,6 +153,32 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
 
         return Task.CompletedTask;
     }
+
+    private PythonPackageManager ResolvePackageManager(string? requested)
+    {
+        if (string.Equals(requested, UvValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return PythonPackageManager.Uv;
+        }
+
+        if (string.Equals(requested, PipValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return PythonPackageManager.Pip;
+        }
+
+        return FindUv() is not null ? PythonPackageManager.Uv : PythonPackageManager.Pip;
+    }
+
+    // PEP 508 names: letters, digits, '.', '_', '-', starting and ending alphanumeric.
+    internal static string SanitizeProjectName(string? directoryName)
+    {
+        string lowered = (directoryName ?? string.Empty).ToLowerInvariant();
+        string name = InvalidNameCharsRegex().Replace(lowered, "-").Trim('-', '.', '_');
+        return name.Length == 0 ? DefaultProjectName : name;
+    }
+
+    [GeneratedRegex(@"[^a-z0-9._-]+")]
+    private static partial Regex InvalidNameCharsRegex();
 
     private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)
     {
