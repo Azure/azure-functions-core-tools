@@ -96,6 +96,7 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
                 if (!await processor.ProcessAsync(context, cancellationToken))
                 {
                     _interaction.WriteError("Post action failed.");
+                    WriteDescription(action);
                     WriteManualInstructions(action);
                     actionStatus = PostActionExecutionStatus.Failure;
                 }

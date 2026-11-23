@@ -119,14 +119,31 @@ public sealed class PostActionDispatcherTests : IDisposable
     public async Task ProcessAsync_ProcessorFails_ReturnsFailureAndShowsInstructions()
     {
         _processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(false);
-        ITemplateCreationResult result = CreateResult([CreateAction(_knownActionId, instructions: "Do it by hand.")]);
+        ITemplateCreationResult result = CreateResult(
+            [CreateAction(_knownActionId, description: "Restore packages", instructions: "Do it by hand.")]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
             _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         _interaction.Received().WriteError("Post action failed.");
+        _interaction.Received().WriteLine("  Restore packages");
         _interaction.Received().WriteLine("Manual instructions: Do it by hand.");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ProcessorFailsWithoutInstructions_ShowsDescription()
+    {
+        _processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(false);
+        ITemplateCreationResult result = CreateResult([CreateAction(_knownActionId, description: "Restore packages")]);
+
+        PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
+            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+
+        status.Should().Be(PostActionExecutionStatus.Failure);
+        _interaction.Received().WriteError("Post action failed.");
+        _interaction.Received().WriteLine("  Restore packages");
+        _interaction.DidNotReceive().WriteLine(Arg.Is<string>(text => text.StartsWith("Manual instructions", StringComparison.Ordinal)));
     }
 
     [Fact]
