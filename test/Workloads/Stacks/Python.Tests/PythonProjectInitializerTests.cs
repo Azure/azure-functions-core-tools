@@ -198,9 +198,117 @@ public class PythonProjectInitializerTests : IDisposable
         root!["extensionBundle"]!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Experimental");
     }
 
-    private Task RunAsync(bool force, string[]? args = null, string? language = null)
+    [Fact]
+    public void GetInitOptions_RegistersPackageManager_AndRejectsInvalidValue()
     {
-        PythonProjectInitializer initializer = new(new PythonProjectStack());
+        RootCommand root = [];
+        IReadOnlyList<Option> options = new PythonProjectInitializer(new PythonProjectStack()).GetInitOptions(new InitOptionRegistry(root));
+
+        options.Select(o => o.Name).Should().Contain(PythonProjectInitializer.PackageManagerOptionName);
+        root.Parse(["--package-manager", "uv"]).Errors.Should().BeEmpty();
+        root.Parse(["--package-manager", "pip"]).Errors.Should().BeEmpty();
+        root.Parse(["--package-manager", "poetry"]).Errors.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("pyproject.toml")]
+    [InlineData("python-version")]
+    [InlineData("getting_started.uv.md")]
+    public void UvTemplates_AreEmbedded(string name)
+    {
+        ProjectFiles.ReadTemplate(typeof(PythonProjectInitializer).Assembly, name).Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_UvDetected_WritesUvFileSet()
+    {
+        await RunAsync(force: false, uvPath: "/fake/uv");
+
+        string pyproject = File.ReadAllText(Path.Combine(_projectDir.FullName, "pyproject.toml"));
+        pyproject.Should().Contain("[project]");
+        pyproject.Should().Contain("[tool.uv]");
+        pyproject.Should().Contain("\"azure-functions\"");
+        pyproject.Should().Contain($"requires-python = \">={PythonProjectInitializer.MinimumPythonVersion}\"");
+        pyproject.Should().NotContain("[build-system]");
+        pyproject.Should().NotContain("{{");
+        File.ReadAllText(Path.Combine(_projectDir.FullName, ".python-version")).Trim().Should().Be("3.13");
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "getting_started.md")).Should().Contain("uv sync");
+        File.Exists(Path.Combine(_projectDir.FullName, "requirements.txt")).Should().BeFalse();
+        File.Exists(Path.Combine(_projectDir.FullName, "function_app.py")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "local.settings.json")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")).Should().BeTrue();
+        PythonPackageManagerDetector.Detect(_projectDir.FullName).Should().Be(PythonPackageManager.Uv);
+    }
+
+    [Theory]
+    [InlineData("win-arm64", "3.15")]
+    [InlineData("win-x64", "3.13")]
+    [InlineData("linux-x64", "3.13")]
+    public async Task InitializeAsync_Uv_PinsPlatformDefaultPythonVersion(string rid, string expected)
+    {
+        await RunAsync(force: false, uvPath: "/fake/uv", rid: rid);
+
+        File.ReadAllText(Path.Combine(_projectDir.FullName, ".python-version")).Trim().Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_UvAbsent_WritesPipFileSet()
+    {
+        await RunAsync(force: false);
+
+        File.Exists(Path.Combine(_projectDir.FullName, "requirements.txt")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "pyproject.toml")).Should().BeFalse();
+        File.Exists(Path.Combine(_projectDir.FullName, ".python-version")).Should().BeFalse();
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "getting_started.md")).Should().Contain("pip install");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ExplicitPip_WithUvPresent_WritesPipFileSet()
+    {
+        await RunAsync(force: false, args: ["--package-manager", "pip"], uvPath: "/fake/uv");
+
+        File.Exists(Path.Combine(_projectDir.FullName, "requirements.txt")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "pyproject.toml")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ExplicitUv_WithUvAbsent_WritesUvFileSet()
+    {
+        await RunAsync(force: false, args: ["--package-manager", "uv"]);
+
+        File.Exists(Path.Combine(_projectDir.FullName, "pyproject.toml")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "requirements.txt")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_Uv_PreservesExistingPyProject_UnlessForce()
+    {
+        string path = Path.Combine(_projectDir.FullName, "pyproject.toml");
+        const string existing = "[project]\nname = \"mine\"\n";
+        File.WriteAllText(path, existing);
+
+        await RunAsync(force: false, uvPath: "/fake/uv");
+        File.ReadAllText(path).Should().Be(existing);
+
+        await RunAsync(force: true, uvPath: "/fake/uv");
+        File.ReadAllText(path).Should().Contain("azure-functions");
+    }
+
+    [Theory]
+    [InlineData("MyApp", "myapp")]
+    [InlineData("my app!", "my-app")]
+    [InlineData("--weird__", "weird")]
+    [InlineData("!!!", "function-app")]
+    [InlineData("func-py-1.0", "func-py-1.0")]
+    public void SanitizeProjectName_ProducesValidName(string input, string expected)
+    {
+        PythonProjectInitializer.SanitizeProjectName(input).Should().Be(expected);
+    }
+
+    private Task RunAsync(bool force, string[]? args = null, string? language = null, string? uvPath = null, string rid = "linux-x64")
+    {
+        PythonProjectInitializer initializer = new(new PythonProjectStack()) { FindUv = () => uvPath, GetRuntimeIdentifier = () => rid };
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: "test",

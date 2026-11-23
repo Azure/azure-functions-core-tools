@@ -1,0 +1,10 @@
+[project]
+name = "{{ProjectName}}"
+version = "0.1.0"
+description = "Azure Functions Python app"
+requires-python = ">={{MinimumPythonVersion}}"
+dependencies = [
+    "azure-functions",
+]
+
+[tool.uv]
