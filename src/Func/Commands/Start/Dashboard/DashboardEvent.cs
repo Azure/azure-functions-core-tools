@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Hosting.Dashboard;
 /// their first-class output kinds (<c>invocation_started</c>,
 /// <c>host_state_changed</c>, etc.).
 /// </summary>
-internal abstract record DashboardEvent(DateTimeOffset Timestamp);
+internal closed record DashboardEvent(DateTimeOffset Timestamp);
 
 internal sealed record HostStateChangedEvent(
     DateTimeOffset Timestamp,

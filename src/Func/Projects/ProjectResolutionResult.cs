@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Result of resolving a Functions project for a command invocation.
 /// </summary>
-internal abstract record ProjectResolutionResult
+internal closed record ProjectResolutionResult
 {
     private ProjectResolutionResult()
     {

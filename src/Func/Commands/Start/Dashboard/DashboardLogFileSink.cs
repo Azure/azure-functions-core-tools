@@ -85,9 +85,6 @@ internal sealed class DashboardLogFileSink(TextWriter writer) : IDashboardEventS
         SummaryEvent ev => string.Create(
             CultureInfo.InvariantCulture,
             $"{ev.Timestamp:O} [event] summary {ev.ExitReason} functions={ev.FunctionCount} invocations={ev.TotalInvocations} errors={ev.ErrorCount}"),
-        _ => string.Create(
-            CultureInfo.InvariantCulture,
-            $"{dashboardEvent.Timestamp:O} [event] {dashboardEvent.GetType().Name}"),
     };
 
     private static string FormatLevel(LogLevel level) => level switch

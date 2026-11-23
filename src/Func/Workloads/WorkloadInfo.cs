@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// <param name="ContentRoot">Directory containing package payload files.</param>
 /// <param name="DisplayName">Human-readable name for <c>func workload list</c>.</param>
 /// <param name="Description">One-line workload description.</param>
-internal abstract record WorkloadInfo(
+internal closed record WorkloadInfo(
     WorkloadKind Kind,
     string PackageId,
     string PackageVersion,

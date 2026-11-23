@@ -64,28 +64,32 @@ internal sealed class ValidateHostWorkloadInitializationStep(
 
         context.State.HostVersion = resolution.HostVersion;
 
-        switch (resolution)
+        return resolution switch
         {
-            case HostWorkloadResolution.Installed installed:
-                context.State.HostWorkload = installed.Workload;
-                string explicitText = installed.ExplicitlyRequested ? "requested " : string.Empty;
-                return StartInitializationStepResult.Completed($"Using {explicitText}host {installed.HostVersion}");
+            HostWorkloadResolution.Installed installed => UseInstalledHost(context, installed),
+            HostWorkloadResolution.InstallRequired installRequired => ScheduleHostInstall(context, installRequired),
+        };
+    }
 
-            case HostWorkloadResolution.InstallRequired installRequired:
-                if (context.Options.Offline)
-                {
-                    string message = $"{installRequired.Message}, and --offline prevents installing it.";
-                    throw new GracefulException(message, isUserError: true);
-                }
+    private static StartInitializationStepResult UseInstalledHost(StartInitializationStepContext context, HostWorkloadResolution.Installed installed)
+    {
+        context.State.HostWorkload = installed.Workload;
+        string explicitText = installed.ExplicitlyRequested ? "requested " : string.Empty;
+        return StartInitializationStepResult.Completed($"Using {explicitText}host {installed.HostVersion}");
+    }
 
-                var installStep = new InstallHostWorkloadInitializationStep(_installer, installRequired.PackageId, installRequired.HostVersion);
-                context.AddNext(installStep);
-
-                return StartInitializationStepResult.Completed(installRequired.Message);
-
-            default:
-                throw new InvalidOperationException($"Unknown host workload resolution: {resolution.GetType().Name}");
+    private StartInitializationStepResult ScheduleHostInstall(StartInitializationStepContext context, HostWorkloadResolution.InstallRequired installRequired)
+    {
+        if (context.Options.Offline)
+        {
+            string message = $"{installRequired.Message}, and --offline prevents installing it.";
+            throw new GracefulException(message, isUserError: true);
         }
+
+        var installStep = new InstallHostWorkloadInitializationStep(_installer, installRequired.PackageId, installRequired.HostVersion);
+        context.AddNext(installStep);
+
+        return StartInitializationStepResult.Completed(installRequired.Message);
     }
 
     private static ContentWorkloadInfo CreateLocalContentWorkload(string configuredContentRoot)

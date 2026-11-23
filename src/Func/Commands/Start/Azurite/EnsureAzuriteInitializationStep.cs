@@ -60,26 +60,20 @@ internal sealed class EnsureAzuriteInitializationStep(
 
         ManagedAzuriteResult result = await _orchestrator.EnsureReadyAsync(request, progress, cancellationToken);
 
-        switch (result)
+        return result switch
         {
-            case ManagedAzuriteResult.Disabled disabled:
-                return StartInitializationStepResult.Completed(disabled.Reason);
+            ManagedAzuriteResult.Disabled disabled => StartInitializationStepResult.Completed(disabled.Reason),
+            ManagedAzuriteResult.UserManaged userManaged => StartInitializationStepResult.Completed(userManaged.Reason),
+            ManagedAzuriteResult.Started started => UseStartedAzurite(context, started),
+            ManagedAzuriteResult.Failed failed => throw new GracefulException(failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail),
+        };
+    }
 
-            case ManagedAzuriteResult.UserManaged userManaged:
-                return StartInitializationStepResult.Completed(userManaged.Reason);
-
-            case ManagedAzuriteResult.Started started:
-                context.State.ManagedAzurite = ManagedAzuriteHandle.Owning(started.Process, started.Mode);
-                context.State.AzuritePaths = started.Paths;
-                return StartInitializationStepResult.Completed(
-                    $"Started managed Azurite ({started.Mode}). Data directory: {started.Paths.DataDirectory}");
-
-            case ManagedAzuriteResult.Failed failed:
-                throw new GracefulException(failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail);
-
-            default:
-                throw new InvalidOperationException($"Unknown ManagedAzuriteResult: {result.GetType().Name}");
-        }
+    private static StartInitializationStepResult UseStartedAzurite(StartInitializationStepContext context, ManagedAzuriteResult.Started started)
+    {
+        context.State.ManagedAzurite = ManagedAzuriteHandle.Owning(started.Process, started.Mode);
+        context.State.AzuritePaths = started.Paths;
+        return StartInitializationStepResult.Completed($"Started managed Azurite ({started.Mode}). Data directory: {started.Paths.DataDirectory}");
     }
 
     private string? ResolveStorageConnectionString(FunctionsProjectHostRunContext hostRunContext)

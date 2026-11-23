@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Base type for events emitted during startup initialization.
 /// </summary>
-internal abstract record StartInitializationEvent(DateTimeOffset Timestamp);
+internal closed record StartInitializationEvent(DateTimeOffset Timestamp);
 
 /// <summary>
 /// Emitted before the first startup initialization step begins.

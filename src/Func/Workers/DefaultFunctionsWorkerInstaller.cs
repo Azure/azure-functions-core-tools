@@ -98,9 +98,11 @@ internal sealed class DefaultFunctionsWorkerInstaller(
             versionRange,
             cancellationToken);
 
-        return resolution is FunctionsWorkerResolutionResult.Resolved resolved
-            ? resolved.Worker
-            : throw CreateInvalidInstalledWorkerException((FunctionsWorkerResolutionResult.NotResolved)resolution);
+        return resolution switch
+        {
+            FunctionsWorkerResolutionResult.Resolved resolved => resolved.Worker,
+            FunctionsWorkerResolutionResult.NotResolved notResolved => throw CreateInvalidInstalledWorkerException(notResolved),
+        };
     }
 
     private static ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)

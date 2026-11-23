@@ -25,14 +25,14 @@ internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjec
         var projectResolutionContext = new ProjectResolutionContext(context.Options.WorkingDirectory);
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(projectResolutionContext, cancellationToken);
 
-        if (resolution is ProjectResolutionResult.NotResolved notResolved)
+        FunctionsProject project = resolution switch
         {
-            throw new GracefulException(notResolved.Message, isUserError: true);
-        }
+            ProjectResolutionResult.Resolved resolved => resolved.Project,
+            ProjectResolutionResult.NotResolved notResolved => throw new GracefulException(notResolved.Message, isUserError: true),
+        };
 
-        var resolved = (ProjectResolutionResult.Resolved)resolution;
-        context.State.Project = resolved.Project;
+        context.State.Project = project;
 
-        return StartInitializationStepResult.Completed(resolved.Project.StackDisplayName);
+        return StartInitializationStepResult.Completed(project.StackDisplayName);
     }
 }

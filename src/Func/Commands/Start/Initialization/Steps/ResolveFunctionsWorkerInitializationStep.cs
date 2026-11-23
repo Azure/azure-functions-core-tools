@@ -62,24 +62,18 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
                 cancellationToken);
         }
 
-        if (result is not FunctionsWorkerResolutionResult.Resolved resolved)
+        IFunctionsWorker worker = result switch
         {
-            var failedResult = (FunctionsWorkerResolutionResult.NotResolved)result;
-            Log.WorkerResolutionFailed(
-                _logger,
-                context.State.ResolvedProfile?.Name ?? "(none)",
-                string.Join(", ", workerVersionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}")),
-                failedResult.Failure.GetType().Name,
-                failedResult.Failure.Message);
-            throw CreateWorkerResolutionException(failedResult.Failure, context);
-        }
+            FunctionsWorkerResolutionResult.Resolved resolved => resolved.Worker,
+            FunctionsWorkerResolutionResult.NotResolved failed => throw ReportWorkerResolutionFailure(failed.Failure, context, workerVersionRanges),
+        };
 
-        ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: resolved.Worker.WorkerRuntime, project.StackDisplayName);
-        context.State.Worker = resolved.Worker;
+        ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: worker.WorkerRuntime, project.StackDisplayName);
+        context.State.Worker = worker;
 
-        string completionMessage = string.IsNullOrWhiteSpace(resolved.Worker.Version)
-            ? resolved.Worker.WorkerRuntime
-            : $"{resolved.Worker.WorkerRuntime} {resolved.Worker.Version}";
+        string completionMessage = string.IsNullOrWhiteSpace(worker.Version)
+            ? worker.WorkerRuntime
+            : $"{worker.WorkerRuntime} {worker.Version}";
 
         await context.ReportProgressAsync(100, $"Resolved worker {completionMessage}", cancellationToken);
 
@@ -182,6 +176,13 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         }
     }
 
+    private GracefulException ReportWorkerResolutionFailure(FunctionsWorkerResolutionFailure failure, StartInitializationStepContext context, IReadOnlyDictionary<string, VersionRange> versionRanges)
+    {
+        string ranges = string.Join(", ", versionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+        Log.WorkerResolutionFailed(_logger, context.State.ResolvedProfile?.Name ?? "(none)", ranges, failure.GetType().Name, failure.Message);
+        return CreateWorkerResolutionException(failure, context);
+    }
+
     private static GracefulException CreateWorkerResolutionException(
         FunctionsWorkerResolutionFailure failure,
         StartInitializationStepContext context)
@@ -191,7 +192,6 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             FunctionsWorkerResolutionFailure.NotInstalled notInstalled => CreateNotInstalledMessage(notInstalled.WorkerId, context),
             FunctionsWorkerResolutionFailure.MissingCompatibleVersion missingCompatibleVersion => CreateMissingCompatibleVersionMessage(missingCompatibleVersion, context),
             FunctionsWorkerResolutionFailure.InvalidInstallation invalidInstallation => CreateInvalidInstallationMessage(invalidInstallation),
-            _ => failure.Message,
         };
 
         return new GracefulException(message, isUserError: true);

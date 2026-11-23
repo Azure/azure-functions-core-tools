@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 /// existing instance, hand back a process we started, or fail fast with a
 /// user-facing message.
 /// </summary>
-internal abstract record ManagedAzuriteResult
+internal closed record ManagedAzuriteResult
 {
     private ManagedAzuriteResult()
     {
