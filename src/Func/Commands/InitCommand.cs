@@ -17,8 +17,8 @@ using Azure.Functions.Cli.Workloads;
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Initializes a new Azure Functions project. The actual scaffolding is
-/// delegated to an <see cref="IProjectInitializer"/> contributed by a workload.
+/// Initializes a new Azure Functions project through <see cref="TemplateProjectInitializer"/> when applicable templates
+/// exist, otherwise through an <see cref="IProjectInitializer"/> contributed by a workload.
 /// Each registered initializer may also contribute additional options to this
 /// command (e.g. dotnet's <c>--target-framework</c>).
 /// </summary>
@@ -361,13 +361,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                     _stackSpecificOptions,
                     templateArguments,
                     ct => PrepareDestinationAsync(context, ct),
+                    () => WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force),
                     cancellationToken);
                 if (templateExitCode != 0)
                 {
                     return templateExitCode;
                 }
 
-                WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
                 _interaction.WriteBlankLine();
                 return await ReportInitializedAsync(workingDirectory.Info, initializer.Stack, cancellationToken);
             }

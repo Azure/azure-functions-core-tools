@@ -23,7 +23,8 @@ internal sealed class TemplateProjectInitializer(IInteractionService interaction
 
     /// <summary>
     /// Selects the default template from <paramref name="candidates"/>, validates its creation with a dry run, and
-    /// creates the project after <paramref name="prepareDestinationAsync"/> approves the destination.
+    /// creates the project after <paramref name="prepareDestinationAsync"/> approves the destination, then invokes
+    /// <paramref name="writeProjectConfiguration"/>.
     /// </summary>
     /// <returns><c>0</c> when the project was created; otherwise <c>1</c> after reporting the failure.</returns>
     public async Task<int> InitializeAsync(
@@ -35,6 +36,7 @@ internal sealed class TemplateProjectInitializer(IInteractionService interaction
         IReadOnlyList<Option> stackOptions,
         IReadOnlyList<string> templateArguments,
         Func<CancellationToken, Task<bool>> prepareDestinationAsync,
+        Action writeProjectConfiguration,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(templater);
@@ -45,6 +47,7 @@ internal sealed class TemplateProjectInitializer(IInteractionService interaction
         ArgumentNullException.ThrowIfNull(stackOptions);
         ArgumentNullException.ThrowIfNull(templateArguments);
         ArgumentNullException.ThrowIfNull(prepareDestinationAsync);
+        ArgumentNullException.ThrowIfNull(writeProjectConfiguration);
         if (candidates.Count == 0)
         {
             throw new ArgumentException("At least one project template candidate is required.", nameof(candidates));
@@ -109,6 +112,7 @@ internal sealed class TemplateProjectInitializer(IInteractionService interaction
             return 1;
         }
 
+        writeProjectConfiguration();
         return 0;
     }
 

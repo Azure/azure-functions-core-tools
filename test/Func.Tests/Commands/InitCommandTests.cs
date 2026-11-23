@@ -512,6 +512,42 @@ public class InitCommandTests
     }
 
     [Fact]
+    public async Task InitCommand_TemplateConfigurationWriteFailurePreservesWarningAndSuccess()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            Directory.CreateDirectory(output);
+            string configFolder = Path.Combine(output, ".func");
+            File.WriteAllText(configFolder, "user content");
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net10.0");
+            File.ReadAllText(configFolder).Should().Be("user content");
+            string expectedWarning = $"Could not write {Path.Combine(".func", "config.json")}";
+            _interaction.Lines.Should().Contain(line => line.Contains(expectedWarning));
+            File.Exists(Path.Combine(configFolder, "config.json")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task InitCommand_ScaffoldsCliConfigurationFile_OnSuccess()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");

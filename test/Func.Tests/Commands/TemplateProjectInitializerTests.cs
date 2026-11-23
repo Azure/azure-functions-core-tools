@@ -14,11 +14,15 @@ public sealed class TemplateProjectInitializerTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"func-template-initializer-{Guid.NewGuid():N}");
     private readonly TestInteractionService _interaction = new();
     private int _prepareCalls;
+    private int _configurationWrites;
     private bool _generatedFileExistedWhenPrepared;
+    private bool _generatedFileExistedWhenConfigured;
 
     private string Home => Path.Combine(_root, "home");
 
     private string Output => Path.Combine(_root, "App");
+
+    private string ConfigurationPath => Path.Combine(Output, ".func", "config.json");
 
     public void Dispose()
     {
@@ -29,29 +33,7 @@ public sealed class TemplateProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_NoCandidates_Throws()
-    {
-        await InstallAsync();
-        var directory = WorkingDirectory.FromExplicit(Output);
-        using Templater templater = CreateTemplater(directory);
-
-        Func<Task> act = () => new TemplateProjectInitializer(_interaction).InitializeAsync(
-            templater,
-            [],
-            new InitContext(directory, ProjectName: null, Language: "python", Force: false),
-            "python",
-            new Command("init").Parse(Array.Empty<string>()),
-            [],
-            [],
-            _ => PrepareDestinationAsync(approve: true),
-            CancellationToken.None);
-
-        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("candidates");
-        _prepareCalls.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_Success_PreparesDestinationBeforeCreatingProject()
+    public async Task InitializeAsync_Success_PreparesDestinationThenCreatesProjectThenWritesConfiguration()
     {
         await InstallAsync();
 
@@ -60,13 +42,15 @@ public sealed class TemplateProjectInitializerTests : IDisposable
         exitCode.Should().Be(0, _interaction.AllOutput);
         _prepareCalls.Should().Be(1);
         _generatedFileExistedWhenPrepared.Should().BeFalse();
+        _configurationWrites.Should().Be(1);
+        _generatedFileExistedWhenConfigured.Should().BeTrue();
         File.ReadAllText(Path.Combine(Output, "App.txt")).Should().Be("net10.0");
         File.Exists(Path.Combine(Output, "Http.txt")).Should().BeTrue();
-        File.Exists(Path.Combine(Output, ".func", "config.json")).Should().BeFalse();
+        File.ReadAllText(ConfigurationPath).Should().Be("configuration written");
     }
 
     [Fact]
-    public async Task InitializeAsync_PreflightFailure_DoesNotPrepareDestinationOrCreateProject()
+    public async Task InitializeAsync_PreflightFailure_DoesNotPrepareDestinationCreateProjectOrWriteConfiguration()
     {
         await InstallAsync();
         Directory.CreateDirectory(Output);
@@ -76,13 +60,14 @@ public sealed class TemplateProjectInitializerTests : IDisposable
 
         exitCode.Should().Be(1);
         _prepareCalls.Should().Be(0);
+        _configurationWrites.Should().Be(0);
         _interaction.AllOutput.Should().Contain("these files already exist").And.Contain("App.txt");
         File.ReadAllText(Path.Combine(Output, "App.txt")).Should().Be("existing");
         File.Exists(Path.Combine(Output, "Http.txt")).Should().BeFalse();
     }
 
     [Fact]
-    public async Task InitializeAsync_DestinationNotPrepared_DoesNotCreateProject()
+    public async Task InitializeAsync_DestinationNotPrepared_DoesNotCreateProjectOrWriteConfiguration()
     {
         await InstallAsync();
 
@@ -90,8 +75,40 @@ public sealed class TemplateProjectInitializerTests : IDisposable
 
         exitCode.Should().Be(1);
         _prepareCalls.Should().Be(1);
+        _configurationWrites.Should().Be(0);
         File.Exists(Path.Combine(Output, "App.txt")).Should().BeFalse();
         File.Exists(Path.Combine(Output, "Http.txt")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DestinationPreparationCancelled_DoesNotCreateProjectOrWriteConfiguration()
+    {
+        await InstallAsync();
+
+        Func<Task> act = () => InitializeAsync(afterPreflight: () => throw new OperationCanceledException());
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _prepareCalls.Should().Be(1);
+        _configurationWrites.Should().Be(0);
+        Directory.Exists(Output).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_CreationFailure_DoesNotWriteConfiguration()
+    {
+        await InstallAsync();
+
+        int exitCode = await InitializeAsync(afterPreflight: () =>
+        {
+            Directory.CreateDirectory(Path.Combine(Output, "App.txt"));
+        });
+
+        exitCode.Should().Be(1, _interaction.AllOutput);
+        _prepareCalls.Should().Be(1);
+        _configurationWrites.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("Failed to initialize the project");
+        Directory.Exists(Path.Combine(Output, "App.txt")).Should().BeTrue();
+        File.Exists(ConfigurationPath).Should().BeFalse();
     }
 
     [Fact]
@@ -103,6 +120,7 @@ public sealed class TemplateProjectInitializerTests : IDisposable
 
         exitCode.Should().Be(1);
         _prepareCalls.Should().Be(0);
+        _configurationWrites.Should().Be(0);
         _interaction.AllOutput.Should().Contain("Unrecognized option '--unknown'.");
         Directory.Exists(Output).Should().BeFalse();
     }
@@ -116,6 +134,7 @@ public sealed class TemplateProjectInitializerTests : IDisposable
 
         exitCode.Should().Be(1);
         _prepareCalls.Should().Be(0);
+        _configurationWrites.Should().Be(0);
         _interaction.AllOutput.Should().Contain("Expected one default project template named 'func-python'")
             .And.Contain("but found 0");
         Directory.Exists(Output).Should().BeFalse();
@@ -130,6 +149,7 @@ public sealed class TemplateProjectInitializerTests : IDisposable
 
         exitCode.Should().Be(1);
         _prepareCalls.Should().Be(0);
+        _configurationWrites.Should().Be(0);
         _interaction.AllOutput.Should().Contain("but found 2");
         Directory.Exists(Output).Should().BeFalse();
     }
@@ -156,6 +176,7 @@ public sealed class TemplateProjectInitializerTests : IDisposable
 
         exitCode.Should().Be(1);
         _prepareCalls.Should().Be(0);
+        _configurationWrites.Should().Be(0);
         _interaction.AllOutput.Should().Contain("Option '--no-bundles' is not supported by template");
         Directory.Exists(Output).Should().BeFalse();
     }
@@ -176,11 +197,13 @@ public sealed class TemplateProjectInitializerTests : IDisposable
         bool approveDestination = true,
         IReadOnlyList<string>? templateArguments = null,
         IReadOnlyList<Option>? stackOptions = null,
-        string[]? args = null)
+        string[]? args = null,
+        Action? afterPreflight = null)
     {
         var directory = WorkingDirectory.FromExplicit(Output);
         using Templater templater = CreateTemplater(directory);
         IReadOnlyList<FuncTemplateInfo> candidates = (await templater.ListProjectTemplatesAsync("python", CancellationToken.None)).Templates;
+        candidates.Should().NotBeEmpty();
         var command = new Command("init");
         foreach (Option option in stackOptions ?? [])
         {
@@ -195,14 +218,24 @@ public sealed class TemplateProjectInitializerTests : IDisposable
             command.Parse(args ?? []),
             stackOptions ?? [],
             templateArguments ?? [],
-            _ => PrepareDestinationAsync(approveDestination),
+            _ => PrepareDestinationAsync(approveDestination, afterPreflight),
+            WriteProjectConfiguration,
             CancellationToken.None);
     }
 
-    private Task<bool> PrepareDestinationAsync(bool approve)
+    private Task<bool> PrepareDestinationAsync(bool approve, Action? afterPreflight)
     {
         _prepareCalls++;
         _generatedFileExistedWhenPrepared = File.Exists(Path.Combine(Output, "App.txt"));
+        afterPreflight?.Invoke();
         return Task.FromResult(approve);
+    }
+
+    private void WriteProjectConfiguration()
+    {
+        _configurationWrites++;
+        _generatedFileExistedWhenConfigured = File.Exists(Path.Combine(Output, "App.txt"));
+        Directory.CreateDirectory(Path.Combine(Output, ".func"));
+        File.WriteAllText(ConfigurationPath, "configuration written");
     }
 }
