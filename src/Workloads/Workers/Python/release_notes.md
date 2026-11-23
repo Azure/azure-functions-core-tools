@@ -1,5 +1,9 @@
 # Azure.Functions.Cli.Workloads.Workers.Python
 
+## 4.47.0-preview
+
+- Updated the Python worker payload to 4.47.0, removing Python 3.9 builds.
+
 ## 4.46.2-preview
 
 - Retarget the workload assembly to `net11.0` for the .NET 11-based Azure Functions CLI; the Python worker payload is unchanged.
