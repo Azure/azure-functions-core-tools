@@ -7,6 +7,7 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>go</WorkloadAlias>
+    <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +16,10 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Templates/Go/Workloads.Templates.Go.csproj"
+                      ReferenceOutputAssembly="false"
+                      TargetPathPrefix="$(WorkloadTemplateRoot)"
+                      Pack="true" />
   </ItemGroup>
 
   <ItemGroup>

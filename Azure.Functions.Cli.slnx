@@ -29,6 +29,11 @@
   </Folder>
   <Folder Name="/src/Workloads/Templates/">
     <Project Path="src/Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj" />
+    <Project Path="src/Workloads/Templates/Go/Workloads.Templates.Go.csproj" />
+    <Project Path="src/Workloads/Templates/Java/Workloads.Templates.Java.csproj" />
+    <Project Path="src/Workloads/Templates/Node/Workloads.Templates.Node.csproj" />
+    <Project Path="src/Workloads/Templates/PowerShell/Workloads.Templates.PowerShell.csproj" />
+    <Project Path="src/Workloads/Templates/Python/Workloads.Templates.Python.csproj" />
   </Folder>
   <Folder Name="/src/Workloads/Workers/">
     <Project Path="src/Workloads/Workers/Go/Workloads.Workers.Go.csproj" />
@@ -60,5 +65,10 @@
   </Folder>
   <Folder Name="/test/Workloads/Templates/">
     <Project Path="test/Workloads/Templates/DotNet.Tests/Workloads.Templates.DotNet.Tests.csproj" />
+    <Project Path="test/Workloads/Templates/Go.Tests/Workloads.Templates.Go.Tests.csproj" />
+    <Project Path="test/Workloads/Templates/Java.Tests/Workloads.Templates.Java.Tests.csproj" />
+    <Project Path="test/Workloads/Templates/Node.Tests/Workloads.Templates.Node.Tests.csproj" />
+    <Project Path="test/Workloads/Templates/PowerShell.Tests/Workloads.Templates.PowerShell.Tests.csproj" />
+    <Project Path="test/Workloads/Templates/Python.Tests/Workloads.Templates.Python.Tests.csproj" />
   </Folder>
 </Solution>

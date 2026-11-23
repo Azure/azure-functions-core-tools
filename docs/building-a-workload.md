@@ -195,6 +195,13 @@ copy-to-output items, using each item's `TargetPath` as its package path. Add
 in both the build output and the package. The .NET stack workload references
 `Workloads.Templates.DotNet` with `TargetPathPrefix="$(WorkloadTemplateRoot)"`,
 so the template project stays layout-agnostic.
+
+Go, Java, Node.js, PowerShell, and Python use the same wiring with empty template
+projects under `src/Workloads/Templates/` and one skipped placeholder test per
+project under `test/Workloads/Templates/`. Until template files are added, each
+template project contains a `placeholder.txt` so the declared `content/templates`
+directory exists in the package. Remove it when adding templates.
+
 Paths must be relative according to the current platform's `Path.IsPathRooted`
 rules. The CLI normalizes both slash styles, combines the declaration with the
 package directory, and uses `Path.GetFullPath` to reject paths that resolve outside
