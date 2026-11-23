@@ -78,8 +78,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(
         return StartInitializationStepResult.Completed($"Using {explicitText}host {installed.HostVersion}");
     }
 
-    private StartInitializationStepResult ScheduleHostInstall(
-        StartInitializationStepContext context, HostWorkloadResolution.InstallRequired installRequired)
+    private StartInitializationStepResult ScheduleHostInstall(StartInitializationStepContext context, HostWorkloadResolution.InstallRequired installRequired)
     {
         if (context.Options.Offline)
         {

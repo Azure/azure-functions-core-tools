@@ -176,8 +176,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         }
     }
 
-    private GracefulException ReportWorkerResolutionFailure(
-        FunctionsWorkerResolutionFailure failure, StartInitializationStepContext context, IReadOnlyDictionary<string, VersionRange> versionRanges)
+    private GracefulException ReportWorkerResolutionFailure(FunctionsWorkerResolutionFailure failure, StartInitializationStepContext context, IReadOnlyDictionary<string, VersionRange> versionRanges)
     {
         string ranges = string.Join(", ", versionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}"));
         Log.WorkerResolutionFailed(_logger, context.State.ResolvedProfile?.Name ?? "(none)", ranges, failure.GetType().Name, failure.Message);

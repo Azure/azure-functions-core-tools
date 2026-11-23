@@ -65,8 +65,7 @@ internal sealed class EnsureAzuriteInitializationStep(
             ManagedAzuriteResult.Disabled disabled => StartInitializationStepResult.Completed(disabled.Reason),
             ManagedAzuriteResult.UserManaged userManaged => StartInitializationStepResult.Completed(userManaged.Reason),
             ManagedAzuriteResult.Started started => UseStartedAzurite(context, started),
-            ManagedAzuriteResult.Failed failed => throw new GracefulException(
-                failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail),
+            ManagedAzuriteResult.Failed failed => throw new GracefulException(failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail),
         };
     }
 
