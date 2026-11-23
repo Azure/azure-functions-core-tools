@@ -1,6 +1,9 @@
 parameters:
 - name: projects
   type: string
+- name: run_tests
+  type: boolean
+  default: true
 - name: folder
   type: string
 - name: public
@@ -55,6 +58,7 @@ extends:
           sign: true
           artifacts: ['pack']
           projects: ${{ parameters.projects }}
+          run_tests: ${{ parameters.run_tests }}
           build_args: -p:IsReleaseCI=true ${{ parameters.build_args }}
 
     - stage: Release

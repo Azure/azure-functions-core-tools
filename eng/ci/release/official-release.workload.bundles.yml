@@ -22,6 +22,8 @@ extends:
   parameters:
     public: ${{ parameters.public }}
     folder: workloads/bundles
+    # This build has no test projects.
+    run_tests: false
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/ExtensionBundles/Workloads.ExtensionBundles.csproj
     ${{ if ne(parameters.channel, 'inferred') }}:

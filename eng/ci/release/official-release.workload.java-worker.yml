@@ -13,5 +13,7 @@ extends:
   parameters:
     public: ${{ parameters.public }}
     folder: workloads/java-worker
+    # This build has no test projects.
+    run_tests: false
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Workers/Java/Workloads.Workers.Java.csproj

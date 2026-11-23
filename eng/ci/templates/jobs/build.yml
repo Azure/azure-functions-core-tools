@@ -1,6 +1,9 @@
 parameters:
 - name: projects
   type: string
+- name: run_tests
+  type: boolean
+  default: true
 - name: configuration
   type: string
   default: release
@@ -60,32 +63,63 @@ jobs:
       parameters:
         sign: ${{ parameters.sign }}
 
+    - pwsh: |
+        $ErrorActionPreference = 'Stop'
+        $projects = @($env:PROJECTS -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        if ($projects.Count -eq 0) {
+          throw 'No projects were provided.'
+        }
+
+        if ($projects.Count -eq 1 -and [IO.Path]::GetExtension($projects[0]) -in '.sln', '.slnx', '.slnf') {
+          $solution = (Resolve-Path -LiteralPath $projects[0]).Path
+        } else {
+          $parent = (Resolve-Path -LiteralPath 'Azure.Functions.Cli.slnx').Path
+          $solution = Join-Path $env:AGENT_TEMPDIRECTORY 'azure-functions-build.slnf'
+          $projectPaths = @($projects | ForEach-Object { (Resolve-Path -LiteralPath $_).Path })
+          dotnet new slnf -n azure-functions-build -o $env:AGENT_TEMPDIRECTORY -s $parent --force
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to create solution filter.' }
+          dotnet sln $solution add @projectPaths
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to add projects to solution filter.' }
+
+          $filter = Get-Content -LiteralPath $solution -Raw | ConvertFrom-Json
+          $included = @($filter.solution.projects | ForEach-Object { [IO.Path]::GetFullPath($_, (Split-Path -Parent $parent)) })
+          foreach ($project in $projectPaths) {
+            if ($project -notin $included) {
+              throw "Project '$project' is not in the parent solution."
+            }
+          }
+        }
+        Write-Host "##vso[task.setvariable variable=build_solution]$solution"
+      displayName: Select build solution
+      env:
+        PROJECTS: ${{ parameters.projects }}
+
     - task: DotNetCoreCLI@2
       displayName: Restore
       inputs:
         command: custom
         custom: restore
-        projects: ${{ parameters.projects }}
+        projects: $(build_solution)
         arguments: -v m ${{ parameters.build_args }}
 
     - task: DotNetCoreCLI@2
       displayName: Build
       inputs:
         command: build
-        projects: ${{ parameters.projects }}
+        projects: $(build_solution)
         arguments: -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
 
-    - task: DotNetCoreCLI@2
-      displayName: Unit tests
-      inputs:
-        command: test
-        projects: ${{ parameters.projects }}
-        arguments: -c ${{ parameters.configuration }} -v m --no-build --report-azdo --publish-azdo-test-results ${{ parameters.build_args }}
-        # Results are published natively by --publish-azdo-test-results rather than the task's TRX upload.
-        publishTestResults: false
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-        TESTINGPLATFORM_EXITCODE_IGNORE: '8'
+    - ${{ if parameters.run_tests }}:
+      - task: DotNetCoreCLI@2
+        displayName: Unit tests
+        inputs:
+          command: test
+          projects: $(build_solution)
+          arguments: -c ${{ parameters.configuration }} -v m --no-build --report-azdo --publish-azdo-test-results ${{ parameters.build_args }}
+          # Results are published natively by --publish-azdo-test-results rather than the task's TRX upload.
+          publishTestResults: false
+        env:
+          SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       # Only sign the intermediate DLLs if we are packing.
@@ -107,7 +141,7 @@ jobs:
         inputs:
           command: custom
           custom: pack
-          projects: ${{ parameters.projects }}
+          projects: $(build_solution)
           arguments: -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
 
     - ${{ if containsValue(parameters.artifacts, 'publish') }}:
@@ -116,7 +150,7 @@ jobs:
         inputs:
           command: custom
           custom: build
-          projects: ${{ parameters.projects }}
+          projects: $(build_solution)
           arguments: -c ${{ parameters.configuration }} -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
 
       - task: CopyFiles@2
