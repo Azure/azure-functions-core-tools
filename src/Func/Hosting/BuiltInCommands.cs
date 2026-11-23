@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Commands.Setup;
+using Azure.Functions.Cli.Commands.Templates;
 using Azure.Functions.Cli.Commands.Update;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
@@ -36,6 +37,10 @@ internal static class BuiltInCommands
 
         services.AddSingleton<FuncCliCommand, InitCommand>();
         services.AddSingleton<FuncCliCommand, NewCommand>();
+        services.AddSingleton<TemplatesSearchCommand>();
+        services.AddSingleton<TemplatesInstallCommand>();
+        services.AddSingleton<TemplatesUninstallCommand>();
+        services.AddSingleton<FuncCliCommand, TemplatesCommand>();
         services.AddSingleton<FuncCliCommand, StartCommand>();
         services.AddSingleton<FuncCliCommand, PackCommand>();
         services.AddSingleton<FuncCliCommand, PublishCommand>();

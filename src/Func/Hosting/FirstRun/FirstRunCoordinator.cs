@@ -46,9 +46,10 @@ internal sealed class FirstRunCoordinator(
     // installation metadata before any setup activity. "workload" covers every
     // `func workload ...` subcommand: a user reaching for those is already
     // managing their setup directly. `init` still prompts, but the unavailable
-    // `new` command must report its failure without running setup.
+    // `new` command must report its failure without running setup. Template
+    // package management is independent of workload setup.
     private static readonly HashSet<string> _skippedRootCommands =
-        [with(StringComparer.OrdinalIgnoreCase), "new", "setup", "update", "version", "workload"];
+        [with(StringComparer.OrdinalIgnoreCase), "new", "setup", "templates", "update", "version", "workload"];
 
     private static readonly HashSet<string> _skippedTokens =
         [with(StringComparer.OrdinalIgnoreCase), "--help", "-h", "-?", "/?", "--version", "-v"];

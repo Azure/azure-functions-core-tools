@@ -7,12 +7,15 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.Packages;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests;
@@ -114,6 +117,13 @@ internal static class TestParser
         // resolve without standing up the real install/uninstall side effects.
         services.AddSingleton(Substitute.For<Cli.Workloads.Install.IWorkloadInstaller>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Catalog.IWorkloadCatalog>());
+        TemplateCatalog templateCatalog = Substitute.For<TemplateCatalog>(
+            Options.Create(new TemplateCatalogOptions()),
+            (Func<NuGet.Configuration.PackageSource, Cli.Workloads.Catalog.NuGetProtocolSourceClient>)(_ => null!));
+        services.AddSingleton(templateCatalog);
+        services.AddSingleton(Substitute.For<TemplatePackageService>(templateCatalog, new TemplatePackageValidator(),
+            Substitute.For<ITemplaterFactory>(), Substitute.For<Cli.Common.IFileSystem>(), Substitute.For<IWorkloadTemplateSource>(),
+            new TemplatePackageVerifier()));
 
         // Update: stub network, installation metadata, and updater boundaries.
         services.AddSingleton(Substitute.For<IReleaseFeed>());

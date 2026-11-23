@@ -2,9 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -30,8 +33,11 @@ public sealed class TemplatePackageServiceTests : IDisposable
     private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
     private readonly List<string> _temporaryDirectories = [];
 
-    public TemplatePackageServiceTests()
+    private readonly ITestOutputHelper _output;
+
+    public TemplatePackageServiceTests(ITestOutputHelper output)
     {
+        _output = output ?? throw new ArgumentNullException(nameof(output));
         Directory.CreateDirectory(_root);
         _catalog = new ArchiveCatalog(Path.Combine(_root, "fixture.nupkg"));
         _factory = new TestFactory(Path.Combine(_root, "templates"));
@@ -145,6 +151,70 @@ public sealed class TemplatePackageServiceTests : IDisposable
         _factory.Installations.Should().Be(installations);
         _factory.Uninstallations.Should().Be(0);
         await AssertInstalledVersionAsync("1.0.0");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task CliInstall_SignedPackageFromExplicitSourceOwnsItsArchive()
+    {
+        byte[] archive = await SignArchiveAsync(_catalog.Archive);
+        await using LoopbackTemplateFeed feed = new();
+        feed.Add("1.0.0", archive);
+        string home = Path.Combine(_root, "signed-home");
+
+        var result = await RunCliAsync(home, ["templates", "install", "test.templates", "--source", feed.Source, "--version", "1.0.0"]);
+
+        result.ExitCode.Should().Be(0, result.StandardOutput + result.StandardError);
+        await AssertCliPackageAsync(home, "1.0.0", archive);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task CliInstall_UsesConfiguredFeedAndRestoresPreviousPackageWhenReplacementFails()
+    {
+        await using LoopbackTemplateFeed feed = new();
+        byte[] stable = _catalog.Archive;
+        byte[] prerelease = MakeArchive("3.0.0-preview.1");
+        feed.Add("1.0.0", stable);
+        feed.Add("3.0.0-preview.1", prerelease);
+        File.WriteAllText(Path.Combine(_root, "NuGet.Config"), """
+            <configuration>
+              <packageSources><clear /><add key="ignored" value="http://127.0.0.1:1/v3/index.json" /></packageSources>
+              <config><add key="signatureValidationMode" value="require" /></config>
+            </configuration>
+            """);
+        string home = Path.Combine(_root, "cli-home");
+        Dictionary<string, string> environment = new() { [TemplateCatalogOptionsSetup.SourceEnvironmentVariable] = feed.Source };
+
+        (await RunCliAsync(home, ["templates", "install", "test.templates"], environment)).ExitCode.Should().Be(0);
+        await AssertCliPackageAsync(home, "1.0.0", stable);
+        (await RunCliAsync(home, ["templates", "install", "test.templates", "--prerelease"], environment)).ExitCode.Should().Be(0);
+        await AssertCliPackageAsync(home, "3.0.0-preview.1", prerelease);
+        (await RunCliAsync(home, ["templates", "install", "test.templates", "--version", "1.0.0"], environment)).ExitCode.Should().Be(0);
+        feed.Add("2.0.0", MakeArchive("2.0.0", invalidTemplate: true));
+
+        var failed = await RunCliAsync(home, ["templates", "install", "test.templates", "--version", "2.0.0"], environment);
+
+        failed.ExitCode.Should().Be(1, failed.StandardOutput + failed.StandardError);
+        await AssertCliPackageAsync(home, "1.0.0", stable);
+    }
+
+    private Task<CliProcessTestRunner.CliResult> RunCliAsync(
+        string home, string[] args, IReadOnlyDictionary<string, string>? environment = null)
+        => new CliProcessTestRunner(_output).RunAsync(
+            _root, home, Path.Combine(_root, "workload-home"), _root, args, TestContext.Current.CancellationToken, environment);
+
+    private async Task AssertCliPackageAsync(string home, string version, byte[] archive)
+    {
+        var factory = new TemplaterFactory(new CliConfigurationPathsOptions(home), []);
+        using Templater templater = factory.Create(Context());
+        var package = (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Should().ContainSingle().Subject;
+        package.Version.Should().Be(version);
+        package.IsLocalPackage.Should().BeTrue();
+        package.GetDetails().Should().NotContainKey("NuGetSource");
+        package.MountPointUri.Should().StartWith(factory.HivePath);
+        File.ReadAllBytes(package.MountPointUri).Should().Equal(archive);
+        (await templater.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().HaveCount(4);
     }
 
     [Fact]
@@ -513,6 +583,99 @@ public sealed class TemplatePackageServiceTests : IDisposable
         }
 
         return output.ToArray();
+    }
+
+    private sealed class LoopbackTemplateFeed : IAsyncDisposable
+    {
+        private const string PackageId = "test.templates";
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _stop = new();
+        private readonly Dictionary<string, byte[]> _packages = [];
+        private readonly Lock _gate = new();
+        private readonly string _address;
+        private readonly Task _server;
+
+        public LoopbackTemplateFeed()
+        {
+            _listener.Start();
+            _address = $"http://127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}/";
+            _server = ServeAsync(_stop.Token);
+        }
+
+        public string Source => _address + "index.json";
+
+        public void Add(string version, byte[] package)
+        {
+            lock (_gate)
+            {
+                _packages[version.ToLowerInvariant()] = package;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _stop.CancelAsync();
+            _listener.Stop();
+            try
+            {
+                await _server;
+            }
+            catch (Exception ex) when (_stop.IsCancellationRequested && ex is OperationCanceledException or SocketException)
+            {
+                // Stopping the listener aborts the pending accept; that is the expected shutdown path.
+            }
+            finally
+            {
+                _stop.Dispose();
+            }
+        }
+
+        private byte[]? Resolve(string path)
+        {
+            lock (_gate)
+            {
+                if (path == "/index.json")
+                {
+                    return Encoding.UTF8.GetBytes(
+                        $$"""{"version":"3.0.0","resources":[{"@id":"{{_address}}flat/","@type":"PackageBaseAddress/3.0.0"}]}""");
+                }
+
+                if (path == $"/flat/{PackageId}/index.json")
+                {
+                    string versions = string.Join(",", _packages.Keys.Select(v => $"\"{v}\""));
+                    return Encoding.UTF8.GetBytes($$"""{"versions":[{{versions}}]}""");
+                }
+
+                foreach ((string version, byte[] package) in _packages)
+                {
+                    if (path == $"/flat/{PackageId}/{version}/{PackageId}.{version}.nupkg")
+                    {
+                        return package;
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        private async Task ServeAsync(CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                using TcpClient client = await _listener.AcceptTcpClientAsync(cancellationToken);
+                await using NetworkStream stream = client.GetStream();
+                using StreamReader reader = new(stream, Encoding.ASCII, false, 1024, leaveOpen: true);
+                string request = await reader.ReadLineAsync(cancellationToken) ?? throw new InvalidDataException("Missing HTTP request.");
+                while (!string.IsNullOrEmpty(await reader.ReadLineAsync(cancellationToken)))
+                {
+                }
+
+                byte[]? body = Resolve(request.Split(' ')[1]);
+                string headers = $"HTTP/1.1 {(body is null ? "404 Not Found" : "200 OK")}\r\nContent-Length: {body?.Length ?? 0}\r\nConnection: close\r\n\r\n";
+                await stream.WriteAsync(Encoding.ASCII.GetBytes(headers), cancellationToken);
+                await stream.WriteAsync(body ?? [], cancellationToken);
+            }
+        }
     }
 
     private sealed class ArchiveCatalog(string archivePath) : TemplateCatalog(Options.Create(new TemplateCatalogOptions
