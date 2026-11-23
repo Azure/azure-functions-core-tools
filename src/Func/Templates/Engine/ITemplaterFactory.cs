@@ -9,6 +9,11 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal interface ITemplaterFactory
 {
     /// <summary>
+    /// Gets the shared engine settings, packages, and cache directory.
+    /// </summary>
+    public string HivePath { get; }
+
+    /// <summary>
     /// Creates a templater bound to <paramref name="context"/>. The caller disposes it when the command is finished.
     /// </summary>
     public Templater Create(TemplateEngineContext context);

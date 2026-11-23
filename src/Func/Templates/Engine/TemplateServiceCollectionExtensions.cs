@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Templates.Packages;
 using Azure.Functions.Cli.Templates.PostActions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -50,6 +51,10 @@ internal static class TemplateServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
             services.TryAddSingleton<ITemplaterFactory, TemplaterFactory>();
             services.TryAddSingleton<IFuncTemplateComponentProvider, FuncTemplateComponentsProvider>();
+            services.TryAddSingleton<TemplateHiveTransaction>();
+            services.TryAddSingleton<TemplatePackageValidator>();
+            services.TryAddSingleton<TemplatePackageVerifier>();
+            services.TryAddSingleton<TemplatePackageService>();
             services.TryAddSingleton<IWorkloadTemplateSource, WorkloadTemplateSource>();
             services.TryAddSingleton<PostActionDispatcher>();
             services.AddTemplateComponent<PostActionDispatcher, PostActionDispatcher>();

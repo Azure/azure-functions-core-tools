@@ -2,15 +2,17 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Installer;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Command-scoped entry point for discovering templates installed in the func template engine.
+/// Command-scoped entry point for package lifecycle and discovery in the func template engine.
 /// </summary>
-internal sealed class Templater : IDisposable
+internal class Templater : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
@@ -51,9 +53,27 @@ internal sealed class Templater : IDisposable
     public async Task<TemplateResolutionResult> ListAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
         return new([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
+    }
+
+    internal Task<IReadOnlyList<IManagedTemplatePackage>> GetManagedPackagesAsync(CancellationToken cancellationToken)
+        => _packageManager.GetManagedTemplatePackagesAsync(true, cancellationToken);
+
+    internal virtual Task<IEnumerable<ITemplateInfo>> GetTemplatesAsync(ITemplatePackage package, CancellationToken cancellationToken)
+        => _packageManager.GetTemplatesAsync(package, cancellationToken);
+
+    internal virtual async Task<InstallResult> InstallAsync(InstallRequest request, CancellationToken cancellationToken)
+    {
+        IManagedTemplatePackageProvider provider = _packageManager.GetBuiltInManagedProvider(InstallationScope.Global);
+        IReadOnlyList<InstallResult> results = await provider.InstallAsync([request], cancellationToken);
+        return results.Single();
+    }
+
+    internal async Task<UninstallResult> UninstallAsync(IManagedTemplatePackage package, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<UninstallResult> results = await package.ManagedProvider.UninstallAsync([package], cancellationToken);
+        return results.Single();
     }
 
     public void Dispose()
