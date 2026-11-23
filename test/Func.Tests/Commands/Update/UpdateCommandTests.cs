@@ -61,9 +61,16 @@ public sealed class UpdateCommandTests
             .Contain("managed externally")
             .And.Contain("same installer or package manager")
             .And.Contain("https://aka.ms/func-cli");
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(default, default);
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetVersionAsync(default!, default);
-        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(
+            default,
+            TestContext.Current.CancellationToken);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetVersionAsync(
+            default!,
+            TestContext.Current.CancellationToken);
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -102,7 +109,9 @@ public sealed class UpdateCommandTests
         var root = new RootCommand { command };
 
         int exitCode = await root.Parse(["update", "--yes"])
-            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            .InvokeAsync(
+                new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+                TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         interaction.IsInteractive.Should().BeTrue();
@@ -126,8 +135,13 @@ public sealed class UpdateCommandTests
         GracefulException exception = (await act.Should().ThrowAsync<GracefulException>()).Which;
         exception.IsUserError.Should().BeTrue();
         exception.Message.Should().Contain("https://aka.ms/func-cli");
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(default, default);
-        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(
+            default,
+            TestContext.Current.CancellationToken);
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -145,8 +159,13 @@ public sealed class UpdateCommandTests
         exception.IsUserError.Should().BeTrue();
         exception.InnerException.Should().BeSameAs(readerFailure);
         exception.Message.Should().Contain("https://aka.ms/func-cli");
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(default, default);
-        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(
+            default,
+            TestContext.Current.CancellationToken);
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -199,7 +218,10 @@ public sealed class UpdateCommandTests
 
         exitCode.Should().Be(0);
         harness.Interaction.AllOutput.Should().Contain("Update cancelled.");
-        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -250,7 +272,9 @@ public sealed class UpdateCommandTests
         GracefulException exception = (await act.Should().ThrowAsync<GracefulException>()).Which;
         exception.IsUserError.Should().BeTrue();
         exception.Message.Should().Contain("--version");
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetVersionAsync(default!, default);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetVersionAsync(
+            default!,
+            TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -265,8 +289,12 @@ public sealed class UpdateCommandTests
         GracefulException exception = (await act.Should().ThrowAsync<GracefulException>()).Which;
         exception.IsUserError.Should().BeTrue();
         exception.Message.Should().Contain("--version");
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(default, default);
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetVersionAsync(default!, default);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(
+            default,
+            TestContext.Current.CancellationToken);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetVersionAsync(
+            default!,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -295,7 +323,10 @@ public sealed class UpdateCommandTests
 
         exitCode.Should().Be(0);
         harness.Interaction.AllOutput.Should().Contain("newer").And.Contain("No update was performed");
-        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -322,7 +353,10 @@ public sealed class UpdateCommandTests
 
         exitCode.Should().Be(0);
         harness.Interaction.AllOutput.Should().Contain("already up to date");
-        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(
+            default!,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -338,7 +372,9 @@ public sealed class UpdateCommandTests
 
         OperationCanceledException exception = (await act.Should().ThrowAsync<OperationCanceledException>()).Which;
         exception.CancellationToken.IsCancellationRequested.Should().BeTrue();
-        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(default, default);
+        await harness.ReleaseFeed.DidNotReceiveWithAnyArgs().GetLatestAsync(
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]

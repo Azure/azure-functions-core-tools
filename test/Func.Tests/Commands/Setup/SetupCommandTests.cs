@@ -98,7 +98,9 @@ public sealed class SetupCommandTests : IDisposable
             $"setup \"{_tempDir}\" --features node,python --profile flex --profile premium --profiles staging,prod "
             + "--source https://example.test/v3/index.json --install-policy if-needed --prerelease --non-interactive --yes --check --format json");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         await setupRunner.Received(1).RunAsync(

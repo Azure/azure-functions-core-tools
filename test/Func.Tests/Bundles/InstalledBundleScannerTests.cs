@@ -14,7 +14,7 @@ public class InstalledBundleScannerTests
     [Fact]
     public async Task NoRows_ReportsZeroTotal()
     {
-        ScanResult result = await Build([]).ScanAsync(StableId);
+        ScanResult result = await Build([]).ScanAsync(StableId, TestContext.Current.CancellationToken);
         result.TotalInstalledRows.Should().Be(0);
         result.FilteredVersions.Should().BeEmpty();
     }
@@ -28,7 +28,7 @@ public class InstalledBundleScannerTests
             Row("4.23.0-preview", "/b"),
             Row("4.23.0-experimental", "/c"),
             Row("4.24.0", "/d"),
-        ]).ScanAsync(StableId);
+        ]).ScanAsync(StableId, TestContext.Current.CancellationToken);
 
         result.TotalInstalledRows.Should().Be(4);
         result.FilteredVersions.Count.Should().Be(2);
@@ -45,7 +45,7 @@ public class InstalledBundleScannerTests
             Row("4.23.0-preview", "/b"),
             Row("4.24.0-experimental", "/c"),
             Row("4.25.0-beta", "/d"),
-        ]).ScanAsync(PreviewId);
+        ]).ScanAsync(PreviewId, TestContext.Current.CancellationToken);
 
         result.FilteredVersions.Should().ContainSingle();
         result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.23.0-preview"));
@@ -60,7 +60,7 @@ public class InstalledBundleScannerTests
             Row("4.23.0-preview.1", "/b"),
             Row("4.24.0-experimental.1", "/c"),
             Row("4.25.0-experimental.2", "/d"),
-        ]).ScanAsync(ExperimentalId);
+        ]).ScanAsync(ExperimentalId, TestContext.Current.CancellationToken);
 
         result.FilteredVersions.Count.Should().Be(2);
         result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.25.0-experimental.2"));
@@ -70,7 +70,9 @@ public class InstalledBundleScannerTests
     [Fact]
     public async Task PayloadPath_IsInstallDirSlashToolsSlashAny()
     {
-        ScanResult result = await Build([Row("4.35.0", "/install/dir")]).ScanAsync(StableId);
+        ScanResult result = await Build([Row("4.35.0", "/install/dir")]).ScanAsync(
+            StableId,
+            TestContext.Current.CancellationToken);
 
         result.FilteredVersions[0].Path.Should().Be(Path.Combine("/install/dir", "tools", "any"));
     }
@@ -82,7 +84,7 @@ public class InstalledBundleScannerTests
         [
             new InstalledBundleWorkload("garbage", "/x"),
             Row("4.22.0", "/y"),
-        ]).ScanAsync(StableId);
+        ]).ScanAsync(StableId, TestContext.Current.CancellationToken);
 
         result.FilteredVersions.Should().ContainSingle();
         result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.22.0"));
@@ -96,7 +98,7 @@ public class InstalledBundleScannerTests
             Row("4.20.0", "/a"),
             Row("4.30.0", "/b"),
             Row("4.10.0", "/c"),
-        ]).ScanAsync(StableId);
+        ]).ScanAsync(StableId, TestContext.Current.CancellationToken);
 
         result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.30.0"));
         result.FilteredVersions[2].Version.Should().Be(NuGetVersion.Parse("4.10.0"));

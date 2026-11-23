@@ -42,7 +42,7 @@ public class JavaFunctionsProjectTests : IDisposable
         });
 
         FunctionsProjectHostRunContext context = CreateContext();
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         Assert.Equal(_projectDir.FullName, observedRoot);
         Assert.Equal(
@@ -64,7 +64,7 @@ public class JavaFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "[INFO] BUILD SUCCESS");
         Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "[WARNING] something");
@@ -83,7 +83,7 @@ public class JavaFunctionsProjectTests : IDisposable
         context.Reporter = reporter;
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+            () => project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("mvn clean package", ex.Message);
@@ -103,7 +103,7 @@ public class JavaFunctionsProjectTests : IDisposable
         });
 
         FunctionsProjectHostRunContext context = CreateContext(skipBuild: true);
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         Assert.False(invoked);
         Assert.Equal(
@@ -118,7 +118,7 @@ public class JavaFunctionsProjectTests : IDisposable
         project.ResolveMavenCommand = (_, _) => Task.FromResult<string?>(null);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("Could not find Apache Maven", ex.Message);
@@ -131,7 +131,7 @@ public class JavaFunctionsProjectTests : IDisposable
         JavaFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("No built Functions app", ex.Message);

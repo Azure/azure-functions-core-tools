@@ -116,7 +116,7 @@ public class InitCommandTests
             var root = TestParser.CreateRoot(_interaction);
             var result = root.Parse($"init \"{newDir}\"");
 
-            var exitCode = await result.InvokeAsync();
+            var exitCode = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
             // No --stack provided → exit 1, but directory was still created.
             exitCode.Should().Be(1);
@@ -658,7 +658,8 @@ public class InitCommandTests
             var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
             var root = new RootCommand { command };
 
-            int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
+            int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
 
             exitCode.Should().Be(0);
             dotnet.WasInvoked.Should().BeFalse();
@@ -822,7 +823,8 @@ public class InitCommandTests
             var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
             var root = new RootCommand { command };
 
-            int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
+            int exitCode = await root.Parse(["init", newDir]).InvokeAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
 
             exitCode.Should().Be(0);
             python.WasInvoked.Should().BeFalse();

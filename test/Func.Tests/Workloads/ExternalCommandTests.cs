@@ -163,7 +163,7 @@ public class ExternalCommandTests
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
         var parseResult = external.Parse("--stack dotnet");
-        var exit = await parseResult.InvokeAsync();
+        var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exit.Should().Be(0);
         captured.Should().Be("dotnet");
@@ -184,7 +184,7 @@ public class ExternalCommandTests
             });
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
-        await external.Parse("my-app").InvokeAsync();
+        await external.Parse("my-app").InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         captured.Should().Be("my-app");
     }
@@ -204,7 +204,7 @@ public class ExternalCommandTests
             });
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
-        await external.Parse(string.Empty).InvokeAsync();
+        await external.Parse(string.Empty).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         captured.Should().Be(7071);
     }
@@ -233,7 +233,7 @@ public class ExternalCommandTests
             });
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
-        await external.Parse("--name foo").InvokeAsync();
+        await external.Parse("--name foo").InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         captured.Should().BeOfType<ArgumentException>();
         captured!.Message.Should().Contain("--name");
@@ -259,7 +259,7 @@ public class ExternalCommandTests
             });
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
-        await external.Parse(string.Empty).InvokeAsync();
+        await external.Parse(string.Empty).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         captured.Should().BeOfType<ArgumentNullException>();
     }

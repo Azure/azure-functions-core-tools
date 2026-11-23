@@ -95,8 +95,11 @@ public class ForceConfirmationCancellationTests
         {
             string gitSentinel = Path.Combine(gitDirectory, "keep.txt");
             string sentinel = Path.Combine(directory, "keep.txt");
-            await File.WriteAllTextAsync(gitSentinel, "git content");
-            if (!gitOnly) await File.WriteAllTextAsync(sentinel, "original content");
+            await File.WriteAllTextAsync(gitSentinel, "git content", TestContext.Current.CancellationToken);
+            if (!gitOnly) await File.WriteAllTextAsync(
+                sentinel,
+                "original content",
+                TestContext.Current.CancellationToken);
             ParseResult parsed = command.Parse([directory, "--stack", "python", "--language", "python", "--force"]);
 
             await FluentActions.Awaiting(() => parsed.InvokeAsync(
@@ -106,8 +109,12 @@ public class ForceConfirmationCancellationTests
             cancellation.IsCancellationRequested.Should().BeTrue();
             scaffolded.Should().BeFalse();
             Directory.GetFileSystemEntries(directory).Should().HaveCount(gitOnly ? 1 : 2);
-            (await File.ReadAllTextAsync(gitSentinel)).Should().Be("git content");
-            if (!gitOnly) (await File.ReadAllTextAsync(sentinel)).Should().Be("original content");
+            (await File.ReadAllTextAsync(
+                gitSentinel,
+                TestContext.Current.CancellationToken)).Should().Be("git content");
+            if (!gitOnly) (await File.ReadAllTextAsync(
+                sentinel,
+                TestContext.Current.CancellationToken)).Should().Be("original content");
             await interaction.Received(gitOnly ? 0 : 1).ConfirmAsync("Continue?", false, true, Arg.Any<CancellationToken>());
         }
         finally

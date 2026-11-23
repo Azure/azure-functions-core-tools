@@ -82,7 +82,7 @@ public class ParserTests
         FuncRootCommand root = Parser.CreateCommand(services);
         ParseResult result = root.Parse(["--verbose"]);
 
-        int exit = await result.InvokeAsync();
+        int exit = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Contain("  ROW: [Version, 5.0.0-preview.5]");
@@ -112,7 +112,7 @@ public class ParserTests
         FuncRootCommand root = Parser.CreateCommand(services);
         ParseResult result = root.Parse([command]);
 
-        int exit = await result.InvokeAsync();
+        int exit = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exit.Should().Be(0);
         stdout.Output.Should().Be(version + Environment.NewLine);
@@ -132,7 +132,7 @@ public class ParserTests
         FuncRootCommand root = Parser.CreateCommand(services);
         ParseResult result = root.Parse(args);
 
-        int exit = await result.InvokeAsync();
+        int exit = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Equal("5.0.0-preview.5");
@@ -216,7 +216,7 @@ public class ParserTests
         FuncRootCommand root = TestParser.CreateRoot(_interaction);
         ParseResult parseResult = root.Parse("workload");
 
-        int exit = await parseResult.InvokeAsync();
+        int exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exit.Should().Be(0);
         _interaction.Lines.Should().NotBeEmpty();

@@ -46,7 +46,8 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         string valid = BuildNupkg();
         string invalid = BuildNupkg(includeFuncCliWorkloadType: false);
 
-        var result = await installer.InstallFromPackageAsync(valid, allowUntrusted: true);
+        var result = await installer.InstallFromPackageAsync(
+            valid, allowUntrusted: true, cancellationToken: TestContext.Current.CancellationToken);
         result.Entry.PackageId.Should().Be("test.workload");
         Func<Task> act = () => installer.InstallFromPackageAsync(invalid, allowUntrusted: true);
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
@@ -58,14 +59,19 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
     public async Task Snapshot_IsIndependentOfUserSourceAndDeletedOnDispose()
     {
         string source = BuildNupkg();
-        byte[] original = await File.ReadAllBytesAsync(source);
+        byte[] original = await File.ReadAllBytesAsync(source, TestContext.Current.CancellationToken);
         WorkloadPackageTrust trust = new();
         string snapshotPath;
         using (WorkloadPackageSnapshot snapshot = await trust.AcquireAsync(source, true, TestContextToken()))
         {
             snapshotPath = snapshot.Path;
-            await File.WriteAllTextAsync(source, "source replaced after acquisition");
-            (await File.ReadAllBytesAsync(snapshotPath)).Should().Equal(original);
+            await File.WriteAllTextAsync(
+                source,
+                "source replaced after acquisition",
+                TestContext.Current.CancellationToken);
+            (await File.ReadAllBytesAsync(
+                snapshotPath,
+                TestContext.Current.CancellationToken)).Should().Equal(original);
             if (OperatingSystem.IsWindows())
             {
                 Action write = () => File.WriteAllText(snapshotPath, "changed");
@@ -292,7 +298,9 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         WorkloadInstaller installer = NewInstaller(packageTrust: new TestRootTrust(root,
             () => File.WriteAllText(signed, "replaced after snapshot was created")));
 
-        var result = await installer.InstallFromPackageAsync(signed);
+        var result = await installer.InstallFromPackageAsync(
+            signed,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         string payload = Path.Combine(Paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion), "tools", "any", "Test.dll");
         File.ReadAllBytes(payload).Should().Equal([0x4D, 0x5A]);
@@ -328,7 +336,9 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
             Arg.Any<CancellationToken>()).Returns(resolved);
         WorkloadInstaller installer = NewInstaller(packageTrust: new WorkloadPackageTrust());
 
-        var result = await installer.InstallFromCatalogAsync(current.PackageId, null, null, false, true, false);
+        var result = await installer.InstallFromCatalogAsync(
+            current.PackageId, null, null, false, true, false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeTrue();
         result.Entry.Should().BeSameAs(current);

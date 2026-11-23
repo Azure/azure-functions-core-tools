@@ -34,7 +34,7 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
-        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         session.SetMouseCapture(false);
         session.SetMouseCapture(true);
@@ -57,9 +57,10 @@ public class TerminalSessionTests
         TerminalSession session = new(CreateConsole(new StringWriter()), driver);
         session.Activate();
         using CancellationTokenSource cancellation = new();
-        await using var reader = session.ReadAsync(cancellation.Token).GetAsyncEnumerator();
+        await using var reader = session.ReadAsync(cancellation.Token).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         Task<bool> next = reader.MoveNextAsync().AsTask();
-        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         cancellation.Cancel();
 
         Func<Task> read = async () => await next.WaitAsync(TimeSpan.FromSeconds(5));
@@ -75,7 +76,8 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(new StringWriter()), driver);
         session.Activate();
-        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         Task<bool> next = reader.MoveNextAsync().AsTask();
 
         await session.DisposeAsync();
@@ -91,7 +93,8 @@ public class TerminalSessionTests
         FakeDriver driver = new() { ReadFailure = new IOException("native read failed") };
         TerminalSession session = new(CreateConsole(new StringWriter()), driver);
         session.Activate();
-        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         Func<Task> read = async () => await reader.MoveNextAsync();
         await read.Should().ThrowAsync<IOException>().WithMessage("native read failed");
 
@@ -125,7 +128,7 @@ public class TerminalSessionTests
         FakeDriver driver = new() { ReadFailure = new IOException("original read failure") };
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
-        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         writer.Fail = true;
 
         Func<Task> dispose = () => session.DisposeAsync().AsTask();
@@ -160,7 +163,7 @@ public class TerminalSessionTests
         {
             Action activate = session.Activate;
             activate.Should().Throw<IOException>().Which.Should().BeSameAs(writer.Failure);
-            await writer.Restoring.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await writer.Restoring.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             driver.DisposeCount.Should().Be(0);
         }
         finally
@@ -168,7 +171,7 @@ public class TerminalSessionTests
             writer.Release.Set();
         }
 
-        await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         driver.RestoreCount.Should().Be(1);
         driver.DisposeCount.Should().Be(1);
         driver.ActiveReads.Should().Be(0);
@@ -187,7 +190,7 @@ public class TerminalSessionTests
         FakeDriver driver = new() { SignalDisposeFailure = signalFailure };
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
-        var render = Task.Run(() => session.Render(new Text("blocked frame")));
+        var render = Task.Run(() => session.Render(new Text("blocked frame")), TestContext.Current.CancellationToken);
         try
         {
             await driver.ReadEntered.Task.WaitAsync(deadline.Token);
@@ -214,8 +217,9 @@ public class TerminalSessionTests
             writer.Release.Set();
             // Disposal may already be faulted; its independently owned cleanup still needs to finish.
             _ = session.DisposeAsync().AsTask();
-            await render.WaitAsync(TimeSpan.FromSeconds(5));
-            await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
+            await Task.WhenAll(render, driver.Disposed.Task).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+#pragma warning restore xUnit1051
         }
 
         driver.RestoreCount.Should().Be(1);
@@ -230,14 +234,15 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
-        await using IAsyncEnumerator<TerminalInputEvent> reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using IAsyncEnumerator<TerminalInputEvent> reader =
+            session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Task<bool> read = reader.MoveNextAsync().AsTask();
         DeferredSynchronizationContext context = new();
         Task? disposal = null;
         try
         {
             session.Restore();
-            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             await FluentActions.Awaiting(async () => await read).Should().ThrowAsync<OperationCanceledException>();
 
             SynchronizationContext? previous = SynchronizationContext.Current;
@@ -252,8 +257,8 @@ public class TerminalSessionTests
             }
 
             writer.Release.Set();
-            await context.Posted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(1500));
+            await context.Posted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(1500), TestContext.Current.CancellationToken);
 
             disposal.IsCompleted.Should().BeFalse("the completed restoration must not time out waiting for the caller's context");
             driver.DisposeCount.Should().Be(1);
@@ -264,7 +269,7 @@ public class TerminalSessionTests
             context.RunPosted();
         }
 
-        await disposal!.WaitAsync(TimeSpan.FromSeconds(5));
+        await disposal!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         driver.RestoreCount.Should().Be(1);
         driver.DisposeCount.Should().Be(1);
     }
@@ -276,7 +281,7 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
-        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await driver.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         writer.Fail = true;
 
         Func<Task> dispose = () => session.DisposeAsync().AsTask();
@@ -293,10 +298,10 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
-        var render = Task.Run(() => session.Render(new Text("blocked frame")));
+        var render = Task.Run(() => session.Render(new Text("blocked frame")), TestContext.Current.CancellationToken);
         try
         {
-            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             var elapsed = Stopwatch.StartNew();
             session.Restore();
@@ -311,8 +316,16 @@ public class TerminalSessionTests
         finally
         {
             writer.Release.Set();
-            await render.WaitAsync(TimeSpan.FromSeconds(5));
-            await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+            try
+            {
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
+                await render.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            }
+            finally
+            {
+                await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+#pragma warning restore xUnit1051
+            }
         }
 
         writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
@@ -335,12 +348,16 @@ public class TerminalSessionTests
 
             elapsed.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
             driver.InputRestored.Should().BeTrue();
-            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
         finally
         {
             writer.Release.Set();
-            await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+#pragma warning disable xUnit1051 // Cleanup must outlive test cancellation.
+            await session.DisposeAsync().AsTask().WaitAsync(
+                TimeSpan.FromSeconds(5),
+                CancellationToken.None);
+#pragma warning restore xUnit1051
         }
 
         driver.RestoreCount.Should().Be(1);
@@ -364,7 +381,8 @@ public class TerminalSessionTests
         driver.ResumeCallback!();
         driver.ResumeCount.Should().Be(1);
         driver.MouseCapture.Should().BeFalse();
-        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         (await reader.MoveNextAsync()).Should().BeTrue();
         reader.Current.Kind.Should().Be(TerminalInputKind.FocusLost);
         (await reader.MoveNextAsync()).Should().BeTrue();
@@ -394,10 +412,12 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(new StringWriter()), driver);
         session.Activate();
-        driver.Input.Add(TerminalKey.Create('q'));
-        await using var first = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        driver.Input.Add(TerminalKey.Create('q'), TestContext.Current.CancellationToken);
+        await using var first = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         (await first.MoveNextAsync()).Should().BeTrue();
-        await using var second = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        await using var second = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         Func<Task> read = async () => await second.MoveNextAsync();
         await read.Should().ThrowAsync<InvalidOperationException>();
         await session.DisposeAsync();
@@ -409,8 +429,9 @@ public class TerminalSessionTests
         FakeDriver driver = new();
         TerminalSession session = new(CreateConsole(new StringWriter()), driver);
         session.Activate();
-        driver.Input.Add(TerminalKey.Create('\u0003'));
-        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        driver.Input.Add(TerminalKey.Create('\u0003'), TestContext.Current.CancellationToken);
+        await using var reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
         (await reader.MoveNextAsync()).Should().BeTrue();
         reader.Current.Kind.Should().Be(TerminalInputKind.Key);
         reader.Current.Key.Should().Be(new ConsoleKeyInfo('\u0003', ConsoleKey.C, false, false, true));

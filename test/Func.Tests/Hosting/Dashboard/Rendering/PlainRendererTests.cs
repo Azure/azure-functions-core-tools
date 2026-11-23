@@ -51,7 +51,7 @@ public class PlainRendererTests
         console.Profile.Capabilities.Links = true;
 
         var state = new DashboardState();
-        await renderer.OnStartAsync(state, default);
+        await renderer.OnStartAsync(state, TestContext.Current.CancellationToken);
         await PumpHostReadyAsync(renderer, state);
 
         HostLogEntry entry = MakeEntry(new Dictionary<string, object?>
@@ -61,7 +61,7 @@ public class PlainRendererTests
             [HostLogAttributeKeys.FunctionTriggerType] = "queue",
             [HostLogAttributeKeys.FunctionRoute] = "my-queue",
         });
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
 
         string output = writer.ToString();
         output.Should().Contain("QueueProcessor");
@@ -93,7 +93,7 @@ public class PlainRendererTests
             message: "Executed 'Functions.HttpTrigger1' (Failed, Id=11111111-1111-1111-1111-111111111111, Duration=10ms)",
             exceptionDetails: exceptionDetails);
 
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
 
         string output = writer.ToString();
         output.Should().Contain("[invocation end]");
@@ -121,7 +121,7 @@ public class PlainRendererTests
             message: "Executed 'Functions.HttpTrigger1' (Failed, Id=11111111-1111-1111-1111-111111111111, Duration=10ms)",
             exceptionDetails: exceptionDetails);
 
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
 
         string output = writer.ToString();
         output.Should().NotContain("Grpc");
@@ -141,7 +141,7 @@ public class PlainRendererTests
             message: string.Empty,
             exceptionDetails: new HostLogExceptionDetails("System.InvalidOperationException", "A connection string was not found.", null, null));
 
-        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+        await renderer.OnEventAsync(entry, state.Observe(entry), TestContext.Current.CancellationToken);
 
         string output = writer.ToString();
         output.Should().NotContain("Grpc");
