@@ -26,6 +26,7 @@ jobs:
 
   variables:
   - template: /eng/ci/templates/variables/build.yml@self
+  - template: /eng/ci/templates/variables/test-reporting.yml@self
   - name: pack_dir
     readonly: true
     value: $(Build.ArtifactStagingDirectory)/pkg
@@ -77,11 +78,15 @@ jobs:
 
     - script: >-
         dotnet test "$(build_solution)" -c ${{ parameters.configuration }} -v m --no-build
-        --report-azdo --publish-azdo-test-results ${{ parameters.build_args }}
+        --report-azdo $(test_reporting_args) ${{ parameters.build_args }}
       displayName: Unit tests
       condition: and(succeeded(), eq(variables.has_test_projects, 'true'))
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+    - template: /eng/ci/templates/steps/publish-fork-test-results.yml@self
+      parameters:
+        condition: and(succeededOrFailed(), eq(variables.has_test_projects, 'true'))
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       # Only sign the intermediate DLLs if we are packing.

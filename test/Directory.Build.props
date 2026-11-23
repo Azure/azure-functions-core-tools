@@ -18,6 +18,7 @@
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Microsoft.Testing.Extensions.AzureDevOpsReport" />
     <PackageReference Include="Microsoft.Testing.Extensions.GitHubActionsReport" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="NSubstitute" />
 

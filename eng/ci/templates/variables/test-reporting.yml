@@ -1,0 +1,3 @@
+variables:
+- name: test_reporting_args
+  value: $[iif(eq(variables['System.PullRequest.IsFork'], 'true'), '--report-trx --results-directory "$(Agent.TempDirectory)/TestResults"', '--publish-azdo-test-results')]

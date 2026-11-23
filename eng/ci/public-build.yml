@@ -32,6 +32,7 @@ extends:
       name: 1es-pool-azfunc-public
       image: 1es-ubuntu-24.04-min
       os: linux
+
       ${{ if eq( variables['Build.Reason'], 'Schedule' ) }}:
         demands:
         - Priority -equals Low
@@ -41,6 +42,7 @@ extends:
         name: 1es-pool-azfunc-public
         image: 1es-windows-2022
         os: windows
+
       codeql:
          runSourceLanguagesInSourceAnalysis: true
 
@@ -55,41 +57,61 @@ extends:
           parameters:
             projects: Azure.Functions.Cli.slnx
             sign: false
+
         - job: terminal_windows
           displayName: Windows terminal qualification
+
+          variables:
+          - template: /eng/ci/templates/variables/test-reporting.yml@self
+
           pool:
             name: 1es-pool-azfunc-public
             image: 1es-windows-2022
             os: windows
+
           steps:
           - template: /eng/ci/templates/steps/setup-dependencies.yml@self
             parameters:
               sign: false
+
           - script: dotnet restore test/Func.Tests/Func.Tests.csproj
             displayName: Restore terminal tests
+
           - script: >-
               dotnet test test/Func.Tests/Func.Tests.csproj -c Release --no-restore -p:CI=true
-              --report-azdo --publish-azdo-test-results
+              --report-azdo $(test_reporting_args)
               --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
             displayName: Qualify native input and dashboard lifecycle
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+          - template: /eng/ci/templates/steps/publish-fork-test-results.yml@self
+
         - job: terminal_linux
           displayName: Linux terminal qualification
+
+          variables:
+          - template: /eng/ci/templates/variables/test-reporting.yml@self
+
           steps:
           - template: /eng/ci/templates/steps/setup-dependencies.yml@self
             parameters:
               sign: false
+
           - bash: python3 --version
             displayName: Verify Unix PTY harness prerequisite
+
           - script: dotnet restore test/Func.Tests/Func.Tests.csproj
             displayName: Restore terminal tests
+
           - script: >-
               dotnet test test/Func.Tests/Func.Tests.csproj -c Release --no-restore -p:CI=true
-              --report-azdo --publish-azdo-test-results
+              --report-azdo $(test_reporting_args)
               --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
             displayName: Qualify native Unix input and job control
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+          - template: /eng/ci/templates/steps/publish-fork-test-results.yml@self
