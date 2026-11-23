@@ -8,23 +8,28 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Templates;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
-public class InitCommandTests
+public class InitCommandTests : IDisposable
 {
+    private readonly string _templatesHome = Path.Combine(Path.GetTempPath(), $"func-init-templates-{Guid.NewGuid():N}");
     private readonly TestInteractionService _interaction;
     private readonly RecordingWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettings;
     private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IHostJsonBundleSectionReader _bundleReader;
     private readonly IInstalledBundleWorkloads _installedBundles;
+    private readonly TemplaterFactory _templaterFactory;
 
     public InitCommandTests()
     {
+        _templaterFactory = new TemplaterFactory(new CliConfigurationPathsOptions(_templatesHome), []);
         _interaction = new TestInteractionService();
         _hintRenderer = new RecordingWorkloadHintRenderer();
         _localSettings = Substitute.For<ILocalSettingsProvider>();
@@ -43,8 +48,16 @@ public class InitCommandTests
             .Returns([]);
     }
 
-    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+    public void Dispose()
+    {
+        if (Directory.Exists(_templatesHome))
+        {
+            Directory.Delete(_templatesHome, recursive: true);
+        }
+    }
+
+    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers, ITemplaterFactory? templaterFactory = null) =>
+        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), templaterFactory ?? _templaterFactory, new TemplateParameterBinder(), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -99,15 +112,14 @@ public class InitCommandTests
     public void InitCommand_HasPathArgument()
     {
         var cmd = CreateCommand([]);
-        cmd.Arguments.Should().ContainSingle();
+        cmd.Arguments.Should().HaveCount(2);
         cmd.Arguments[0].Name.Should().Be("path");
+        cmd.Arguments[1].Should().BeSameAs(cmd.TemplateArgumentsArgument);
     }
 
     [Fact]
-    public async Task InitCommand_CreatesMissingDirectoryBeforeDispatch()
+    public async Task InitCommand_MissingStack_DoesNotCreateDirectory()
     {
-        // Even when --stack is missing, InitCommand creates the target
-        // directory before validating (directory creation is unconditional).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         Directory.Exists(newDir).Should().BeFalse();
 
@@ -118,9 +130,8 @@ public class InitCommandTests
 
             var exitCode = await result.InvokeAsync();
 
-            // No --stack provided → exit 1, but directory was still created.
             exitCode.Should().Be(1);
-            Directory.Exists(newDir).Should().BeTrue();
+            Directory.Exists(newDir).Should().BeFalse();
         }
         finally
         {
@@ -655,7 +666,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), _templaterFactory, new TemplateParameterBinder(), [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -819,7 +830,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), _templaterFactory, new TemplateParameterBinder(), [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
@@ -1275,6 +1286,370 @@ public class InitCommandTests
         {
             CleanupDirectory(newDir);
         }
+    }
+
+    [Theory]
+    [InlineData(new string[0], "net10.0")]
+    [InlineData(new[] { "-tfm", "net11.0" }, "net11.0")]
+    public async Task InitCommand_ProjectTemplateMatches_ScaffoldsFromTemplateInsteadOfInitializer(string[] frameworkArgs, string expectedFramework)
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            FakeProjectInitializer initializer = CreateFrameworkInitializer();
+
+            int exitCode = await InvokeInitAsync(newDir, initializer, ["--name", "MyApp", .. frameworkArgs]);
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(newDir, "MyApp.csproj")).Should().Contain(expectedFramework);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Theory]
+    [InlineData("--target-framework")]
+    [InlineData("-tfm")]
+    public async Task InitCommand_ProjectTemplateOptionNotDeclaredByInitializer_BindsFromTemplate(string alias)
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            var initializer = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#"]);
+
+            int exitCode = await InvokeInitAsync(newDir, initializer, "--name", "MyApp", alias, "net11.0");
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(newDir, "MyApp.csproj")).Should().Be("<TargetFramework>net11.0</TargetFramework>");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_ExplicitStackOptionWithoutHostMapping_RejectsBeforeWriting(bool force)
+    {
+        string newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            string package = TemplateFixtures.WriteProjectPackage(Path.Combine(_templatesHome, "packages"), "Func.Tests.CSharp", "C#");
+            File.WriteAllText(Path.Combine(package, ".template.config", "func.host.json"), "{}");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(_templatesHome, "templates"));
+            if (force)
+            {
+                Directory.CreateDirectory(newDir);
+                File.WriteAllText(Path.Combine(newDir, "keep.txt"), "existing");
+            }
+            FakeProjectInitializer initializer = CreateFrameworkInitializer();
+            string[] args = force ? ["--force", "-tfm", "net11.0"] : ["-tfm", "net11.0"];
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer, args))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be("Option '-tfm' is not supported by template 'Func.Tests.CSharp'.");
+            initializer.WasInvoked.Should().BeFalse();
+            if (force)
+            {
+                Directory.EnumerateFileSystemEntries(newDir).Should().ContainSingle()
+                    .Which.Should().Be(Path.Combine(newDir, "keep.txt"));
+                File.ReadAllText(Path.Combine(newDir, "keep.txt")).Should().Be("existing");
+            }
+            else
+            {
+                Directory.Exists(newDir).Should().BeFalse();
+            }
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("denied")]
+    [InlineData("io")]
+    [InlineData("json")]
+    [InlineData("cancelled")]
+    public async Task InitCommand_TemplateDiscoveryError_PreservesDiagnosticAndDestination(string failure)
+    {
+        const string message = "Host configuration for template 'Test.Template' at 'source/.template.config/func.host.json'.";
+        Exception error = failure switch
+        {
+            "missing" => new FileNotFoundException(message),
+            "denied" => new UnauthorizedAccessException(message),
+            "io" => new IOException(message),
+            "json" => new JsonException(message),
+            "cancelled" => new OperationCanceledException(message),
+            _ => throw new ArgumentOutOfRangeException(nameof(failure)),
+        };
+        string newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        IEnumerable<ITemplateComponent> components = [];
+        var templater = Substitute.For<Templater>(
+            new TemplateEngineContext(WorkingDirectory.FromExplicit(newDir)),
+            Path.Combine(_templatesHome, "templates"),
+            components);
+        templater.FindProjectTemplateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<FuncTemplateInfo?>(error));
+        var factory = Substitute.For<ITemplaterFactory>();
+        factory.Create(Arg.Any<TemplateEngineContext>()).Returns(templater);
+        var root = new RootCommand { CreateCommand([new FakeProjectInitializer("dotnet", supportedLanguages: ["C#"])], factory) };
+        ParseResult result = root.Parse(["init", newDir, "--stack", "dotnet"]);
+
+        Func<Task> act = () => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        if (error is OperationCanceledException)
+        {
+            (await act.Should().ThrowAsync<OperationCanceledException>()).Which.Should().BeSameAs(error);
+        }
+        else
+        {
+            GracefulException ex = (await act.Should().ThrowAsync<GracefulException>()).Which;
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be(message);
+            ex.InnerException.Should().BeSameAs(error);
+        }
+        Directory.Exists(newDir).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InitCommand_InvalidUndeclaredTemplateOptionWithForce_KeepsFilesAndConfig()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            Directory.CreateDirectory(newDir);
+            string existingFile = Path.Combine(newDir, "keep.txt");
+            File.WriteAllText(existingFile, "existing");
+            var initializer = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#"]);
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer, "--force", "-tfm", "net6.0"))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be("Invalid value 'net6.0' for option '-tfm'. Valid values: net10.0, net11.0.");
+            Directory.EnumerateFileSystemEntries(newDir).Should().ContainSingle().Which.Should().Be(existingFile);
+            File.ReadAllText(existingFile).Should().Be("existing");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_NoProjectTemplateForLanguage_FallsBackToInitializer()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            var initializer = new FakeProjectInitializer("python", supportedLanguages: ["python"]);
+
+            int exitCode = await InvokeInitAsync(newDir, initializer);
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
+            Directory.EnumerateFiles(newDir, "*.csproj").Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_FSharpWithoutProjectTemplate_FallsBackToInitializer()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            FakeProjectInitializer initializer = new(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                optionFactory: registry => [registry.GetOrAdd(new Option<string>("--target-framework", "-tfm"))]);
+
+            int exitCode = await InvokeInitAsync(newDir, initializer, "--language", "F#", "-tfm", "net10.0");
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
+            Directory.EnumerateFiles(newDir, "*.csproj").Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_ProjectTemplateWouldOverwriteFiles_ThrowsUserErrorAndKeepsFiles()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "MyApp.csproj"), "existing");
+            var initializer = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#"]);
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer, "--name", "MyApp"))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Contain("MyApp.csproj").And.Contain("--force");
+            File.ReadAllText(Path.Combine(newDir, "MyApp.csproj")).Should().Be("existing");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_InvalidTemplateParameter_ThrowsUserError()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            FakeProjectInitializer initializer = CreateFrameworkInitializer();
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer, "--target-framework", "net6.0"))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be("Invalid value 'net6.0' for option '--target-framework'. Valid values: net10.0, net11.0.");
+            Directory.Exists(newDir).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_InvalidTemplateParameterWithForce_DoesNotClearDirectory()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            Directory.CreateDirectory(newDir);
+            string existingFile = Path.Combine(newDir, "keep.txt");
+            File.WriteAllText(existingFile, "existing");
+            FakeProjectInitializer initializer = CreateFrameworkInitializer();
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(
+                newDir, initializer, "--force", "--target-framework", "net6.0"))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be("Invalid value 'net6.0' for option '--target-framework'. Valid values: net10.0, net11.0.");
+            File.ReadAllText(existingFile).Should().Be("existing");
+            Directory.EnumerateFileSystemEntries(newDir).Should().ContainSingle().Which.Should().Be(existingFile);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_UnknownOptionWithProjectTemplate_ThrowsUserErrorBeforeWriting()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("csharp", "Func.Tests.CSharp", "C#");
+            FakeProjectInitializer initializer = CreateFrameworkInitializer();
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer, "--bogus"))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be("Unrecognized option '--bogus'.");
+            Directory.Exists(newDir).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_UnknownOptionWithoutProjectTemplate_ThrowsUserError()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var initializer = new FakeProjectInitializer("python", supportedLanguages: ["python"]);
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer, "--bogus"))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Be("Unrecognized option '--bogus'.");
+            initializer.WasInvoked.Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_MultipleProjectTemplatesForLanguage_ThrowsUserErrorListingThem()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            await InstallProjectTemplateAsync("first", "Func.Tests.First", "C#");
+            await InstallProjectTemplateAsync("second", "Func.Tests.Second", "C#");
+            var initializer = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#"]);
+
+            GracefulException ex = (await FluentActions.Awaiting(() => InvokeInitAsync(newDir, initializer))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            ex.IsUserError.Should().BeTrue();
+            ex.Message.Should().Contain("Func.Tests.First").And.Contain("Func.Tests.Second");
+            initializer.WasInvoked.Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    private async Task InstallProjectTemplateAsync(string directoryName, string identity, string language)
+    {
+        string package = TemplateFixtures.WriteProjectPackage(Path.Combine(_templatesHome, "packages", directoryName), identity, language);
+        await TemplateFixtures.InstallAsync(package, Path.Combine(_templatesHome, "templates"));
+    }
+
+    private static FakeProjectInitializer CreateFrameworkInitializer() => new(
+        "dotnet",
+        supportedLanguages: ["C#"],
+        optionFactory: registry => [registry.GetOrAdd(new Option<string>("--target-framework", "-tfm"))]);
+
+    private Task<int> InvokeInitAsync(string path, IProjectInitializer initializer, params string[] extraArgs)
+    {
+        var root = new RootCommand { CreateCommand([initializer]) };
+        ParseResult parseResult = root.Parse(["init", path, "--stack", initializer.Stack, .. extraArgs]);
+
+        return parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
     }
 
     private sealed class StubFunctionsProject(string stackName, string? language) : FunctionsProject

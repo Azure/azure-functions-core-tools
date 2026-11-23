@@ -1,11 +1,14 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.CommandLine;
 using System.Text.Json;
+using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -86,6 +89,134 @@ public sealed class TemplaterTests : IDisposable
         Func<Task> act = () => templater.ListAsync(CancellationToken.None);
 
         await act.Should().ThrowAsync<JsonException>().WithMessage($"*{TemplateFixtures.ItemTemplateIdentity}*func.host.json*");
+    }
+
+    [Fact]
+    public async Task ListAsync_TemplateWithFuncHostJson_BindsDeclaredOptions()
+    {
+        string packageDirectory = TemplateFixtures.WriteParameterPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+        TemplateArgumentsArgument templateArguments = new();
+        Command command = new("init") { Arguments = { new PathArgument(releaseOptionTokens: true), templateArguments } };
+        ParseResult parseResult = command.Parse(["myproj", "-f", "net8.0", "--no-http"]);
+
+        TemplateResolutionResult result = await templater.ListAsync(CancellationToken.None);
+        FuncTemplateInfo template = result.Templates.Should().ContainSingle().Subject;
+        IReadOnlyDictionary<string, string> values = new TemplateParameterBinder().Bind(template, parseResult, templateArguments.GetTokens(parseResult), []);
+
+        values.Should().BeEquivalentTo(new Dictionary<string, string> { ["Framework"] = "net8.0", ["NoHttp"] = "true" });
+    }
+
+    [Fact]
+    public async Task FindProjectTemplateAsync_MatchingLanguage_ReturnsOnlyThatProjectTemplate()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        await TemplateFixtures.InstallAsync(CsharpProjectPackage("csharp", "Func.Tests.CSharp"), _hive);
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectPackage(Path.Combine(_root, "fsharp"), "Func.Tests.FSharp", "F#"), _hive);
+        using Templater templater = CreateTemplater();
+
+        FuncTemplateInfo? template = await templater.FindProjectTemplateAsync("c#");
+
+        template.Should().NotBeNull();
+        template.Identity.Should().Be("Func.Tests.CSharp");
+    }
+
+    [Fact]
+    public async Task FindProjectTemplateAsync_NoLanguageMatch_ReturnsNull()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        await TemplateFixtures.InstallAsync(CsharpProjectPackage("csharp", "Func.Tests.CSharp"), _hive);
+        using Templater templater = CreateTemplater();
+
+        FuncTemplateInfo? template = await templater.FindProjectTemplateAsync("python");
+
+        template.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FindProjectTemplateAsync_MultipleMatches_Throws()
+    {
+        await TemplateFixtures.InstallAsync(CsharpProjectPackage("first", "Func.Tests.First"), _hive);
+        await TemplateFixtures.InstallAsync(CsharpProjectPackage("second", "Func.Tests.Second"), _hive);
+        using Templater templater = CreateTemplater();
+
+        Func<Task> act = () => templater.FindProjectTemplateAsync("C#");
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Message
+            .Should().Contain("Func.Tests.First").And.Contain("Func.Tests.Second");
+    }
+
+    [Fact]
+    public async Task InstantiateAsync_WritesProjectUsingNameAndParameters()
+    {
+        using Templater templater = await CreateCsharpProjectTemplaterAsync();
+        FuncTemplateInfo template = (await templater.FindProjectTemplateAsync("C#"))!;
+        string output = Path.Combine(_root, "out");
+
+        ITemplateCreationResult result = await templater.InstantiateAsync(
+            template, "MyApp", output, new Dictionary<string, string> { ["Framework"] = "net11.0" }, force: false);
+
+        result.Status.Should().Be(CreationResultStatus.Success);
+        File.ReadAllText(Path.Combine(output, "MyApp.csproj")).Should().Contain("net11.0");
+    }
+
+    [Fact]
+    public async Task InstantiateAsync_NoName_UsesOutputDirectoryName()
+    {
+        using Templater templater = await CreateCsharpProjectTemplaterAsync();
+        FuncTemplateInfo template = (await templater.FindProjectTemplateAsync("C#"))!;
+        string output = Path.Combine(_root, "sample-app");
+
+        ITemplateCreationResult result = await templater.InstantiateAsync(
+            template, name: null, output, new Dictionary<string, string>(), force: false);
+
+        result.Status.Should().Be(CreationResultStatus.Success);
+        File.ReadAllText(Path.Combine(output, "sample-app.csproj")).Should().Contain("net10.0");
+    }
+
+    [Fact]
+    public async Task InstantiateAsync_InvalidParameterValue_ReturnsInvalidParamValues()
+    {
+        using Templater templater = await CreateCsharpProjectTemplaterAsync();
+        FuncTemplateInfo template = (await templater.FindProjectTemplateAsync("C#"))!;
+        string output = Path.Combine(_root, "out");
+
+        ITemplateCreationResult result = await templater.InstantiateAsync(
+            template, "MyApp", output, new Dictionary<string, string> { ["Framework"] = "net6.0" }, force: false);
+
+        result.Status.Should().Be(CreationResultStatus.InvalidParamValues);
+        File.Exists(Path.Combine(output, "MyApp.csproj")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false, CreationResultStatus.DestructiveChangesDetected, "existing")]
+    [InlineData(true, CreationResultStatus.Success, "<TargetFramework>net10.0</TargetFramework>")]
+    public async Task InstantiateAsync_ExistingFile_OverwritesOnlyWhenForced(bool force, CreationResultStatus expectedStatus, string expectedContent)
+    {
+        using Templater templater = await CreateCsharpProjectTemplaterAsync();
+        FuncTemplateInfo template = (await templater.FindProjectTemplateAsync("C#"))!;
+        string output = Path.Combine(_root, "out");
+        Directory.CreateDirectory(output);
+        string projectFile = Path.Combine(output, "MyApp.csproj");
+        File.WriteAllText(projectFile, "existing");
+
+        ITemplateCreationResult result = await templater.InstantiateAsync(
+            template, "MyApp", output, new Dictionary<string, string>(), force);
+
+        result.Status.Should().Be(expectedStatus);
+        File.ReadAllText(projectFile).Should().Be(expectedContent);
+    }
+
+    [Fact]
+    public async Task FindProjectTemplateAsync_AfterDispose_ThrowsObjectDisposedException()
+    {
+        Templater templater = CreateTemplater();
+        templater.Dispose();
+
+        Func<Task> act = () => templater.FindProjectTemplateAsync("C#");
+
+        await act.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]
@@ -175,13 +306,22 @@ public sealed class TemplaterTests : IDisposable
 
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
+    private string CsharpProjectPackage(string directoryName, string identity)
+        => TemplateFixtures.WriteProjectPackage(Path.Combine(_root, directoryName), identity, "C#");
+
+    private async Task<Templater> CreateCsharpProjectTemplaterAsync()
+    {
+        await TemplateFixtures.InstallAsync(CsharpProjectPackage("csharp", "Func.Tests.CSharp"), _hive);
+        return CreateTemplater();
+    }
+
     private Templater CreateTemplater() => new(Context(), _hive, []);
 
     private interface ITestComponent : IIdentifiedComponent
     {
     }
 
-    private sealed class TestComponent : ITestComponent, IIdentifiedComponent
+    private sealed class TestComponent : ITestComponent
     {
         public Guid Id { get; } = Guid.NewGuid();
     }

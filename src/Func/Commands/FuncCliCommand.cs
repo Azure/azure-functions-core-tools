@@ -30,6 +30,12 @@ internal abstract class FuncCliCommand : Command
     /// </summary>
     public PathArgument? PathArgument { get; private set; }
 
+    /// <summary>
+    /// Hidden argument that captures template-specific tokens after <see cref="PathArgument"/>; set only when
+    /// <see cref="AddPathArgument(bool)"/> is called with <c>captureTemplateArguments</c>.
+    /// </summary>
+    public TemplateArgumentsArgument? TemplateArgumentsArgument { get; private set; }
+
     protected FuncCliCommand(string name, string description) : base(name, description)
     {
         SetAction(ExecuteAsync);
@@ -116,10 +122,19 @@ internal abstract class FuncCliCommand : Command
     /// Adds the optional [path] argument to this command. Call from the constructor
     /// of commands that operate on a project directory.
     /// </summary>
-    protected void AddPathArgument()
+    /// <param name="captureTemplateArguments">
+    /// Keeps undeclared options in <see cref="TemplateArgumentsArgument"/> instead of reporting them as parse errors.
+    /// </param>
+    protected void AddPathArgument(bool captureTemplateArguments = false)
     {
-        PathArgument = new PathArgument();
+        PathArgument = new PathArgument(captureTemplateArguments);
         Arguments.Add(PathArgument);
+
+        if (captureTemplateArguments)
+        {
+            TemplateArgumentsArgument = new TemplateArgumentsArgument();
+            Arguments.Add(TemplateArgumentsArgument);
+        }
     }
 
     /// <summary>
