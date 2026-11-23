@@ -253,13 +253,42 @@ Additional templates, such as Service Bus, SDK- or service-specific, partner, an
 
 ### Future standalone template packages
 
-The current design direction is a dedicated `func templates` experience for listing, installing, uninstalling, and managing independently packaged templates, rather than the historical `func new install/update/uninstall` proposal. No such commands are implemented. The exact command surface, acquisition flow, search, source and version selection, and update, downgrade, rollback, and other lifecycle semantics remain separate design work.
+The proposed [`func templates search/install/uninstall` design](package-management.md)
+manages independently packaged templates rather than using the historical
+`func new install/update/uninstall` command family. No such commands are
+implemented. The NuGet catalog, package lifecycle, and CLI integration are later
+layers; this documentation alone changes no CLI behavior.
+
+In that proposed implementation, `Templater` would expose engine primitives for
+listing and managed package operations. `TemplatePackageService` would
+orchestrate package validation and transactional mutation, and
+`TemplateHiveTransaction` would own snapshot and recovery. As with workload
+operations, template package operations would not coordinate concurrent CLI
+processes that share a func home.
+
+Package acquisition would use ambient `NuGet.Config` sources and an optional
+additional feed selected by `--source` or `FUNC_CLI_TEMPLATES_SOURCE`, filtering
+HTTP feeds. The CLI would download the exact version to a temporary directory
+and verify it in-process without requiring the .NET SDK. Integrity and configured
+trusted signers would always be enforced; certificate-chain trust would follow
+NuGet's `signatureValidationMode`. The engine's built-in NuGet installer would
+copy the local `.nupkg` into the hive, allowing temporary-download cleanup.
+Validation of the installed archive would precede transaction commit; failures
+would restore the previous hive. The engine would record a local NuGet package
+without `NuGetSource`; package identity and version alone would determine no-op
+or replacement behavior. There would be no separate installer.
+
+Standalone packages would share the func template hive and discovery path but
+remain separately owned from workload-provided roots. Template package uninstall
+must not remove workload content. Focused integration tests in the lifecycle
+layer must qualify cache refresh during install, replacement, and uninstall
+without a separate forced rebuild; those tests are not part of this docs layer.
 
 For a known NuGet package ID, the future CLI command delegates acquisition and lifecycle operations to the engine's built-in managed provider in the same CLI hive. The engine retains and mounts the package archive, discovers its templates, and aggregates them with workload-provided roots. The CLI should not extract standalone packages into the workload store or require a fixed internal template layout.
 
 Managed-provider changes raise `TemplatePackagesChanged`; the engine refreshes its source list and checks/rebuilds the cache on subsequent discovery. Thus both acquisition paths feed one engine catalog, but only the workload installer owns workload payloads. A package can contain multiple templates; one package per authoring repository is the default publishing model, not an engine restriction.
 
-Remote indexing/search answers which packages could be installed. It is separate from the local cache and is not required for installation by known package ID. Functions package-type validation, allowed feeds, source/version UX, and failure handling must be settled before enabling standalone management commands; they are not new infrastructure in this slice.
+Remote indexing/search answers which packages could be installed. It is separate from the local cache and is not required for installation by known package ID. The package-management proposal defines Functions package-type validation, allowed feeds, source/version UX, and failure handling; these requirements must be implemented and qualified before enabling standalone management commands. They are not new infrastructure in this slice.
 
 <a id="normative-authority"></a>
 
@@ -273,7 +302,7 @@ This document defines the proposed initial contract. Archived task lists are not
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
 | Engine integration | Retain host context, engine metadata, native duplicate precedence, func-host aliases and exact invocation. Blanket duplicate-ID rejection, projection-driven conditional evaluation and full-ID widening are superseded. Richer grouping/selection frameworks and authored action plumbing are deferred. |
 | Constraints | Raw validation and fail-closed evaluation belong to the separate constraints increment. They do not block the initial constraint-free .NET/HTTP slice. Installer/update preflight and producer-specific rules are deferred with those workflows. |
-| Package lifecycle | `func templates` management and feed UX are deferred. The old `func new install/update/uninstall` command family is historical. Future standalone packages use the engine's managed provider and the existing hive; workload roots use the read-only workload provider. Replacement safety still needs qualification. |
+| Package lifecycle | The proposed `func templates search/install/uninstall` surface uses bounded search and ambient-plus-additional NuGet install feeds, with transactional validation and recovery. These commands are not yet available. Standalone packages use the engine's managed provider and existing hive; workload roots retain the read-only workload provider. Replacement safety must be qualified in the lifecycle layer. |
 | Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 

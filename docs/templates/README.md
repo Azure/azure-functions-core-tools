@@ -8,5 +8,8 @@ The first command slice targets .NET 10 isolated/C# with the workload-provided p
 
 - [Architecture](architecture.md) — current foundation, proposed design, and component responsibilities.
 - [Implementation](implementation.md) — existing infrastructure, remaining work, and validation.
+- [Template package management](package-management.md) — proposed `func templates`
+  search, install, and uninstall design, including the dedicated template feed;
+  these commands are not yet available.
 
 Earlier designs and investigations are preserved in the [archive](archive/). Their old command names, source-registration plans, helper inventories, and first-slice constraints are historical; use the current architecture and implementation pages rather than treating archived task lists as requirements.
