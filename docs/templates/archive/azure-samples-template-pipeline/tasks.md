@@ -2,15 +2,15 @@
 
 ## 1. Repository and Tooling Foundation
 
-- [ ] 1.1 Create the `func-templates` repository in `azfunc/internal` with `src/Quickstarts`, `src/Schema`, central tooling and test projects, and `eng/ci`.
+- [ ] 1.1 Create the `func-templates` repository in `azfunc/internal` with `src/SampleOnboarding`, `src/Schema`, central tooling and test projects, and `eng/ci`.
 - [ ] 1.2 Add dependency restore, build, test, and code-quality configuration for the central packaging tooling.
 - [ ] 1.3 Add shared typed models for onboarding entries, effective metadata, GitHub releases, package provenance, feed state, and per-release outcomes.
 - [ ] 1.4 Add dependency-injected boundaries for filesystem, GitHub API, source acquisition, TemplateEngine validation, NuGet packing, feeds, time, retries, and reporting.
 
 ## 2. Onboarding Schema and Loading
 
-- [ ] 2.1 Author `src/Schema/quickstart.schema.json` for schema version 1 with strict onboarding properties, defaults, formats, package prefix, repository owner, and license allowlist, and reject template metadata or project topology.
-- [ ] 2.2 Implement non-recursive ordinal scanning of `src/Quickstarts/*.yaml` and combine zero-or-more entries from each file into one logical manifest.
+- [ ] 2.1 Author `src/Schema/sample-onboarding.schema.json` for schema version 1 with strict onboarding properties, defaults, formats, package prefix, repository owner, and license allowlist, and reject template metadata or project topology.
+- [ ] 2.2 Implement non-recursive ordinal scanning of `src/SampleOnboarding/*.yaml` and combine zero-or-more entries from each file into one logical manifest.
 - [ ] 2.3 Implement schema validation with file, entry, property, and source-location diagnostics.
 - [ ] 2.4 Resolve defaults for enablement, prerelease policy, and license.
 - [ ] 2.5 Implement canonical GitHub repository URL construction.

@@ -2,12 +2,12 @@
 
 ## Why
 
-Azure-Samples quickstart repositories are independently released source repositories, but the Azure Functions CLI template system consumes versioned `FuncTemplate` NuGet packages. A centrally managed supply pipeline is needed to onboard eligible repositories, detect new releases, convert immutable release snapshots into safe template packages, and publish those packages without requiring each sample repository to own packaging infrastructure.
+Azure-Samples repositories, including QuickStart and connector samples, release independently, but the Azure Functions CLI template system consumes versioned `FuncTemplate` NuGet packages. A centrally managed supply pipeline is needed to onboard eligible repositories, detect new releases, convert immutable release snapshots into safe template packages, and publish those packages without requiring each sample repository to own packaging infrastructure.
 
 ## What Changes
 
 - Establish `https://dev.azure.com/azfunc/internal/_git/func-templates` as the control-plane repository for Azure-Samples template packaging.
-- Add PR-reviewed onboarding sources under `src/Quickstarts/*.yaml` plus centrally owned onboarding and synthesis-descriptor schemas under `src/Schema/`.
+- Add PR-reviewed onboarding sources under `src/SampleOnboarding/*.yaml` plus centrally owned onboarding and synthesis-descriptor schemas under `src/Schema/`.
 - Add `eng/ci/validate-onboarding.yaml` to validate every onboarding file and enforce repository-wide onboarding uniqueness.
 - Add `eng/ci/publish-releases.yaml` to scan onboarded GitHub repositories daily for eligible releases.
 - Require published releases to use `v` followed by SemVer 2.0, support prereleases only through explicit opt-in, and use a required minimum version as the initial backfill boundary.
@@ -24,7 +24,7 @@ Azure-Samples quickstart repositories are independently released source reposito
 
 ### New Capabilities
 
-- `azure-samples-template-pipeline`: PR-based repository onboarding, GitHub release discovery, safe template synthesis and packaging, staged approval, and NuGet.org publication for Azure-Samples quickstarts.
+- `azure-samples-template-pipeline`: PR-based repository onboarding, GitHub release discovery, safe template synthesis and packaging, staged approval, and NuGet.org publication for approved Azure-Samples repositories.
 
 ### Modified Capabilities
 
