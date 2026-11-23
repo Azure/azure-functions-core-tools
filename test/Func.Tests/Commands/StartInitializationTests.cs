@@ -885,7 +885,7 @@ public class StartInitializationTests : IDisposable
     {
         using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        await using var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
@@ -894,29 +894,41 @@ public class StartInitializationTests : IDisposable
         for (int i = 1; i <= 12; i++)
         {
             await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"entry {i:00}", FunctionsProjectReportSeverity.Info), CancellationToken.None);
+            if (i == 10)
+            {
+                // Ensure the transcript contains an earlier frame with entries that will leave the tail.
+                await WaitForFrameAsync(writer, frame => frame.Contains("10 lines", StringComparison.Ordinal));
+            }
         }
 
-        await WaitForOutputAsync(writer, output => output.Contains("entry 12", StringComparison.Ordinal));
-        string runningOutput = writer.ToString();
+        string runningOutput = await WaitForFrameAsync(writer, frame => frame.Contains("12 lines", StringComparison.Ordinal));
 
         runningOutput.Should().Contain("running npm install");
+        runningOutput.Should().Contain("12 lines");
         runningOutput.Should().NotContain("entry 01");
         runningOutput.Should().NotContain("entry 02");
-        runningOutput.Should().Contain("entry 03");
-        runningOutput.Should().Contain("entry 12");
+        int previousEntryIndex = -1;
+        for (int i = 3; i <= 12; i++)
+        {
+            string entry = $"entry {i:00}";
+            int entryIndex = runningOutput.IndexOf(entry, StringComparison.Ordinal);
+            entryIndex.Should().BeGreaterThan(previousEntryIndex);
+            runningOutput.Split(entry, StringSplitOptions.None).Length.Should().Be(2);
+            previousEntryIndex = entryIndex;
+        }
 
         await renderer.OnEventAsync(new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, "prepare", "ready"), CancellationToken.None);
-        await WaitForOutputAsync(writer, output => output.Contains("ready", StringComparison.Ordinal));
+        await WaitForFrameAsync(writer, frame => frame.Contains("ready", StringComparison.Ordinal));
         await renderer.OnEventAsync(new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, CreateResult()), CancellationToken.None);
         await renderer.DisposeAsync();
 
-        string completedOutput = writer.ToString();
+        string completedTranscript = writer.ToString();
+        string completedOutput = GetLatestFrame(completedTranscript);
         completedOutput.Should().Contain("ready");
-
-        // On success the log area collapses entirely. The old collapsed summary row was the only place a
-        // line count was followed by an ellipsis ("N lines…"), so its absence guards the full collapse.
+        completedOutput.Should().NotContain("entry ");
+        completedOutput.Should().NotContain("lines");
         string ellipsis = console.Profile.Capabilities.Unicode ? "\u2026" : "...";
-        completedOutput.Should().NotContain($"lines{ellipsis}");
+        completedTranscript.Should().NotContain($"lines{ellipsis}");
     }
 
     [Fact]
@@ -924,7 +936,7 @@ public class StartInitializationTests : IDisposable
     {
         using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        await using var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
@@ -934,11 +946,10 @@ public class StartInitializationTests : IDisposable
             await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"line {i}", FunctionsProjectReportSeverity.Info), CancellationToken.None);
         }
 
-        await WaitForOutputAsync(writer, output => output.Contains("3 lines", StringComparison.Ordinal));
+        string output = await WaitForFrameAsync(writer, frame => frame.Contains("3 lines", StringComparison.Ordinal));
 
         await renderer.DisposeAsync();
 
-        string output = writer.ToString();
         output.Should().Contain("3 lines");
         output.Should().Contain("line 3");
     }
@@ -973,21 +984,23 @@ public class StartInitializationTests : IDisposable
     {
         using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        await using var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "error tail", FunctionsProjectReportSeverity.Error), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationStepFailedEvent(DateTimeOffset.UnixEpoch, "prepare", "build failed"), CancellationToken.None);
-        await WaitForOutputAsync(writer, output => output.Contains("build failed", StringComparison.Ordinal)
-            && output.Contains("error tail", StringComparison.Ordinal));
+        await WaitForFrameAsync(writer, frame => frame.Contains("build failed", StringComparison.Ordinal)
+            && frame.Contains("error tail", StringComparison.Ordinal)
+            && frame.Contains("1 line", StringComparison.Ordinal));
         await renderer.DisposeAsync();
 
-        string output = writer.ToString();
+        string output = GetOutputAfterLastCursorRestore(writer.ToString());
 
         output.Should().Contain("build failed");
         output.Should().Contain("error tail");
+        output.Should().Contain("1 line");
         output.Should().NotContain("1 lines");
     }
 
@@ -1183,7 +1196,27 @@ public class StartInitializationTests : IDisposable
             Out = new TestTerminalOutput(writer),
         });
 
-    private static async Task WaitForOutputAsync(StringWriter writer, Func<string, bool> predicate)
+    private static string GetLatestFrame(string output)
+    {
+        int frameStart = output.LastIndexOf("Azure Functions CLI", StringComparison.Ordinal);
+        return frameStart < 0 ? string.Empty : output[frameStart..];
+    }
+
+    private static string GetOutputAfterLastCursorRestore(string output)
+    {
+        const string cursorRestore = "\u001b[?25h";
+        int liveDisplayEnd = output.LastIndexOf(cursorRestore, StringComparison.Ordinal);
+        return liveDisplayEnd < 0 ? string.Empty : output[(liveDisplayEnd + cursorRestore.Length)..];
+    }
+
+    private static async Task<string> WaitForFrameAsync(StringWriter writer, Func<string, bool> predicate)
+    {
+        // Return the matching snapshot: a second read could observe a partially written redraw.
+        string output = await WaitForOutputAsync(writer, output => predicate(GetLatestFrame(output)));
+        return GetLatestFrame(output);
+    }
+
+    private static async Task<string> WaitForOutputAsync(StringWriter writer, Func<string, bool> predicate)
     {
         string output = string.Empty;
         for (int attempt = 0; attempt < 20; attempt++)
@@ -1191,13 +1224,14 @@ public class StartInitializationTests : IDisposable
             output = writer.ToString();
             if (predicate(output))
             {
-                return;
+                return output;
             }
 
             await Task.Delay(100);
         }
 
         predicate(output).Should().BeTrue($"Expected output condition was not met. Output: {output}");
+        return output;
     }
 
     private static DemoStartInitializationRunner CreateRunner(
