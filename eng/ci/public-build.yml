@@ -65,22 +65,13 @@ extends:
           - template: /eng/ci/templates/steps/setup-dependencies.yml@self
             parameters:
               sign: false
-          - task: DotNetCoreCLI@2
+          - script: dotnet restore test/Func.Tests/Func.Tests.csproj
             displayName: Restore terminal tests
-            inputs:
-              command: custom
-              custom: restore
-              projects: test/Func.Tests/Func.Tests.csproj
-          - task: DotNetCoreCLI@2
+          - script: >-
+              dotnet test test/Func.Tests/Func.Tests.csproj -c Release --no-restore -p:CI=true
+              --report-azdo --publish-azdo-test-results
+              --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
             displayName: Qualify native input and dashboard lifecycle
-            inputs:
-              command: test
-              projects: test/Func.Tests/Func.Tests.csproj
-              arguments: >-
-                -c Release --no-restore -p:CI=true
-                --report-azdo --publish-azdo-test-results
-                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
-              publishTestResults: false
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -92,22 +83,13 @@ extends:
               sign: false
           - bash: python3 --version
             displayName: Verify Unix PTY harness prerequisite
-          - task: DotNetCoreCLI@2
+          - script: dotnet restore test/Func.Tests/Func.Tests.csproj
             displayName: Restore terminal tests
-            inputs:
-              command: custom
-              custom: restore
-              projects: test/Func.Tests/Func.Tests.csproj
-          - task: DotNetCoreCLI@2
+          - script: >-
+              dotnet test test/Func.Tests/Func.Tests.csproj -c Release --no-restore -p:CI=true
+              --report-azdo --publish-azdo-test-results
+              --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
             displayName: Qualify native Unix input and job control
-            inputs:
-              command: test
-              projects: test/Func.Tests/Func.Tests.csproj
-              arguments: >-
-                -c Release --no-restore -p:CI=true
-                --report-azdo --publish-azdo-test-results
-                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~RunInvocationPolicyTests|FullyQualifiedName~ProcessRunnerTests"
-              publishTestResults: false
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)

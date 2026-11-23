@@ -13,7 +13,5 @@ extends:
   parameters:
     public: ${{ parameters.public }}
     folder: workloads/powershell-worker
-    # This build has no test projects.
-    run_tests: false
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Workers/PowerShell/Workloads.Workers.PowerShell.csproj
