@@ -1,0 +1,17 @@
+<Project>
+
+  <Target Name="DetectTestProjects">
+    <MSBuild Projects="@(ProjectReference)" Targets="_GetTestProjectStatus" BuildInParallel="true">
+      <Output TaskParameter="TargetOutputs" ItemName="_TestProjects" />
+    </MSBuild>
+
+    <PropertyGroup>
+      <_HasTestProjects Condition="'@(_TestProjects)' != ''">true</_HasTestProjects>
+      <_HasTestProjects Condition="'$(_HasTestProjects)' == ''">false</_HasTestProjects>
+    </PropertyGroup>
+
+    <Message Importance="High" Text="Found @(_TestProjects->Count()) test project(s)." />
+    <Message Importance="High" Condition="'$(TF_BUILD)' == 'true' AND '$(OutputVariable)' != ''" Text="##vso[task.setvariable variable=$(OutputVariable)]$(_HasTestProjects)" />
+  </Target>
+
+</Project>

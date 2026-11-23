@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.CompilerServices;
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Console.Clipboard;
@@ -45,7 +47,8 @@ public class MacClipboardSmokeTests
 
     private sealed class MacClipboardTheoryAttribute : TheoryAttribute
     {
-        public MacClipboardTheoryAttribute()
+        public MacClipboardTheoryAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1)
+            : base(sourceFilePath, sourceLineNumber)
         {
             if (!OperatingSystem.IsMacOS())
             {

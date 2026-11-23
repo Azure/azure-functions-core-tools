@@ -14,4 +14,10 @@
 
   <Import Project="$(MSBuildThisFileDirectory)Workloads/Workload.targets" Condition="'$(PackAsWorkload)' == 'true'" />
 
+  <Target Name="_GetTestProjectStatus" Returns="@(_TestProjectStatus)">
+    <ItemGroup>
+      <_TestProjectStatus Include="$(MSBuildProjectFullPath)" Condition="'$(IsTestingPlatformApplication)' == 'true'" />
+    </ItemGroup>
+  </Target>
+
 </Project>

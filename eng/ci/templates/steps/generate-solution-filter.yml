@@ -1,0 +1,46 @@
+# Selects a single solution for the given projects and stores its path in the specified variable.
+# A single .sln, .slnx, or .slnf is used as-is; otherwise a solution filter is generated from the parent solution.
+parameters:
+- name: projects
+  type: string
+- name: variable
+  type: string
+- name: parentSolution
+  type: string
+  default: Azure.Functions.Cli.slnx
+
+steps:
+- pwsh: |
+    $ErrorActionPreference = 'Stop'
+    $projects = @($env:PROJECTS -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($projects.Count -eq 0) {
+      throw 'No projects were provided.'
+    }
+
+    if ($projects.Count -eq 1 -and [IO.Path]::GetExtension($projects[0]) -in '.sln', '.slnx', '.slnf') {
+      $solution = (Resolve-Path -LiteralPath $projects[0]).Path
+    } else {
+      $parent = (Resolve-Path -LiteralPath $env:PARENT_SOLUTION).Path
+      $solution = Join-Path $env:AGENT_TEMPDIRECTORY 'azure-functions-build.slnf'
+      $projectPaths = @($projects | ForEach-Object { (Resolve-Path -LiteralPath $_).Path })
+      dotnet new slnf -n azure-functions-build -o $env:AGENT_TEMPDIRECTORY -s $parent --force
+      if ($LASTEXITCODE -ne 0) { throw 'Failed to create solution filter.' }
+      dotnet sln $solution add @projectPaths
+      if ($LASTEXITCODE -ne 0) { throw 'Failed to add projects to solution filter.' }
+
+      # 'dotnet sln add' exits 0 even when a project is absent from the parent solution.
+      # The filter stores backslash-separated paths on every OS, so normalize them before resolving on Linux.
+      $filter = Get-Content -LiteralPath $solution -Raw | ConvertFrom-Json
+      $included = @($filter.solution.projects | ForEach-Object { [IO.Path]::GetFullPath(($_ -replace '\\', '/'), (Split-Path -Parent $parent)) })
+      foreach ($project in $projectPaths) {
+        if ($project -notin $included) {
+          throw "Project '$project' is not in the parent solution."
+        }
+      }
+    }
+    Write-Host "##vso[task.setvariable variable=$env:OUTPUT_VARIABLE]$solution"
+  displayName: Select build solution
+  env:
+    PROJECTS: ${{ parameters.projects }}
+    OUTPUT_VARIABLE: ${{ parameters.variable }}
+    PARENT_SOLUTION: ${{ parameters.parentSolution }}

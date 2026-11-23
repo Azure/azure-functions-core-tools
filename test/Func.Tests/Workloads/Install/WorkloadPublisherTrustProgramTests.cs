@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Install;
 

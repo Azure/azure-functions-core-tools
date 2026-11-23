@@ -327,5 +327,9 @@ dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA2208.severity = none
 dotnet_diagnostic.xUnit1000.severity = none
 
+[test/**/*.cs]
+# Enforce test cancellation-token propagation in a follow-up PR.
+dotnet_diagnostic.xUnit1051.severity = suggestion
+
 [**/generated/**/*.cs]
 dotnet_analyzer_diagnostic.severity = none
