@@ -1,4 +1,4 @@
-> **MIXED: implemented listing infrastructure and historical command design.** The positional template, `--path`, upward search, public dry-run and lifecycle grammar below are not the current command contract; projected requiredness/defaults do not evaluate conditional engine parameters. See [Templates Architecture](../../README.md) and the [Phase 6 authority map](../../architecture.md#normative-authority). `func new` retains `[path]`/`--format` and its unavailable migration handler; first-run setup may complete before that handler.
+> **HISTORICAL command design with retained discovery infrastructure.** The separate session abstraction and catalog/parameter projections described below were removed. The positional template, `--path`, upward search, public dry-run and lifecycle grammar are not the current command contract. See [Templates Architecture](../../README.md) and [scope](../../architecture.md#normative-authority). `func new` retains `[path]`/`--format`, skips first-run setup, and reports generation/listing unavailable.
 
 ## Context
 

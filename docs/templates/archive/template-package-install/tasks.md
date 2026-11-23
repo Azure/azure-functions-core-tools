@@ -1,4 +1,4 @@
-> **DEFERRED historical lifecycle checklist, not first-slice instructions.** Factory/session infrastructure already exists; new lifecycle commands, package acquisition, locking and replacement transactions below await separate approval. Production local registration is a distinct unresolved installer step. [Templates Architecture](../../README.md) links to the proposed contract; all package-safety tasks and checkboxes are preserved.
+> **DEFERRED historical lifecycle checklist, not first-slice instructions.** The factory and command-scoped `Templater` exist; new lifecycle commands, package acquisition, locking and replacement transactions below await separate approval. .NET workload template packaging under `content/templates` and `templateRoot` emission were implemented later through #5936/#5938. Remaining package-safety tasks and checkboxes are preserved as historical proposals or deferred standalone lifecycle work. Workload template roots are exposed through a read-only provider, not a separate hive-registration step. [Templates Architecture](../../README.md) links to the current contract.
 
 ## 1. TemplateEngine Boundary Foundation
 
