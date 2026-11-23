@@ -29,8 +29,9 @@ steps:
       if ($LASTEXITCODE -ne 0) { throw 'Failed to add projects to solution filter.' }
 
       # 'dotnet sln add' exits 0 even when a project is absent from the parent solution.
+      # The filter stores backslash-separated paths on every OS, so normalize them before resolving on Linux.
       $filter = Get-Content -LiteralPath $solution -Raw | ConvertFrom-Json
-      $included = @($filter.solution.projects | ForEach-Object { [IO.Path]::GetFullPath($_, (Split-Path -Parent $parent)) })
+      $included = @($filter.solution.projects | ForEach-Object { [IO.Path]::GetFullPath(($_ -replace '\\', '/'), (Split-Path -Parent $parent)) })
       foreach ($project in $projectPaths) {
         if ($project -notin $included) {
           throw "Project '$project' is not in the parent solution."
