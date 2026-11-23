@@ -2,8 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
-using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Update;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

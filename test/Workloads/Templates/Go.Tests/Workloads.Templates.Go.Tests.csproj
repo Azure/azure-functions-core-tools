@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(TestRoot)Helpers/Templates/TestHelpers.Templates.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Templates/Go/Workloads.Templates.Go.csproj"
+                      ReferenceOutputAssembly="false"
+                      TargetPathPrefix="content/templates" />
+  </ItemGroup>
+
+</Project>

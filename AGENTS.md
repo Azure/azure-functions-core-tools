@@ -3,7 +3,7 @@
 ## Repository Overview
 
 Azure Functions Core Tools v5 CLI — rebuilt with **System.CommandLine**,
-**Spectre.Console**, and **.NET 10** using a workload-based extensibility model
+**Spectre.Console**, and **.NET 11** using a workload-based extensibility model
 (similar to `dotnet` CLI workloads).
 
 **This repo ships a CLI.** The user's terminal is the only entry point: design
@@ -214,7 +214,7 @@ we don't read app-style settings files.
 
 ### Testing stack
 
-- **xUnit** + **NSubstitute** for unit tests. Use **AwesomeAssertions** for
+- **xUnit v3** (on Microsoft.Testing.Platform) + **NSubstitute** for unit tests. Use **AwesomeAssertions** for
   fluent assertions (the maintained fork of FluentAssertions, which moved to a
   paid licence). No MSTest, no Moq, no FluentAssertions.
 - Common test packages are enforced by `test/Directory.Build.props`, don't
@@ -297,7 +297,7 @@ task matches:
 dotnet restore                    # Restore NuGet packages
 dotnet build                      # Build all projects
 dotnet test                       # Run all tests
-dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
+dotnet test --filter-class "*ClassName"  # Run specific tests (VSTest --filter also works)
 ```
 
 ## Project Conventions

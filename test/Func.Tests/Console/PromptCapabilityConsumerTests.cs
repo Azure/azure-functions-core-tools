@@ -44,7 +44,8 @@ public class PromptCapabilityConsumerTests
 
         try
         {
-            int result = await command.Parse([directory, "--stack", "node"]).InvokeAsync();
+            int result = await command.Parse([directory, "--stack", "node"]).InvokeAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
 
             if (input && stdoutAnsi && stderrAnsi)
             {
@@ -56,7 +57,10 @@ public class PromptCapabilityConsumerTests
             {
                 result.Should().Be(1);
                 stderr.Output.Should().Contain("--language <javascript|typescript>");
-                await initializer.DidNotReceiveWithAnyArgs().InitializeAsync(default!, default!, default);
+                await initializer.DidNotReceiveWithAnyArgs().InitializeAsync(
+                    default!,
+                    default!,
+                    TestContext.Current.CancellationToken);
                 Directory.GetFileSystemEntries(directory).Should().BeEmpty();
                 stderr.Reads.Should().Be(0);
             }
@@ -83,7 +87,7 @@ public class PromptCapabilityConsumerTests
 
         (await coordinator.EnsureFirstRunPromptedAsync("unknown", new RootCommand().Parse([]), CancellationToken.None)).Should().BeNull();
 
-        await setup.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        await setup.DidNotReceiveWithAnyArgs().RunAsync(default!, TestContext.Current.CancellationToken);
         if (input && stdoutAnsi && stderrAnsi)
         {
             stdout.Reads.Should().Be(2);
@@ -93,8 +97,8 @@ public class PromptCapabilityConsumerTests
         {
             stdout.Reads.Should().Be(0);
             stdout.Output.Should().BeEmpty();
-            await store.DidNotReceiveWithAnyArgs().GetStateAsync(default);
-            await store.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+            await store.DidNotReceiveWithAnyArgs().GetStateAsync(TestContext.Current.CancellationToken);
+            await store.DidNotReceiveWithAnyArgs().MarkCompleteAsync(TestContext.Current.CancellationToken);
         }
     }
 

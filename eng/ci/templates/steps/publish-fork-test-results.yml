@@ -1,0 +1,15 @@
+parameters:
+- name: condition
+  type: string
+  default: succeededOrFailed()
+
+steps:
+- ${{ if eq(variables['System.PullRequest.IsFork'], 'true') }}:
+  - task: PublishTestResults@2
+    displayName: Publish fork test results
+    condition: ${{ parameters.condition }}
+    inputs:
+      testResultsFormat: VSTest
+      testResultsFiles: '**/*.trx'
+      searchFolder: $(Agent.TempDirectory)/TestResults
+      failTaskOnMissingResultsFile: true

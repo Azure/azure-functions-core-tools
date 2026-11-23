@@ -49,7 +49,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources, ILogge
         ArgumentNullException.ThrowIfNull(snapshots);
 
         List<ProfileDefinitionEntry> entries = [];
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (ProfileSourceSnapshot snapshot in snapshots)
         {
             if (sourceKinds is not null && !sourceKinds.Contains(snapshot.Source.Kind))
@@ -97,7 +97,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources, ILogge
         ProfileDefinitionEntry resolvedEntry = ResolveDefinitionEntry(entry, snapshots, []);
         VersionRange hostVersionRange = ParseRequiredRange(resolvedEntry.Definition.Host?.Version, resolvedEntry.Name, "host.version");
 
-        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerRanges = [with(StringComparer.OrdinalIgnoreCase)];
         if (resolvedEntry.Definition.Workers is { } workers)
         {
             foreach ((string runtime, ProfileWorkerConstraint? constraint) in workers)

@@ -38,7 +38,8 @@ public class PythonProjectFactoryTests : IDisposable
     [Fact]
     public async Task Empty_directory_does_not_match()
     {
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>()
             .Which.Reason.Should().Be("no Python project fingerprint found");
@@ -49,7 +50,8 @@ public class PythonProjectFactoryTests : IDisposable
     {
         DirectoryInfo missing = new(Path.Combine(_projectDir.FullName, "does-not-exist"));
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(missing), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(missing), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -64,7 +66,8 @@ public class PythonProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, string.Empty);
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.Created>();
     }
@@ -76,7 +79,8 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", "{}");
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -87,7 +91,8 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("go.mod", "module example");
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -103,7 +108,8 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, string.Empty);
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         created.Project.StackName.Should().Be("python");
@@ -122,7 +128,8 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("pyproject.toml", "[project]\nname = \"x\"\n");
         WriteFile("uv.lock", string.Empty);
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found pyproject.toml");
     }
@@ -134,7 +141,8 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("pyproject.toml", "[tool.poetry]\nname = \"x\"\n");
         WriteFile("poetry.lock", string.Empty);
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found pyproject.toml");
     }
@@ -145,7 +153,8 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("loose.py", "print('hi')");
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Contain("*.py");
     }
@@ -155,7 +164,8 @@ public class PythonProjectFactoryTests : IDisposable
     {
         WriteFile("host.json", "{}");
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -170,12 +180,13 @@ public class PythonProjectFactoryTests : IDisposable
         _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
             .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
 
-        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(
+            CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
-            default);
+            TestContext.Current.CancellationToken);
         workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>()
             .Which.Failure.Should().BeSameAs(failure);
     }

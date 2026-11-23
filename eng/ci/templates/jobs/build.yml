@@ -26,6 +26,7 @@ jobs:
 
   variables:
   - template: /eng/ci/templates/variables/build.yml@self
+  - template: /eng/ci/templates/variables/test-reporting.yml@self
   - name: pack_dir
     readonly: true
     value: $(Build.ArtifactStagingDirectory)/pkg
@@ -60,27 +61,32 @@ jobs:
       parameters:
         sign: ${{ parameters.sign }}
 
-    - task: DotNetCoreCLI@2
+    - template: /eng/ci/templates/steps/generate-solution-filter.yml@self
+      parameters:
+        projects: ${{ parameters.projects }}
+        variable: build_solution
+
+    - script: dotnet restore "$(build_solution)" -v m ${{ parameters.build_args }}
       displayName: Restore
-      inputs:
-        command: custom
-        custom: restore
-        projects: ${{ parameters.projects }}
-        arguments: -v m ${{ parameters.build_args }}
 
-    - task: DotNetCoreCLI@2
+    - script: >-
+        dotnet build "$(build_solution)" -t:DetectTestProjects -p:OutputVariable=has_test_projects -v:m -c ${{ parameters.configuration }} --no-restore
+      displayName: Detect test projects
+
+    - script: dotnet build "$(build_solution)" -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
       displayName: Build
-      inputs:
-        command: build
-        projects: ${{ parameters.projects }}
-        arguments: -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
 
-    - task: DotNetCoreCLI@2
+    - script: >-
+        dotnet test "$(build_solution)" -c ${{ parameters.configuration }} -v m --no-build
+        --report-azdo $(test_reporting_args) ${{ parameters.build_args }}
       displayName: Unit tests
-      inputs:
-        command: test
-        projects: ${{ parameters.projects }}
-        arguments: -c ${{ parameters.configuration }} --no-build ${{ parameters.build_args }}
+      condition: and(succeeded(), eq(variables.has_test_projects, 'true'))
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+    - template: /eng/ci/templates/steps/publish-fork-test-results.yml@self
+      parameters:
+        condition: and(succeededOrFailed(), eq(variables.has_test_projects, 'true'))
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       # Only sign the intermediate DLLs if we are packing.
@@ -97,22 +103,16 @@ jobs:
             !**/Azure.Functions.Cli*Tests.dll
 
     - ${{ if containsValue(parameters.artifacts, 'pack') }}:
-      - task: DotNetCoreCLI@2
+      - script: >-
+          dotnet pack "$(build_solution)" -c ${{ parameters.configuration }} -v m
+          -o "$(pack_dir)" --no-build ${{ parameters.build_args }}
         displayName: Pack
-        inputs:
-          command: custom
-          custom: pack
-          projects: ${{ parameters.projects }}
-          arguments: -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
 
     - ${{ if containsValue(parameters.artifacts, 'publish') }}:
-      - task: DotNetCoreCLI@2
+      - script: >-
+          dotnet build "$(build_solution)" -c ${{ parameters.configuration }} -v m --no-restore
+          -t:PublishAllRids "-p:AllRuntimesPublishRoot=$(publish_dir)" ${{ parameters.build_args }}
         displayName: Publish All Runtimes
-        inputs:
-          command: custom
-          custom: build
-          projects: ${{ parameters.projects }}
-          arguments: -c ${{ parameters.configuration }} -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
 
       - task: CopyFiles@2
         displayName: Copy files

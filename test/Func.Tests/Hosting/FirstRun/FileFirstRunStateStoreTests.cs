@@ -38,7 +38,7 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     [Fact]
     public async Task IsFirstRunAsync_ReturnsTrue_WhenMarkerMissingAndNoWorkloads()
     {
-        (await _store.IsFirstRunAsync()).Should().BeTrue();
+        (await _store.IsFirstRunAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
     }
 
     [Fact]
@@ -46,13 +46,13 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         WriteEmptyWorkloadRegistry();
 
-        (await _store.IsFirstRunAsync()).Should().BeFalse();
+        (await _store.IsFirstRunAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 
     [Fact]
     public async Task GetStateAsync_ReturnsNeverPrompted_WhenMarkerMissingAndNoWorkloads()
     {
-        (await _store.GetStateAsync()).Should().Be(FirstRunState.NeverPrompted);
+        (await _store.GetStateAsync(TestContext.Current.CancellationToken)).Should().Be(FirstRunState.NeverPrompted);
     }
 
     [Fact]
@@ -60,7 +60,8 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         await _store.MarkCompleteAsync(CancellationToken.None);
 
-        (await _store.GetStateAsync()).Should().Be(FirstRunState.MarkerWithoutWorkloads);
+        (await _store.GetStateAsync(
+            TestContext.Current.CancellationToken)).Should().Be(FirstRunState.MarkerWithoutWorkloads);
     }
 
     [Fact]
@@ -68,10 +69,12 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         WriteEmptyWorkloadRegistry();
 
-        (await _store.GetStateAsync()).Should().Be(FirstRunState.WorkloadsInstalled);
+        (await _store.GetStateAsync(
+            TestContext.Current.CancellationToken)).Should().Be(FirstRunState.WorkloadsInstalled);
 
         await _store.MarkCompleteAsync(CancellationToken.None);
-        (await _store.GetStateAsync()).Should().Be(FirstRunState.WorkloadsInstalled);
+        (await _store.GetStateAsync(
+            TestContext.Current.CancellationToken)).Should().Be(FirstRunState.WorkloadsInstalled);
     }
 
     [Fact]
@@ -79,7 +82,7 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         await _store.MarkCompleteAsync(CancellationToken.None);
 
-        (await _store.IsFirstRunAsync()).Should().BeFalse();
+        (await _store.IsFirstRunAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
         File.Exists(Path.Combine(_tempHome, FileFirstRunStateStore.MarkerFileName)).Should().BeTrue();
     }
 

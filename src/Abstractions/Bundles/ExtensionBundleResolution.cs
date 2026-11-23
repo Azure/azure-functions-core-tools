@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Bundles;
 /// Outcome of <see cref="IExtensionBundleResolver.ResolveAsync"/>.
 
 /// </summary>
-public abstract record ExtensionBundleResolution
+public closed record ExtensionBundleResolution
 {
     private ExtensionBundleResolution()
     {

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "HTTP" ],
+  "identity": "Azure.Functions.Cli.DotNet.HttpTrigger.CSharp",
+  "name": "Azure Functions HTTP trigger (C#)",
+  "description": "An HTTP trigger using ASP.NET Core integration.",
+  "shortName": "httptrigger",
+  "tags": {
+    "language": "C#",
+    "stack": "dotnet",
+    "type": "item"
+  },
+  "sourceName": "HttpFunction",
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "Company.Function",
+      "description": "The namespace for the function.",
+      "replaces": "FunctionNamespace"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "HttpFunction.cs" }
+  ],
+  "postActions": [
+    {
+      "description": "Add the ASP.NET Core HTTP extension package.",
+      "actionId": "B17581D1-C5C9-4489-8F0A-004BE667B814",
+      "continueOnError": false,
+      "args": {
+        "referenceType": "package",
+        "reference": "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore",
+        "version": "2.1.1",
+        "projectFileExtensions": ".csproj"
+      },
+      "manualInstructions": [
+        { "text": "Ensure the Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore package and Microsoft.AspNetCore.App framework is referenced by your project. Ensure Program.cs calls ConfigureFunctionsWebApplication()." }
+      ]
+    }
+  ]
+}

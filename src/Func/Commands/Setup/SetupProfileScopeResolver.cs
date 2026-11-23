@@ -94,7 +94,7 @@ internal sealed class SetupProfileScopeResolver(
     private static IReadOnlyList<string> NormalizeDistinct(IReadOnlyList<string> values)
     {
         List<string> result = [];
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (string value in values)
         {
             string? normalized = SetupRuntimes.NullIfWhiteSpace(value);

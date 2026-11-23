@@ -4,7 +4,6 @@
 using System.Text.Json;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
@@ -68,16 +67,6 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
-    public void CreateBuilder_RegistersTemplaterFactory()
-    {
-        var interaction = new TestInteractionService();
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
-        using ServiceProvider provider = builder.Services.BuildServiceProvider();
-
-        provider.GetRequiredService<ITemplaterFactory>().Should().BeOfType<TemplaterFactory>();
-    }
-
-    [Fact]
     public async Task CreateHostAsync_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
     {
         StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
@@ -110,6 +99,12 @@ public sealed class CliHostFactoryTests : IDisposable
         provider.GetContentWorkloads().Count.Should().Be(2);
         provider.GetWorkloads().Count.Should().Be(3);
         provider.GetContentWorkloads().Should().AllSatisfy(w => w.DisplayName.Should().Be(w.PackageId));
+        provider.GetContentWorkloads().Should().AllSatisfy(w =>
+        {
+            string packageRoot = Path.Combine(_home, "workloads", w.PackageId, w.PackageVersion);
+            w.InstallDirectory.Should().Be(packageRoot);
+            w.ContentRoot.Should().Be(Path.Combine(packageRoot, "tools", "any"));
+        });
     }
 
     [Fact]
@@ -130,6 +125,39 @@ public sealed class CliHostFactoryTests : IDisposable
         rootCommand.Subcommands.Should().NotContain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         interaction.Lines.Should().Contain(line => line.StartsWith("WARNING:", StringComparison.Ordinal)
             && line.Contains("func workload update", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("packageId")]
+    [InlineData("packageVersion")]
+    public async Task CreateHostAsync_IncompatibleRidWorkloadWithNullIdentityField_IsSkippedWithWarning(string nullField)
+    {
+        string packageId = nullField == "packageId" ? "null" : "\"incompatible.fixture\"";
+        string packageVersion = nullField == "packageVersion" ? "null" : "\"1.0.0\"";
+        Directory.CreateDirectory(_home);
+        File.WriteAllText(
+            Path.Combine(_home, WorkloadPathsOptions.WorkloadRegistryFileName),
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                {
+                  "packageId": {{packageId}},
+                  "packageVersion": {{packageVersion}},
+                  "runtimeIdentifier": "incompatible-{{Guid.NewGuid():N}}"
+                }
+              ]
+            }
+            """);
+
+        var interaction = new TestInteractionService();
+
+        using IHost host = await StartHostAsync(interaction);
+        var rootCommand = Parser.CreateCommand(host.Services);
+
+        rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "version", StringComparison.OrdinalIgnoreCase));
+        interaction.Lines.Should().Contain(line => line.StartsWith("WARNING:", StringComparison.Ordinal)
+            && line.Contains("targets runtime identifier", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -191,9 +219,9 @@ public sealed class CliHostFactoryTests : IDisposable
                 ["Workloads:Home"] = configHome,
             });
 
-            await builder.RegisterWorkloadsAsync();
+            await builder.RegisterWorkloadsAsync(cancellationToken: TestContext.Current.CancellationToken);
             using IHost host = builder.Build();
-            await host.StartAsync();
+            await host.StartAsync(TestContext.Current.CancellationToken);
 
             var rootCommand = Parser.CreateCommand(host.Services);
 

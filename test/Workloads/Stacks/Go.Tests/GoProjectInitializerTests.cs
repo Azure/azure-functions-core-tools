@@ -4,8 +4,8 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
@@ -200,7 +200,10 @@ public class GoProjectInitializerTests : IDisposable
         var root = new RootCommand();
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
-        await initializer.InitializeAsync(context, root.Parse("--skip-go-mod-tidy"));
+        await initializer.InitializeAsync(
+            context,
+            root.Parse("--skip-go-mod-tidy"),
+            TestContext.Current.CancellationToken);
         calls.Should().Be(0);
     }
 
@@ -219,7 +222,7 @@ public class GoProjectInitializerTests : IDisposable
         var root = new RootCommand();
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
-        await initializer.InitializeAsync(context, root.Parse(string.Empty));
+        await initializer.InitializeAsync(context, root.Parse(string.Empty), TestContext.Current.CancellationToken);
         calls.Should().Be(1);
     }
 

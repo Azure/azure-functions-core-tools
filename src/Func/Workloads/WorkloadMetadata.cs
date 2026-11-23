@@ -42,6 +42,12 @@ internal sealed class WorkloadMetadata
     public string? RuntimeIdentifier { get; init; }
 
     /// <summary>
+    /// Optional template directory relative to the physical package root.
+    /// Only runtime workloads may declare it.
+    /// </summary>
+    public string? TemplateRoot { get; set; }
+
+    /// <summary>
     /// Human-readable name for inventory and list output.
     /// </summary>
     public string DisplayName { get; init; } = string.Empty;

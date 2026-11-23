@@ -249,6 +249,15 @@ internal sealed class PythonFunctionsProject : FunctionsProject
             }
         }
 
+        string venvPython = GetVenvExecutablePath(venvPath, "python");
+        string? majorMinor = await ReadPythonVersion(venvPython, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(majorMinor) && !IsSupportedPythonVersion(majorMinor))
+        {
+            throw new GracefulException(
+                $"Python {majorMinor} is not supported. Install Python 3.10 or later and recreate the virtual environment.",
+                isUserError: true);
+        }
+
         string requirementsPath = Path.Combine(root, RequirementsFileName);
         if (File.Exists(requirementsPath))
         {
@@ -334,6 +343,9 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 
         context.EnvironmentVariables[WorkerRuntimeVersionEnvVar] = majorMinor;
     }
+
+    private static bool IsSupportedPythonVersion(string majorMinor)
+        => Version.TryParse(majorMinor, out Version? version) && version.Major == 3 && version.Minor >= 10;
 
     // Pick the venv to use, in priority order:
     //   1. $VIRTUAL_ENV (set by the `activate` script) so an explicitly-activated

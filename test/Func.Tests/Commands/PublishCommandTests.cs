@@ -23,7 +23,7 @@ public class PublishCommandTests
         var command = new PublishCommand(_interaction);
         var parseResult = command.Parse([]);
 
-        var exitCode = await parseResult.InvokeAsync();
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().NotBe(0);
         _interaction.AllOutput.Should().Contain("not supported in v5");
@@ -37,7 +37,7 @@ public class PublishCommandTests
         var command = new PublishCommand(_interaction);
         var parseResult = command.Parse(["myapp", "--slot", "staging"]);
 
-        var exitCode = await parseResult.InvokeAsync();
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         exitCode.Should().NotBe(0);
         _interaction.AllOutput.Should().Contain("not supported in v5");

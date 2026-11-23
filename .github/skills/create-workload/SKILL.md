@@ -31,7 +31,7 @@ Create the following files:
   <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-      <TargetFramework>net10.0</TargetFramework>
+      <TargetFramework>net11.0</TargetFramework>
       <Title><Name> Stack</Title>
       <Description>Azure Functions CLI tooling for <Name> projects.</Description>
       <PackAsWorkload>true</PackAsWorkload>
@@ -166,7 +166,7 @@ Mirror the source path under `test/Workloads/`: grouped workloads use
   <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-      <TargetFramework>net10.0</TargetFramework>
+      <TargetFramework>net11.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>

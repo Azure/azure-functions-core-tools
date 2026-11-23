@@ -57,7 +57,7 @@ public class PythonFunctionsProjectTests : IDisposable
         };
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         venvCreatedAt.Should().Be(Path.Combine(_projectDir.FullName, PythonFunctionsProject.DefaultVenvFolderName));
         pipUsed.Should().NotBeNull();
@@ -84,7 +84,7 @@ public class PythonFunctionsProjectTests : IDisposable
             ReadEnvironmentVariable = _ => null,
         };
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         venvCreated.Should().BeFalse();
     }
@@ -110,7 +110,7 @@ public class PythonFunctionsProjectTests : IDisposable
             ReadEnvironmentVariable = _ => null,
         };
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         pipRan.Should().BeFalse();
     }
@@ -150,7 +150,7 @@ public class PythonFunctionsProjectTests : IDisposable
             ReadEnvironmentVariable = name => name == PythonFunctionsProject.VirtualEnvEnvVar ? activatedVenv : null,
         };
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         uvSyncRan.Should().BeFalse();
         venvCreated.Should().BeFalse();
@@ -180,7 +180,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "created virtual environment");
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "venv warning");
@@ -244,6 +244,7 @@ public class PythonFunctionsProjectTests : IDisposable
     }
 
     [Theory]
+    [InlineData("3.10")]
     [InlineData("3.12")]
     [InlineData("3.15")]
     public async Task PrepareForHostRun_sets_worker_executable_path_and_runtime_version(string pythonVersion)
@@ -263,7 +264,7 @@ public class PythonFunctionsProjectTests : IDisposable
         };
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         string expectedExe = PythonFunctionsProject.GetVenvExecutablePath(
             Path.Combine(_projectDir.FullName, PythonFunctionsProject.DefaultVenvFolderName),
@@ -271,6 +272,37 @@ public class PythonFunctionsProjectTests : IDisposable
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Be(expectedExe);
         context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be(pythonVersion);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_rejects_unsupported_python_before_installing_requirements()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
+        bool pipInvoked = false;
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunCreateVenv = (_, path, _, _, _) =>
+            {
+                Directory.CreateDirectory(path);
+                return Task.FromResult(0);
+            },
+            RunPipInstall = (_, _, _, _, _, _) =>
+            {
+                pipInvoked = true;
+                return Task.FromResult(0);
+            },
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.9"),
+            ReadEnvironmentVariable = _ => null,
+        };
+        FunctionsProjectHostRunContext context = CreateContext();
+
+        GracefulException exception = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        exception.IsUserError.Should().BeTrue();
+        exception.Message.Should().Contain("Python 3.9 is not supported");
+        exception.Message.Should().Contain("Python 3.10 or later");
+        pipInvoked.Should().BeFalse();
     }
 
     [Fact]
@@ -290,7 +322,7 @@ public class PythonFunctionsProjectTests : IDisposable
         };
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerRuntimeVersionEnvVar).Should().BeFalse();
         context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerExecutablePathEnvVar).Should().BeTrue();
@@ -323,7 +355,7 @@ public class PythonFunctionsProjectTests : IDisposable
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         venvCreated.Should().BeFalse();
         pipUsed.Should().NotBeNull();
@@ -359,7 +391,7 @@ public class PythonFunctionsProjectTests : IDisposable
         };
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         venvCreated.Should().BeFalse();
         pipUsed.Should().NotBeNull();
@@ -382,7 +414,7 @@ public class PythonFunctionsProjectTests : IDisposable
         };
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         syncRoot.Should().Be(_projectDir.FullName);
         syncUv.Should().Be(FakeUvPath);
@@ -428,7 +460,7 @@ public class PythonFunctionsProjectTests : IDisposable
         project.ReadEnvironmentVariable = name => name == PythonFunctionsProject.UvProjectEnvironmentEnvVar ? configured : null;
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar]
             .Should().Be(PythonFunctionsProject.GetVenvExecutablePath(envPath, "python"));
@@ -445,7 +477,7 @@ public class PythonFunctionsProjectTests : IDisposable
         project.ReadEnvironmentVariable = name => name == PythonFunctionsProject.VirtualEnvEnvVar ? other : null;
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar]
             .Should().Be(PythonFunctionsProject.GetVenvExecutablePath(DefaultEnvPath, "python"));
@@ -479,7 +511,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         pipRan.Should().BeTrue();
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Warning
@@ -538,7 +570,7 @@ public class PythonFunctionsProjectTests : IDisposable
             ReadEnvironmentVariable = _ => null,
         };
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         pipRan.Should().BeTrue();
     }
@@ -598,7 +630,7 @@ public class PythonFunctionsProjectTests : IDisposable
         project.ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.15");
         FunctionsProjectHostRunContext context = CreateContext();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be("3.15");
     }
@@ -634,7 +666,7 @@ public class PythonFunctionsProjectTests : IDisposable
         context.Reporter = reporter;
         context.EnvironmentVariables[PythonFunctionsProject.WorkerDirectoryEnvVar] = workerDir;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be("3.17");
         reporter.Logs.Should().NotContain(e => e.Severity == FunctionsProjectReportSeverity.Warning);
@@ -670,7 +702,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be("3.16");
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Warning && e.Line.Contains("Python 3.16 is newer"));
@@ -687,7 +719,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerRuntimeVersionEnvVar).Should().BeFalse();
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Warning && e.Line.Contains("Could not determine the Python version"));
@@ -703,7 +735,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be("3.13");
         reporter.Logs.Should().NotContain(e => e.Severity == FunctionsProjectReportSeverity.Warning);
@@ -716,7 +748,7 @@ public class PythonFunctionsProjectTests : IDisposable
         CreateInterpreter(DefaultEnvPath);
         PythonFunctionsProject project = CreateUvProject(exportOutput: ExportContent);
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         File.ReadAllText(RequirementsPath).Should().Be(ExportContent);
     }
@@ -729,7 +761,7 @@ public class PythonFunctionsProjectTests : IDisposable
         File.WriteAllText(RequirementsPath, PythonFunctionsProject.UvExportHeader + " via the following command:\nold==1.0\n");
         PythonFunctionsProject project = CreateUvProject(exportOutput: ExportContent);
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         File.ReadAllText(RequirementsPath).Should().Be(ExportContent);
     }
@@ -744,7 +776,7 @@ public class PythonFunctionsProjectTests : IDisposable
         File.SetLastWriteTimeUtc(RequirementsPath, stamp);
         PythonFunctionsProject project = CreateUvProject(exportOutput: ExportContent);
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
 
         File.GetLastWriteTimeUtc(RequirementsPath).Should().Be(stamp);
     }
@@ -767,7 +799,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         exportRan.Should().BeFalse();
         File.ReadAllText(RequirementsPath).Should().Be(userContent);
@@ -785,7 +817,7 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
         File.Exists(RequirementsPath).Should().BeFalse();
         context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerExecutablePathEnvVar).Should().BeTrue();
@@ -805,7 +837,7 @@ public class PythonFunctionsProjectTests : IDisposable
             return Task.FromResult((0, ExportContent));
         };
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        await project.PrepareForHostRunAsync(CreateContext(), TestContext.Current.CancellationToken);
     }
 
     private const string FakeUvPath = "/fake/uv";

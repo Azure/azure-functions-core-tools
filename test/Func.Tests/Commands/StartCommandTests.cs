@@ -3,17 +3,22 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start;
+using Azure.Functions.Cli.Commands.Start.Azurite;
+using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Terminal;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -269,7 +274,9 @@ public class StartCommandTests : IDisposable
             + "--cors http://localhost,http://example --cors-credentials";
         var result = root.Parse(commandLine);
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         string[] expectedWarnings = outputMode == "compact"
@@ -297,6 +304,81 @@ public class StartCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task StartCommand_ManagedAzuriteReturns500_SuggestsRunCommand()
+    {
+        InMemoryHostEventStream source = new();
+        source.Write(new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Host.Process",
+            LogLevel.Information,
+            default,
+            "Status: 500 (Internal Server Error) Server: Azurite-Blob/3.35.0",
+            Exception: null,
+            HostLogEntry.EmptyAttributes));
+        source.Complete();
+        StartInitializationResult initializationResult = CreateInitializationResult(source) with
+        {
+            AzuritePaths = new AzuriteManagedPaths("azurite-data", "azurite.log")
+        };
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, services =>
+        {
+            services.AddSingleton(_cliVersionProvider);
+            services.AddSingleton(_initializationRunner);
+        });
+        var root = Parser.CreateCommand(services);
+
+        int exitCode = await root.Parse($"run \"{_tempDir}\" --format=plain")
+            .InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+                TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().Contain(line =>
+            line.Contains("Managed Azurite returned a 500", StringComparison.Ordinal)
+            && line.Contains("run 'func run' again", StringComparison.Ordinal));
+        _interaction.Lines.Should().NotContain(line => line.Contains("func start", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StartCommand_WhenStartupInputPreventsHandoff_FallsBackWithoutOpeningATerminal()
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        IInteractionService interaction = Substitute.For<IInteractionService>();
+        ITerminalSessionFactory factory = Substitute.For<ITerminalSessionFactory>();
+        interaction.IsInteractive.Returns(true);
+        interaction.Theme.Returns(new DefaultTheme());
+        interaction.CanUseFullScreen(factory).Returns(true, false);
+        _initializationRunner.RunAsync(Arg.Any<StartInitializationContext>(), Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>()).Returns(CreateInitializationResult(source));
+        IServiceProvider services = TestParser.BuildServiceProviderWith(interaction, collection =>
+        {
+            collection.AddSingleton(_cliVersionProvider);
+            collection.AddSingleton(_initializationRunner);
+            collection.AddSingleton(factory);
+        });
+        var root = Parser.CreateCommand(services);
+
+        int exitCode = await root.Parse($"run \"{_tempDir}\"").InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        interaction.Received().WriteWarning(
+            "Full-screen input is unavailable after initialization; continuing with --format=plain for this run.");
+        interaction.DidNotReceive().OpenFullScreen(Arg.Any<ITerminalSessionFactory>(), Arg.Any<CancellationToken>());
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context => context.Options.OutputMode == OutputMode.Compact),
+            Arg.Any<IStartInitializationRenderer>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task StartCommand_DemoSwitch_SetsDemoMode()
     {
         var source = new InMemoryHostEventStream();
@@ -318,7 +400,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain --demo");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         await _initializationRunner.Received(1).RunAsync(
@@ -350,7 +434,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         options.Received(1).Get(new DirectoryInfo(_tempDir).FullName);
@@ -385,7 +471,9 @@ public class StartCommandTests : IDisposable
         string projectDirectory = Environment.CurrentDirectory;
         var result = root.Parse($"start \"{projectDirectory}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         options.DidNotReceive().Get(Arg.Any<string>());
@@ -417,7 +505,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         TestFunctionsProject project = initializationResult.Project.Should().BeOfType<TestFunctionsProject>().Subject;
@@ -449,7 +539,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(11);
         TestFunctionsProject project = initializationResult.Project.Should().BeOfType<TestFunctionsProject>().Subject;
@@ -485,7 +577,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
-        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+        int exitCode = await result.InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+            TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().Contain("WARNING: Project cleanup failed: cleanup failed");

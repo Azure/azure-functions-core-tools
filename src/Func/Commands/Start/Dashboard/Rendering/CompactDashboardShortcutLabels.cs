@@ -8,16 +8,10 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// </summary>
 internal sealed class CompactDashboardShortcutLabels(IPlatform platform)
 {
-    private const string DefaultLogsNavigationControlLabel = "↑/↓, PgUp/PgDn logs";
-    private const string MacOSLogsNavigationControlLabel = "↑/↓, Fn+↑/↓ logs";
     private const string DefaultPageNavigationHelpKey = "PgUp/PgDn";
     private const string MacOSPageNavigationHelpKey = "Fn+↑/↓";
 
     private readonly IPlatform _platform = platform ?? throw new ArgumentNullException(nameof(platform));
-
-    public string LogsNavigationControlLabel => _platform.IsMacOS
-        ? MacOSLogsNavigationControlLabel
-        : DefaultLogsNavigationControlLabel;
 
     public string PageNavigationHelpKey => _platform.IsMacOS
         ? MacOSPageNavigationHelpKey

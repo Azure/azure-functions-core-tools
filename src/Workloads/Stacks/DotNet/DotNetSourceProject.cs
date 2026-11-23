@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
@@ -12,7 +13,7 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// A .NET Functions project detected from source (has a .csproj/.fsproj).
 /// Requires building before host startup.
 /// </summary>
-internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory)
+internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirectory, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory)
 {
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
@@ -49,6 +50,39 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         // while output-path lookups remain silent on success.
         string resultFile = Path.Combine(Path.GetTempPath(), $"func-dotnet-build-{Guid.NewGuid():N}.json");
         List<string> arguments = ["build", ProjectFilePath, $"--getTargetResult:{targetName}", $"--getResultOutputFile:{resultFile}"];
+        object diagnosticGate = new();
+        List<string> diagnostics = [];
+        HashSet<string> seenDiagnostics = [];
+        bool msbuildCrashed = false;
+
+        void WriteBuildLog(string line, FunctionsProjectReportSeverity severity)
+        {
+            // stdout and stderr callbacks can run concurrently.
+            lock (diagnosticGate)
+            {
+                msbuildCrashed |= line.Contains("Unhandled exception", StringComparison.OrdinalIgnoreCase);
+
+                Match match = BuildErrorRegex().Match(line);
+                if (match.Success)
+                {
+                    string code = match.Groups["code"].Value;
+                    if (code.Equals("MSB1025", StringComparison.OrdinalIgnoreCase))
+                    {
+                        msbuildCrashed = true;
+                    }
+                    else
+                    {
+                        string diagnostic = line.Trim();
+                        if (seenDiagnostics.Add(diagnostic))
+                        {
+                            diagnostics.Add(diagnostic);
+                        }
+                    }
+                }
+            }
+
+            reporter.WriteLog(line, severity);
+        }
 
         try
         {
@@ -63,8 +97,8 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
                     await _dotnetCli.RunStreamingAsync(
                         arguments,
                         projectDir,
-                        line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-                        line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                        line => WriteBuildLog(line, FunctionsProjectReportSeverity.Info),
+                        line => WriteBuildLog(line, FunctionsProjectReportSeverity.Error),
                         cancellationToken);
                 }
             }
@@ -77,9 +111,27 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
             }
             catch (DotnetCliException ex)
             {
-                // The build output has already been streamed live through the callbacks above, so point the
-                // user there instead of repeating it in the message.
-                throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}).", ex, isUserError: true);
+                string message;
+                lock (diagnosticGate)
+                {
+                    if (diagnostics.Count > 0)
+                    {
+                        message = $"'dotnet build' failed: {diagnostics[0]}";
+                        if (diagnostics.Count > 1)
+                        {
+                            message += $" (+{diagnostics.Count - 1} more error(s)). Run 'dotnet build' in the project folder for details.";
+                        }
+                    }
+                    else
+                    {
+                        message = msbuildCrashed
+                            ? $"'dotnet build' failed (exit {ex.ExitCode}): MSBuild crashed before reporting a build result."
+                            : $"'dotnet build' failed (exit {ex.ExitCode}).";
+                        message += " Run 'dotnet build' in the project folder for details.";
+                    }
+                }
+
+                throw new GracefulException(message, ex, isUserError: true);
             }
 
             string json = File.Exists(resultFile)
@@ -93,6 +145,9 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
             TryDeleteFile(resultFile);
         }
     }
+
+    [GeneratedRegex(@"(?:^|:)\s*error\s+(?:(?<code>[A-Za-z]+\d+)\s*)?:\s*(?<message>\S.*)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex BuildErrorRegex();
 
     internal DirectoryInfo ParseTargetResult(string json, string targetName, bool requireAssemblyExists = false)
     {

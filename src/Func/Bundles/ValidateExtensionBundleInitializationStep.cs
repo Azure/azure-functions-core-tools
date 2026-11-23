@@ -54,7 +54,10 @@ internal sealed class ValidateExtensionBundleInitializationStep : FuncStartIniti
         }
         catch (ExtensionBundleConfigurationException ex)
         {
-            throw new GracefulException(ex.Message, isUserError: true, verboseMessage: ex.ToString());
+            throw new GracefulException(
+                $"{ex.Message} Run 'func run' again after correcting the issue.",
+                isUserError: true,
+                verboseMessage: ex.ToString());
         }
 
         if (section is null)
@@ -72,36 +75,41 @@ internal sealed class ValidateExtensionBundleInitializationStep : FuncStartIniti
 
         ExtensionBundleResolution resolution = await _resolver.ResolveAsync(projectContext, cancellationToken);
 
-        switch (resolution)
+        return resolution switch
         {
-            case ExtensionBundleResolution.Resolved r:
-                context.State.BundleDownloadPath = r.Path;
-                context.State.BundleVersion = r.Version;
-                context.State.BundleEnvVarsForHost[DownloadPathEnvVar] = r.Path;
-                context.State.BundleEnvVarsForHost[EnsureLatestEnvVar] = "false";
-                if (r.RuntimeWarning is { } warn)
-                {
-                    _logger.LogWarning(
-                        "Profile '{Profile}' does not list worker runtime '{Runtime}' as supported (declared: {Supported}).",
-                        warn.ProfileName, warn.WorkerRuntime, string.Join(", ", warn.SupportedRuntimes));
-                }
+            ExtensionBundleResolution.Resolved resolved => UseResolvedBundle(context, resolved),
+            ExtensionBundleResolution.NotResolved notResolved => Fail(notResolved.Message, notResolved.RuntimeWarning),
+            ExtensionBundleResolution.WorkloadMissing missing => Fail(missing.Hint),
+            ExtensionBundleResolution.EmptyIntersection empty => Fail(empty.Hint),
+            ExtensionBundleResolution.NoCompatibleInstall none => Fail(none.Hint),
+        };
+    }
 
-                return StartInitializationStepResult.Completed($"Bundle {r.BundleId} {r.Version}");
+    private StartInitializationStepResult UseResolvedBundle(StartInitializationStepContext context, ExtensionBundleResolution.Resolved resolved)
+    {
+        context.State.BundleDownloadPath = resolved.Path;
+        context.State.BundleVersion = resolved.Version;
+        context.State.BundleEnvVarsForHost[DownloadPathEnvVar] = resolved.Path;
+        context.State.BundleEnvVarsForHost[EnsureLatestEnvVar] = "false";
+        LogRuntimeWarning(resolved.RuntimeWarning);
 
-            case ExtensionBundleResolution.WorkloadMissing missing:
-                _logger.LogError("{Hint}", missing.Hint);
-                throw new GracefulException(missing.Hint, isUserError: true);
+        return StartInitializationStepResult.Completed($"Bundle {resolved.BundleId} {resolved.Version}");
+    }
 
-            case ExtensionBundleResolution.EmptyIntersection empty:
-                _logger.LogError("{Hint}", empty.Hint);
-                throw new GracefulException(empty.Hint, isUserError: true);
+    private StartInitializationStepResult Fail(string message, ExtensionBundleSupportedRuntimeWarning? runtimeWarning = null)
+    {
+        LogRuntimeWarning(runtimeWarning);
+        _logger.LogError("{Hint}", message);
+        throw new GracefulException(message, isUserError: true);
+    }
 
-            case ExtensionBundleResolution.NoCompatibleInstall none:
-                _logger.LogError("{Hint}", none.Hint);
-                throw new GracefulException(none.Hint, isUserError: true);
-
-            default:
-                throw new InvalidOperationException($"Unknown resolution variant: {resolution.GetType().Name}");
+    private void LogRuntimeWarning(ExtensionBundleSupportedRuntimeWarning? runtimeWarning)
+    {
+        if (runtimeWarning is { } warn)
+        {
+            _logger.LogWarning(
+                "Profile '{Profile}' does not list worker runtime '{Runtime}' as supported (declared: {Supported}).",
+                warn.ProfileName, warn.WorkerRuntime, string.Join(", ", warn.SupportedRuntimes));
         }
     }
 

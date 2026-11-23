@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Describes how a host run ended.
 /// </summary>
-public abstract record FunctionsProjectHostRunOutcome
+public closed record FunctionsProjectHostRunOutcome
 {
     private FunctionsProjectHostRunOutcome()
     {

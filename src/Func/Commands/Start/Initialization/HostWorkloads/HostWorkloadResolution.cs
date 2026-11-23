@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Result of resolving the host workload for a start run.
 /// </summary>
-internal abstract record HostWorkloadResolution(string HostVersion)
+internal closed record HostWorkloadResolution(string HostVersion)
 {
     public sealed record Installed(ContentWorkloadInfo Workload, NuGetVersion Version, bool ExplicitlyRequested)
         : HostWorkloadResolution(Version.ToNormalizedString());

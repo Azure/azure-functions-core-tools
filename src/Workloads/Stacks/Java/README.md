@@ -2,7 +2,7 @@
 
 This workload extends the Azure Functions CLI (`func`) with Java project
 support: `func init --stack java` scaffolding (a Maven project), language
-detection for existing projects, and a `func start` flow that builds the
+detection for existing projects, and a `func run` flow that builds the
 project with Maven before launching the host.
 
 ## Install
@@ -14,7 +14,7 @@ func workload install java
 ```
 
 The Java worker payload ships separately in the `java-worker` workload and is
-acquired automatically the first time you run `func start`.
+acquired automatically the first time you run `func run`.
 
 ## Prerequisites
 

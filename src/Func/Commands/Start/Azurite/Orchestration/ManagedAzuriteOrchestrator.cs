@@ -446,7 +446,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         StringBuilder sb = new();
         sb.AppendLine("AzureWebJobsStorage points to a local storage emulator, but the Azure Functions CLI cannot start this configuration automatically.");
         sb.AppendLine();
-        sb.AppendLine("Start Azurite with these endpoints, then run 'func start' again:");
+        sb.AppendLine("Start Azurite with these endpoints, then run 'func run' again:");
         sb.AppendLine($"  Blob:  {endpoints.BlobEndpoint}");
         sb.AppendLine($"  Queue: {endpoints.QueueEndpoint}");
         sb.Append($"  Table: {endpoints.TableEndpoint}");
@@ -458,7 +458,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         StringBuilder sb = new();
         sb.AppendLine("AzureWebJobsStorage points to local storage, but another process is using the Azurite ports.");
         sb.AppendLine();
-        sb.AppendLine("Stop whatever is on these ports, then run 'func start' again:");
+        sb.AppendLine("Stop whatever is on these ports, then run 'func run' again:");
         sb.AppendLine($"  Blob:  {endpoints.BlobEndpoint}");
         sb.AppendLine($"  Queue: {endpoints.QueueEndpoint}");
         sb.Append($"  Table: {endpoints.TableEndpoint}");
@@ -479,7 +479,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         sb.AppendLine();
         sb.AppendLine("The Azure Functions CLI could not find an Azurite executable and Docker is not available.");
         sb.AppendLine();
-        sb.AppendLine("Install one of the following and run 'func start' again:");
+        sb.AppendLine("Install one of the following and run 'func run' again:");
         sb.AppendLine("  - Azurite:       npm install -g azurite");
         sb.AppendLine("  - Docker Desktop: https://docs.docker.com/desktop/");
         sb.AppendLine();
@@ -512,7 +512,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         sb.AppendLine($"Data directory: {paths.DataDirectory}");
         sb.AppendLine($"Log file: {paths.LogFilePath}");
         sb.AppendLine();
-        sb.Append("To reset Azurite state, delete the data directory above, then run 'func start' again.");
+        sb.Append("To reset Azurite state, delete the data directory above, then run 'func run' again.");
         if (!string.IsNullOrWhiteSpace(stderrTail))
         {
             sb.AppendLine();
@@ -537,7 +537,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         sb.AppendLine($"Data directory: {paths.DataDirectory}");
         sb.AppendLine($"Log file: {paths.LogFilePath}");
         sb.AppendLine();
-        sb.Append("To reset Azurite state, delete the data directory above, then run 'func start' again.");
+        sb.Append("To reset Azurite state, delete the data directory above, then run 'func run' again.");
         return sb.ToString();
     }
 

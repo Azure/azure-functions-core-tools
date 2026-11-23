@@ -12,8 +12,7 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// </summary>
 internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 {
-    private readonly IWorkloadPaths _paths = paths
-        ?? throw new ArgumentNullException(nameof(paths));
+    private readonly IWorkloadPaths _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
     public async Task<IReadOnlyList<WorkloadEntry>> GetWorkloadsAsync(CancellationToken cancellationToken = default)
     {
@@ -42,7 +41,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         await WriteRegistryAsync(registry, cancellationToken);
     }
 
-    public async Task<bool> RemoveWorkloadAsync(string packageId, string version, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveWorkloadAsync(
+        string packageId, string version, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -60,8 +60,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         return true;
     }
 
-    public async Task ReplaceWorkloadAsync(string oldPackageId, string oldVersion, WorkloadEntry newEntry,
-        CancellationToken cancellationToken = default)
+    public async Task ReplaceWorkloadAsync(
+        string oldPackageId, string oldVersion, WorkloadEntry newEntry, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(oldPackageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
@@ -90,8 +90,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         await WriteRegistryAsync(registry, cancellationToken);
     }
 
-    public async Task<WorkloadEntry> AddOwnershipAsync(WorkloadEntry entry, WorkloadOwnershipKind ownership,
-        CancellationToken cancellationToken = default)
+    public async Task<WorkloadEntry> AddOwnershipAsync(
+        WorkloadEntry entry, WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
     {
         ValidateEntry(entry);
         ValidateOwnership(entry, ownership);
@@ -193,7 +193,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         if (remainingReferences <= 0)
         {
             registry.Workloads.RemoveAt(index);
-            return new WorkloadOwnershipRemovalResult(true, true, null);
+            return new WorkloadOwnershipRemovalResult(true, true, current);
         }
 
         WorkloadEntry updated = CopyWithOwnership(
@@ -272,12 +272,14 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         {
             PackageId = entry.PackageId,
             PackageVersion = entry.PackageVersion,
+            PackageRoot = entry.PackageRoot,
             Kind = entry.Kind,
             Aliases = entry.Aliases,
             DisplayName = entry.DisplayName,
             Description = entry.Description,
             Source = entry.Source,
             RuntimeIdentifier = entry.RuntimeIdentifier,
+            TemplateRoot = entry.TemplateRoot,
             IsImplicitlyInstalled = isImplicitlyInstalled,
             LogicalPackage = logicalPackage,
             InstallRefCount = installRefCount,
@@ -294,12 +296,11 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
         try
         {
-            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+            await using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
 
             WorkloadRegistry registry = await JsonSerializer.DeserializeAsync(
-                stream,
-                WorkloadJsonContext.Default.WorkloadRegistry,
-                cancellationToken)
+                stream, WorkloadJsonContext.Default.WorkloadRegistry, cancellationToken)
                 ?? new WorkloadRegistry();
 
             if (!WorkloadManifestSchema.IsRegistrySupported(registry.Schema))
@@ -320,6 +321,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                     isUserError: true);
             }
 
+            HydratePackageRoots(registry);
             return registry;
         }
         catch (JsonException ex)
@@ -332,6 +334,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
     private async Task WriteRegistryAsync(WorkloadRegistry registry, CancellationToken cancellationToken)
     {
+        HydratePackageRoots(registry);
+
         string path = _paths.WorkloadRegistryPath;
         string directory = Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
@@ -346,12 +350,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         try
         {
             await using (var stream = new FileStream(
-                tempPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 4096,
-                useAsync: true))
+                tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
             {
                 await SerializeAsync(stream, registry, cancellationToken);
             }
@@ -365,16 +364,26 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         }
     }
 
+    private void HydratePackageRoots(WorkloadRegistry registry)
+    {
+        foreach (WorkloadEntry entry in registry.Workloads)
+        {
+            if (entry.PackageId is null || entry.PackageVersion is null)
+            {
+                continue;
+            }
+
+            entry.PackageRoot = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        }
+    }
+
     /// <summary>
     /// Serialize hook. Tests substitute this to exercise the failure-path
     /// cleanup (temp file removed, original registry preserved).
     /// </summary>
     internal virtual Task SerializeAsync(Stream stream, WorkloadRegistry registry, CancellationToken cancellationToken)
         => JsonSerializer.SerializeAsync(
-            stream,
-            registry,
-            WorkloadJsonContext.Default.WorkloadRegistry,
-            cancellationToken);
+            stream, registry, WorkloadJsonContext.Default.WorkloadRegistry, cancellationToken);
 
     private static void TryDelete(string path)
     {

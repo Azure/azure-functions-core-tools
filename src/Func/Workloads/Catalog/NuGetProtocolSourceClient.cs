@@ -51,7 +51,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, CancellationToken cancellationToken)
     {
-        FindPackageByIdResource findResource = await _repository.GetResourceAsync<FindPackageByIdResource>(cancellationToken);
+        FindPackageByIdResource findResource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
         using var cache = new SourceCacheContext();
 
         IEnumerable<NuGetVersion> versions = await findResource.GetAllVersionsAsync(packageId, cache, NullLogger.Instance, cancellationToken);
@@ -61,7 +61,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken)
     {
-        FindPackageByIdResource findResource = await _repository.GetResourceAsync<FindPackageByIdResource>(cancellationToken);
+        FindPackageByIdResource findResource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
         using var cache = new SourceCacheContext();
 
         // Spool to a temp file so the caller gets a seekable stream that
@@ -101,9 +101,22 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     /// </summary>
     internal virtual async Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
     {
-        HttpSourceResource httpSourceResource = await _repository.GetResourceAsync<HttpSourceResource>(cancellationToken);
+        HttpSourceResource httpSourceResource = await GetRequiredResourceAsync<HttpSourceResource>(cancellationToken);
         return await httpSourceResource.HttpSource.GetJObjectAsync(
             new HttpSourceRequest(searchUri, NullLogger.Instance), NullLogger.Instance, cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves a NuGet resource that this client cannot operate without.
+    /// NuGet.Protocol returns null when the source does not provide the
+    /// requested resource type.
+    /// </summary>
+    private async Task<T> GetRequiredResourceAsync<T>(CancellationToken cancellationToken)
+        where T : class, INuGetResource
+    {
+        T? resource = await _repository.GetResourceAsync<T>(cancellationToken);
+        return resource ?? throw new InvalidOperationException(
+            $"Source '{Source.Source}' does not provide the NuGet resource '{typeof(T).Name}'.");
     }
 
     /// <summary>

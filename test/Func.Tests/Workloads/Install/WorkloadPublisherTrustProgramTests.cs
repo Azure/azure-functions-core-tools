@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Install;
 
@@ -29,13 +28,15 @@ public sealed class WorkloadPublisherTrustProgramTests(ITestOutputHelper output)
         string newSource = Path.Combine(feed, $"{PackageId}.1.1.0.nupkg");
         File.Copy(oldPackage, oldSource);
         File.Copy(newPackage, newSource);
-        byte[] oldBytes = await File.ReadAllBytesAsync(oldSource);
-        byte[] newBytes = await File.ReadAllBytesAsync(newSource);
+        byte[] oldBytes = await File.ReadAllBytesAsync(oldSource, TestContext.Current.CancellationToken);
+        byte[] newBytes = await File.ReadAllBytesAsync(newSource, TestContext.Current.CancellationToken);
         await using LoopbackNuGetFeed catalog = new(PackageId, newBytes);
         CliConfigurationPathsOptions paths = new(Path.Combine(Root, "home"));
         WorkloadPathsOptions workloads = new(Path.Combine(Root, "workload-home"));
         Directory.CreateDirectory(paths.Home);
-        await File.WriteAllTextAsync(paths.VersionCachePath, AssemblyCliVersionProvider.Instance.Version.Split('-')[0]);
+        await File.WriteAllTextAsync(
+            paths.VersionCachePath, AssemblyCliVersionProvider.Instance.Version.Split('-')[0],
+            TestContext.Current.CancellationToken);
         CliProcessTestRunner runner = new(output);
         using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
 
@@ -48,7 +49,9 @@ public sealed class WorkloadPublisherTrustProgramTests(ITestOutputHelper output)
         installed.ExitCode.Should().Be(0, installed.StandardOutput + installed.StandardError);
         installed.StandardError.Should().Contain("Extracting workload").And.NotContain("Error:");
         Directory.Exists(workloads.GetInstallDirectory(PackageId, "1.0.0")).Should().BeTrue();
-        byte[] registryBefore = await File.ReadAllBytesAsync(workloads.WorkloadRegistryPath);
+        byte[] registryBefore = await File.ReadAllBytesAsync(
+            workloads.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken);
 
         var repeat = await RunAsync(["workload", "install", oldSource, "--allow-untrusted"]);
         repeat.ExitCode.Should().Be(0);
@@ -57,7 +60,8 @@ public sealed class WorkloadPublisherTrustProgramTests(ITestOutputHelper output)
         var rejectedUpdate = await RunAsync(["workload", "update", PackageId, "--source", catalog.Source]);
         rejectedUpdate.ExitCode.Should().Be(1);
         (rejectedUpdate.StandardOutput + rejectedUpdate.StandardError).Should().Contain("publisher verification failed");
-        (await File.ReadAllBytesAsync(workloads.WorkloadRegistryPath)).Should().Equal(registryBefore);
+        (await File.ReadAllBytesAsync(
+            workloads.WorkloadRegistryPath, TestContext.Current.CancellationToken)).Should().Equal(registryBefore);
         Directory.Exists(workloads.GetInstallDirectory(PackageId, "1.0.0")).Should().BeTrue();
         Directory.Exists(workloads.GetInstallDirectory(PackageId, "1.1.0")).Should().BeFalse();
 
@@ -70,8 +74,8 @@ public sealed class WorkloadPublisherTrustProgramTests(ITestOutputHelper output)
         var reused = await RunAsync(["workload", "update", PackageId, "--source", catalog.Source]);
         reused.ExitCode.Should().Be(0);
         reused.StandardError.Should().Contain("latest available version (1.1.0)");
-        (await File.ReadAllBytesAsync(oldSource)).Should().Equal(oldBytes);
-        (await File.ReadAllBytesAsync(newSource)).Should().Equal(newBytes);
+        (await File.ReadAllBytesAsync(oldSource, TestContext.Current.CancellationToken)).Should().Equal(oldBytes);
+        (await File.ReadAllBytesAsync(newSource, TestContext.Current.CancellationToken)).Should().Equal(newBytes);
         Directory.GetDirectories(Path.Combine(Root, CliProcessTestRunner.StateDirectoryName), "func-workload-trust-*", SearchOption.AllDirectories)
             .Should().BeEmpty();
 

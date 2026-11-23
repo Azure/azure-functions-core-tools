@@ -1,10 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 

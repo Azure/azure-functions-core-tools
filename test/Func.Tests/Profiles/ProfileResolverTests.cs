@@ -369,7 +369,7 @@ public class ProfileResolverTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             LoadCount++;
-            Dictionary<string, ProfileDefinition> profiles = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ProfileDefinition> profiles = [with(StringComparer.OrdinalIgnoreCase)];
             foreach ((string name, ProfileDefinition definition) in _profiles)
             {
                 profiles.Add(name, definition);

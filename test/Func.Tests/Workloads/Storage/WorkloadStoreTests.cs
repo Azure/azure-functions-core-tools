@@ -5,6 +5,7 @@ using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
@@ -32,7 +33,7 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task GetWorkloadsAsync_ReturnsEmpty_WhenRegistryMissing()
     {
-        var workloads = await _store.GetWorkloadsAsync();
+        var workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
 
         workloads.Should().BeEmpty();
     }
@@ -40,48 +41,133 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task SaveWorkloadAsync_InsertsNewEntry()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"),
+            TestContext.Current.CancellationToken);
 
-        var workloads = await _store.GetWorkloadsAsync();
+        var workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         var installed = workloads.Should().ContainSingle().Subject;
         installed.PackageId.Should().Be("Azure.Functions.Cli.Workloads.Dotnet");
         installed.PackageVersion.Should().Be("1.0.0");
     }
 
     [Fact]
+    public async Task GetWorkloadsAsync_HydratesPackageRootsFromCurrentPaths_IgnoringSerializedRoots()
+    {
+        Directory.CreateDirectory(_tempHome);
+        await File.WriteAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                { "packageId": "pkg", "packageVersion": "1.0.0", "packageRoot": "untrusted-root" },
+                { "packageId": "pkg", "packageVersion": "2.0.0" },
+                { "packageId": "content.pkg", "packageVersion": "1.0.0", "kind": "content", "packageRoot": null }
+              ]
+            }
+            """,
+            TestContext.Current.CancellationToken);
+        IWorkloadPaths paths = Substitute.For<IWorkloadPaths>();
+        paths.WorkloadRegistryPath.Returns(_paths.WorkloadRegistryPath);
+        paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(call => Path.Combine(_tempHome, "current-home", call.ArgAt<string>(0), call.ArgAt<string>(1)));
+        WorkloadStore store = new(paths);
+
+        IReadOnlyList<WorkloadEntry> entries = await store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
+
+        entries.Should().HaveCount(3);
+        foreach (WorkloadEntry entry in entries)
+        {
+            entry.PackageRoot.Should().Be(Path.Combine(_tempHome, "current-home", entry.PackageId, entry.PackageVersion));
+            Directory.Exists(entry.PackageRoot).Should().BeFalse();
+            paths.Received(1).GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        }
+    }
+
+    [Fact]
+    public async Task SaveWorkloadAsync_BindsPackageRootWithoutPersistingIt()
+    {
+        WorkloadEntry entry = new()
+        {
+            PackageId = "pkg",
+            PackageVersion = "1.0.0",
+            PackageRoot = "stale-root",
+        };
+
+        await _store.SaveWorkloadAsync(entry, TestContext.Current.CancellationToken);
+
+        entry.PackageRoot.Should().Be(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(
+            _paths.WorkloadRegistryPath, TestContext.Current.CancellationToken));
+        document.RootElement.GetProperty("workloads")[0].TryGetProperty("packageRoot", out _).Should().BeFalse();
+        (await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken))
+            .Should().ContainSingle().Which.PackageRoot.Should().Be(entry.PackageRoot);
+    }
+
+    [Fact]
+    public async Task RemoveOwnershipAsync_FinalOwner_ReturnsRemovedEntryWithPackageRoot()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0"), TestContext.Current.CancellationToken);
+
+        WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(
+            "pkg", "1.0.0", WorkloadOwnershipKind.Explicit, TestContext.Current.CancellationToken);
+
+        result.EntryRemoved.Should().BeTrue();
+        result.Entry.Should().NotBeNull();
+        result.Entry!.PackageRoot.Should().Be(_paths.GetInstallDirectory("pkg", "1.0.0"));
+        (await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SaveWorkloadAsync_KeepsBothVersions_WhenSamePackageIdDifferentVersion()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"));
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"),
+            TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"),
+            TestContext.Current.CancellationToken);
 
-        var workloads = await _store.GetWorkloadsAsync();
+        var workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         workloads.Select(w => w.PackageVersion).OrderBy(v => v).Should().Equal(["1.0.0", "2.0.0"]);
     }
 
     [Fact]
     public async Task SaveWorkloadAsync_ReplacesExistingEntry_WhenSamePackageIdAndVersion()
     {
-        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0", entryAssembly: "first.dll"));
-        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0", entryAssembly: "second.dll"));
+        await _store.SaveWorkloadAsync(
+            NewEntry("pkg", "1.0.0", entryAssembly: "first.dll"),
+            TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(
+            NewEntry("pkg", "1.0.0", entryAssembly: "second.dll"),
+            TestContext.Current.CancellationToken);
 
-        var workloads = await _store.GetWorkloadsAsync();
+        var workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         workloads.Should().ContainSingle().Which.EntryPoint!.AssemblyPath.Should().Be("second.dll");
     }
 
     [Fact]
     public async Task SaveWorkloadAsync_MatchesPackageId_CaseInsensitively()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0", entryAssembly: "first.dll"));
-        await _store.SaveWorkloadAsync(NewEntry("azure.functions.cli.workloads.dotnet", "1.0.0", entryAssembly: "lower.dll"));
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0", entryAssembly: "first.dll"),
+            TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(
+            NewEntry("azure.functions.cli.workloads.dotnet", "1.0.0", entryAssembly: "lower.dll"),
+            TestContext.Current.CancellationToken);
 
-        var workloads = await _store.GetWorkloadsAsync();
+        var workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         workloads.Should().ContainSingle().Which.EntryPoint!.AssemblyPath.Should().Be("lower.dll");
     }
 
     [Fact]
     public async Task RemoveWorkloadAsync_ReturnsFalse_WhenEntryAbsent()
     {
-        var removed = await _store.RemoveWorkloadAsync("does.not.exist", "1.0.0");
+        var removed = await _store.RemoveWorkloadAsync(
+            "does.not.exist",
+            "1.0.0",
+            TestContext.Current.CancellationToken);
 
         removed.Should().BeFalse();
     }
@@ -89,13 +175,13 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task RemoveWorkloadAsync_RemovesSingleVersion_AndKeepsSiblings()
     {
-        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("pkg", "2.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0"), TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(NewEntry("pkg", "2.0.0"), TestContext.Current.CancellationToken);
 
-        var removed = await _store.RemoveWorkloadAsync("PKG", "1.0.0");
+        var removed = await _store.RemoveWorkloadAsync("PKG", "1.0.0", TestContext.Current.CancellationToken);
 
         removed.Should().BeTrue();
-        var workloads = await _store.GetWorkloadsAsync();
+        var workloads = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         workloads.Should().ContainSingle().Which.PackageVersion.Should().Be("2.0.0");
     }
 
@@ -108,6 +194,7 @@ public class WorkloadStoreTests : IDisposable
             PackageVersion = "1.0.0",
             Aliases = ["dotnet", "dotnet-isolated"],
             RuntimeIdentifier = "linux-x64",
+            TemplateRoot = "templates/dotnet",
             IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
@@ -125,13 +212,15 @@ public class WorkloadStoreTests : IDisposable
             },
         };
 
-        await _store.SaveWorkloadAsync(entry);
-        var actual = (await _store.GetWorkloadsAsync()).Single();
+        await _store.SaveWorkloadAsync(entry, TestContext.Current.CancellationToken);
+        var actual = (await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken)).Single();
 
         actual.PackageId.Should().Be(entry.PackageId);
         actual.PackageVersion.Should().Be(entry.PackageVersion);
+        actual.PackageRoot.Should().Be(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
         actual.Aliases.Should().Equal(entry.Aliases);
         actual.RuntimeIdentifier.Should().Be("linux-x64");
+        actual.TemplateRoot.Should().Be("templates/dotnet");
         actual.IsImplicitlyInstalled.Should().BeTrue();
         actual.LogicalPackage!.PackageId.Should().Be(entry.LogicalPackage.PackageId);
         actual.LogicalPackage.Source.Should().Be(entry.LogicalPackage.Source);
@@ -142,11 +231,19 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task PersistedJson_UsesFlatArrayShape()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Node", "1.0.0"));
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"),
+            TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"),
+            TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(
+            NewEntry("Azure.Functions.Cli.Workloads.Node", "1.0.0"),
+            TestContext.Current.CancellationToken);
 
-        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(_paths.WorkloadRegistryPath));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken));
         var workloads = doc.RootElement.GetProperty("workloads");
 
         workloads.ValueKind.Should().Be(JsonValueKind.Array);
@@ -158,16 +255,19 @@ public class WorkloadStoreTests : IDisposable
         {
             element.TryGetProperty("packageId", out _).Should().BeTrue();
             element.TryGetProperty("packageVersion", out _).Should().BeTrue();
+            element.TryGetProperty("packageRoot", out _).Should().BeFalse();
         }
     }
 
     [Fact]
     public async Task PersistedJson_WritesOnlyImplicitOwnership()
     {
-        await _store.SaveWorkloadAsync(NewEntry("explicit.pkg", "1.0.0"));
-        await _store.SaveWorkloadAsync(NewPointerEntry("implicit.pkg", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("explicit.pkg", "1.0.0"), TestContext.Current.CancellationToken);
+        await _store.SaveWorkloadAsync(NewPointerEntry("implicit.pkg", "1.0.0"), TestContext.Current.CancellationToken);
 
-        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(_paths.WorkloadRegistryPath));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            TestContext.Current.CancellationToken));
         JsonElement workloads = doc.RootElement.GetProperty("workloads");
         JsonElement explicitEntry = workloads.EnumerateArray().Single(e => e.GetProperty("packageId").GetString() == "explicit.pkg");
         JsonElement implicitEntry = workloads.EnumerateArray().Single(e => e.GetProperty("packageId").GetString() == "implicit.pkg");
@@ -190,7 +290,7 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task SaveWorkloadAsync_LeavesNoTempFile_OnSuccess()
     {
-        await _store.SaveWorkloadAsync(NewEntry("a", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("a", "1.0.0"), TestContext.Current.CancellationToken);
 
         var stragglers = Directory.GetFiles(_tempHome, "*.json.tmp");
         stragglers.Should().BeEmpty();
@@ -200,7 +300,7 @@ public class WorkloadStoreTests : IDisposable
     public async Task SaveWorkloadAsync_PreservesPreviousRegistry_WhenSerializationFails()
     {
         // Establish a baseline good registry.
-        await _store.SaveWorkloadAsync(NewEntry("baseline", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("baseline", "1.0.0"), TestContext.Current.CancellationToken);
         var baselineBytes = File.ReadAllBytes(_paths.WorkloadRegistryPath);
 
         // Now use a store that throws mid-serialize and assert the original
@@ -232,13 +332,17 @@ public class WorkloadStoreTests : IDisposable
               ],
               "metas": []
             }
-            """);
+            """,
+            TestContext.Current.CancellationToken);
 
-        WorkloadEntry entry = (await _store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        WorkloadEntry entry = (await _store.GetWorkloadsAsync(
+            TestContext.Current.CancellationToken)).Should().ContainSingle().Subject;
 
         entry.IsImplicitlyInstalled.Should().BeFalse();
         entry.LogicalPackage.Should().BeNull();
         entry.RuntimeIdentifier.Should().BeNull();
+        entry.TemplateRoot.Should().BeNull();
+        entry.PackageRoot.Should().Be(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
     }
 
     [Fact]
@@ -265,9 +369,11 @@ public class WorkloadStoreTests : IDisposable
               ],
               "metas": []
             }
-            """);
+            """,
+            TestContext.Current.CancellationToken);
 
-        WorkloadEntry entry = (await _store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        WorkloadEntry entry = (await _store.GetWorkloadsAsync(
+            TestContext.Current.CancellationToken)).Should().ContainSingle().Subject;
 
         entry.IsImplicitlyInstalled.Should().BeTrue();
         entry.LogicalPackage.Should().NotBeNull();
@@ -276,7 +382,7 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task AddOwnershipAsync_ThrowsWhenRowAlreadyHasDifferentLogicalOwner()
     {
-        await _store.SaveWorkloadAsync(NewPointerEntry("pkg.win-x64", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewPointerEntry("pkg.win-x64", "1.0.0"), TestContext.Current.CancellationToken);
         WorkloadEntry conflicting = new()
         {
             PackageId = "pkg.win-x64",
@@ -292,14 +398,104 @@ public class WorkloadStoreTests : IDisposable
             .Should().ThrowExactlyAsync<InvalidOperationException>();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnershipChanges_PreserveTemplateRootAndBindPackageRoot(bool logicalOwnership)
+    {
+        WorkloadOwnershipKind ownership = logicalOwnership ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+        LogicalPackage logical = new() { PackageId = "pkg", PackageVersion = "1.0.0" };
+        WorkloadEntry original = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            TemplateRoot = "templates/original",
+            IsImplicitlyInstalled = ownership == WorkloadOwnershipKind.Explicit,
+            LogicalPackage = ownership == WorkloadOwnershipKind.Explicit ? logical : null,
+        };
+        WorkloadOwnershipKind originalOwnership = ownership == WorkloadOwnershipKind.Explicit
+            ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+        WorkloadEntry added = await _store.AddOwnershipAsync(
+            original,
+            originalOwnership,
+            TestContext.Current.CancellationToken);
+        added.TemplateRoot.Should().Be(original.TemplateRoot);
+        WorkloadEntry incoming = new()
+        {
+            PackageId = original.PackageId,
+            PackageVersion = original.PackageVersion,
+            TemplateRoot = "templates/replaced",
+            LogicalPackage = logical,
+            IsImplicitlyInstalled = ownership == WorkloadOwnershipKind.Logical,
+        };
+
+        WorkloadEntry merged = await _store.AddOwnershipAsync(
+            incoming,
+            ownership,
+            TestContext.Current.CancellationToken);
+        WorkloadOwnershipRemovalResult removal = await _store.RemoveOwnershipAsync(
+            original.PackageId, original.PackageVersion, ownership, TestContext.Current.CancellationToken);
+
+        merged.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        merged.InstallRefCount.Should().Be(2);
+        removal.Entry!.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        (await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken))
+            .Should().ContainSingle().Which.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        merged.PackageRoot.Should().Be(_paths.GetInstallDirectory(incoming.PackageId, incoming.PackageVersion));
+        removal.Entry!.PackageRoot.Should().Be(merged.PackageRoot);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnershipMoves_PreserveTemplateRootsAndBindPackageRoots(bool logicalOwnership)
+    {
+        WorkloadOwnershipKind ownership = logicalOwnership ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+        LogicalPackage logical = new() { PackageId = "pkg", PackageVersion = "1.0.0" };
+        WorkloadEntry original = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            TemplateRoot = "templates/old",
+            LogicalPackage = logical,
+            InstallRefCount = 2,
+        };
+        WorkloadEntry incoming = new()
+        {
+            PackageId = original.PackageId,
+            PackageVersion = "2.0.0",
+            TemplateRoot = "templates/new",
+            LogicalPackage = ownership == WorkloadOwnershipKind.Logical ? logical : null,
+            IsImplicitlyInstalled = ownership == WorkloadOwnershipKind.Logical,
+        };
+        await _store.SaveWorkloadAsync(original, TestContext.Current.CancellationToken);
+
+        WorkloadOwnershipMoveResult moved = ownership == WorkloadOwnershipKind.Logical
+            ? await _store.MoveLogicalOwnershipAsync(
+                original.PackageId, original.PackageVersion, incoming, TestContext.Current.CancellationToken)
+            : await _store.MoveExplicitOwnershipAsync(
+                original.PackageId, original.PackageVersion, incoming, TestContext.Current.CancellationToken);
+
+        moved.Entry.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
+        entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Which.TemplateRoot.Should().Be(original.TemplateRoot);
+        entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0").Which.TemplateRoot.Should().Be(incoming.TemplateRoot);
+        moved.Entry.PackageRoot.Should().Be(_paths.GetInstallDirectory(incoming.PackageId, incoming.PackageVersion));
+        entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Which.PackageRoot.Should().Be(
+            _paths.GetInstallDirectory(original.PackageId, original.PackageVersion));
+        entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0").Which.PackageRoot.Should().Be(moved.Entry.PackageRoot);
+    }
+
     [Fact]
     public async Task AddOwnershipAsync_AttachesLogicalOwnershipIdempotently()
     {
-        await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"), TestContext.Current.CancellationToken);
         WorkloadEntry pointerEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
 
-        WorkloadEntry first = await _store.AddOwnershipAsync(pointerEntry, WorkloadOwnershipKind.Logical);
-        WorkloadEntry second = await _store.AddOwnershipAsync(pointerEntry, WorkloadOwnershipKind.Logical);
+        WorkloadEntry first = await _store.AddOwnershipAsync(
+            pointerEntry, WorkloadOwnershipKind.Logical, TestContext.Current.CancellationToken);
+        WorkloadEntry second = await _store.AddOwnershipAsync(
+            pointerEntry, WorkloadOwnershipKind.Logical, TestContext.Current.CancellationToken);
 
         first.IsImplicitlyInstalled.Should().BeFalse();
         first.LogicalPackage.Should().NotBeNull();
@@ -310,9 +506,11 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task AddOwnershipAsync_CountsLogicalOwnerAttachedWhileAddingExplicitOwnership()
     {
-        await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"), TestContext.Current.CancellationToken);
 
-        WorkloadEntry merged = await _store.AddOwnershipAsync(NewPointerEntry("pkg.win-x64", "1.0.0"), WorkloadOwnershipKind.Explicit);
+        WorkloadEntry merged = await _store.AddOwnershipAsync(
+            NewPointerEntry("pkg.win-x64", "1.0.0"), WorkloadOwnershipKind.Explicit,
+            TestContext.Current.CancellationToken);
 
         merged.IsImplicitlyInstalled.Should().BeFalse();
         merged.LogicalPackage.Should().NotBeNull();
@@ -332,10 +530,11 @@ public class WorkloadStoreTests : IDisposable
             LogicalPackage = pointerEntry.LogicalPackage,
             InstallRefCount = 2,
         };
-        await _store.SaveWorkloadAsync(entry);
+        await _store.SaveWorkloadAsync(entry, TestContext.Current.CancellationToken);
 
         WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(
-            entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit);
+            entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit,
+            TestContext.Current.CancellationToken);
 
         result.OwnershipRemoved.Should().BeTrue();
         result.EntryRemoved.Should().BeFalse();
@@ -355,13 +554,14 @@ public class WorkloadStoreTests : IDisposable
             LogicalPackage = NewPointerEntry("pkg.win-x64", "1.0.0").LogicalPackage,
             InstallRefCount = 2,
         };
-        await _store.SaveWorkloadAsync(oldEntry);
+        await _store.SaveWorkloadAsync(oldEntry, TestContext.Current.CancellationToken);
 
         WorkloadOwnershipMoveResult result = await _store.MoveLogicalOwnershipAsync(
-            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"));
+            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"),
+            TestContext.Current.CancellationToken);
 
         result.PreviousEntryRemoved.Should().BeFalse();
-        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         WorkloadEntry retained = entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Subject;
         retained.IsImplicitlyInstalled.Should().BeFalse();
         retained.LogicalPackage.Should().BeNull();
@@ -373,13 +573,14 @@ public class WorkloadStoreTests : IDisposable
     public async Task MoveLogicalOwnershipAsync_RemovesOldRow_WhenLogicalOwnershipIsFinalOwner()
     {
         WorkloadEntry oldEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
-        await _store.SaveWorkloadAsync(oldEntry);
+        await _store.SaveWorkloadAsync(oldEntry, TestContext.Current.CancellationToken);
 
         WorkloadOwnershipMoveResult result = await _store.MoveLogicalOwnershipAsync(
-            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"));
+            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"),
+            TestContext.Current.CancellationToken);
 
         result.PreviousEntryRemoved.Should().BeTrue();
-        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         WorkloadEntry moved = entries.Should().ContainSingle().Subject;
         moved.PackageVersion.Should().Be("2.0.0");
         moved.IsImplicitlyInstalled.Should().BeTrue();
@@ -398,13 +599,14 @@ public class WorkloadStoreTests : IDisposable
             LogicalPackage = NewPointerEntry("pkg.win-x64", "1.0.0").LogicalPackage,
             InstallRefCount = 2,
         };
-        await _store.SaveWorkloadAsync(oldEntry);
+        await _store.SaveWorkloadAsync(oldEntry, TestContext.Current.CancellationToken);
 
         WorkloadOwnershipMoveResult result = await _store.MoveExplicitOwnershipAsync(
-            oldEntry.PackageId, oldEntry.PackageVersion, NewEntry("pkg.win-x64", "2.0.0"));
+            oldEntry.PackageId, oldEntry.PackageVersion, NewEntry("pkg.win-x64", "2.0.0"),
+            TestContext.Current.CancellationToken);
 
         result.PreviousEntryRemoved.Should().BeFalse();
-        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync(TestContext.Current.CancellationToken);
         WorkloadEntry retained = entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Subject;
         retained.IsImplicitlyInstalled.Should().BeTrue();
         retained.LogicalPackage.Should().NotBeNull();
@@ -419,11 +621,12 @@ public class WorkloadStoreTests : IDisposable
     {
         var store = new CountingSerializeStore(_paths);
         WorkloadEntry oldEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
-        await store.SaveWorkloadAsync(oldEntry);
+        await store.SaveWorkloadAsync(oldEntry, TestContext.Current.CancellationToken);
         store.ResetSerializeCount();
 
         await store.MoveLogicalOwnershipAsync(
-            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"));
+            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"),
+            TestContext.Current.CancellationToken);
 
         store.SerializeCount.Should().Be(1);
     }

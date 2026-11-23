@@ -30,7 +30,9 @@ public sealed class WorkloadPackageSourceTests : IDisposable
         WorkloadPackageSource source = NewSource();
 
         ResolvedPackage resolved =
-            await source.ResolveAsync(expected.PackageId, version: null, source: null, includePrerelease: null, exact: true);
+            await source.ResolveAsync(
+                expected.PackageId, version: null, source: null, includePrerelease: null, exact: true,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         resolved.Should().BeSameAs(expected);
         await _catalog.DidNotReceive().SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
@@ -51,7 +53,9 @@ public sealed class WorkloadPackageSourceTests : IDisposable
             expected.PackageId, false, null, true, null, Arg.Any<CancellationToken>()).Returns(expected);
         WorkloadPackageSource source = NewSource();
 
-        ResolvedPackage resolved = await source.ResolveAsync(alias, version: null, source: null, includePrerelease: null, exact: false);
+        ResolvedPackage resolved = await source.ResolveAsync(
+            alias, version: null, source: null, includePrerelease: null, exact: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         resolved.Should().BeSameAs(expected);
     }
@@ -91,7 +95,9 @@ public sealed class WorkloadPackageSourceTests : IDisposable
             expected.PackageId, false, null, true, null, Arg.Any<CancellationToken>()).Returns(expected);
         WorkloadPackageSource source = NewSource();
 
-        ResolvedPackage resolved = await source.ResolveAsync(alias, version: null, source: null, includePrerelease: null, exact: false);
+        ResolvedPackage resolved = await source.ResolveAsync(
+            alias, version: null, source: null, includePrerelease: null, exact: false,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         resolved.Should().BeSameAs(expected);
         await _catalog.Received(2).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
@@ -121,7 +127,9 @@ public sealed class WorkloadPackageSourceTests : IDisposable
         WorkloadPackageSource source = NewSource(includePrerelease: true);
 
         ResolvedPackage? resolved =
-            await source.ResolveLatestVersionAsync(expected.PackageId, includePrerelease: null, currentVersion, allowMajor: false, source: "source");
+            await source.ResolveLatestVersionAsync(
+                expected.PackageId, includePrerelease: null, currentVersion, allowMajor: false, source: "source",
+                cancellationToken: TestContext.Current.CancellationToken);
 
         resolved.Should().BeSameAs(expected);
     }
@@ -136,7 +144,8 @@ public sealed class WorkloadPackageSourceTests : IDisposable
         _catalog.ResolveVersionAsync(
             selection.PackageId, NuGetVersion.Parse(pointer.Identity.Version), "source", Arg.Any<CancellationToken>()).Returns(expected);
 
-        ResolvedPackage resolved = await source.ResolveImplementationAsync(pointer, selection, "source");
+        ResolvedPackage resolved = await source.ResolveImplementationAsync(
+            pointer, selection, "source", TestContext.Current.CancellationToken);
 
         resolved.Should().BeSameAs(expected);
     }
@@ -178,7 +187,10 @@ public sealed class WorkloadPackageSourceTests : IDisposable
         var progress = Substitute.For<IProgress<WorkloadInstallProgress>>();
         WorkloadPackageSource source = NewSource();
 
-        TemporaryWorkloadPackageFile download = await source.DownloadAsync(package, progress);
+        TemporaryWorkloadPackageFile download = await source.DownloadAsync(
+            package,
+            progress,
+            TestContext.Current.CancellationToken);
         string path = download.Path;
 
         File.ReadAllText(path).Should().Be("package-content");

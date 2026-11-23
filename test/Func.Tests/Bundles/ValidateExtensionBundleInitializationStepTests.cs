@@ -47,7 +47,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         result.Message.Should().Be("No extension bundle declared");
         context.State.BundleEnvVarsForHost.Should().BeEmpty();
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
         result.Message.Should().Be("No extension bundle declared");
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -153,6 +153,24 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
     }
 
     [Fact]
+    public async Task BundleDeclared_ResolverReturnsNotResolved_ThrowsUserError()
+    {
+        WriteHostJson(new { extensionBundle = new { id = "Microsoft.Azure.Functions.ExtensionBundle", version = "[4.*, 5.0.0)" } });
+
+        IExtensionBundleResolver resolver = Substitute.For<IExtensionBundleResolver>();
+        resolver.ResolveAsync(Arg.Any<ExtensionBundleProjectContext>(), Arg.Any<CancellationToken>())
+            .Returns(new ExtensionBundleResolution.NotResolved("CUSTOM-RESOLVER-MESSAGE"));
+
+        ValidateExtensionBundleInitializationStep step = NewStep(resolver);
+        StartInitializationStepContext context = NewContext();
+
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Be("CUSTOM-RESOLVER-MESSAGE");
+        ex.IsUserError.Should().BeTrue();
+        context.State.BundleEnvVarsForHost.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task BundleDeclared_UsesResolvedProjectDirectoryForHostJson()
     {
         string optionsDirectory = Path.Combine(_projectDir, "options");
@@ -195,7 +213,9 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("host.json is not valid JSON");
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        ex.Message.Should().Contain("Run 'func run' again after correcting the issue.");
+        ex.Message.Should().NotContain("func start");
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -210,7 +230,28 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("host.json extensionBundle must include");
-        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+        ex.Message.Should().Contain("Run 'func run' again after correcting the issue.");
+        ex.Message.Should().NotContain("func start");
+        await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("{ invalid", "host.json is not valid JSON")]
+    [InlineData("[]", "host.json root must be a JSON object")]
+    [InlineData("{\"extensionBundle\": {\"id\": \"example\"}}", "host.json extensionBundle must include")]
+    public async Task HostJsonReader_InvalidConfiguration_ReportsRepairWithoutCommandSpecificRetry(string content, string expectedError)
+    {
+        File.WriteAllText(Path.Combine(_projectDir, "host.json"), content);
+        HostJsonBundleSectionReader reader = new();
+
+        ExtensionBundleConfigurationException ex = (await FluentActions.Awaiting(
+            () => reader.ReadAsync(new DirectoryInfo(_projectDir), CancellationToken.None))
+            .Should().ThrowAsync<ExtensionBundleConfigurationException>()).Which;
+
+        ex.Message.Should().Contain(expectedError);
+        ex.Message.Should().EndWith("Fix host.json.");
+        ex.Message.Should().NotContain("func run");
+        ex.Message.Should().NotContain("func start");
     }
 
     private static ValidateExtensionBundleInitializationStep NewStep(IExtensionBundleResolver resolver)
@@ -254,7 +295,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
     private static ResolvedProfile CreateProfileWithBundleRange(string bundleRange)
     {
         var source = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
-        Dictionary<string, VersionRange> workerVersionRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, VersionRange> workerVersionRanges = [with(StringComparer.OrdinalIgnoreCase)];
 
         return new ResolvedProfile(
             "flex",

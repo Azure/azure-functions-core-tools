@@ -47,7 +47,7 @@ internal sealed class ProfileDocumentParser
             }
 
             string? schema = null;
-            Dictionary<string, ProfileDefinition> profiles = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ProfileDefinition> profiles = [with(StringComparer.OrdinalIgnoreCase)];
             foreach (JsonProperty property in document.RootElement.EnumerateObject())
             {
                 if (property.NameEquals("$schema"))
@@ -100,7 +100,7 @@ internal sealed class ProfileDocumentParser
         Dictionary<string, ProfileDefinition> profiles,
         string displayName)
     {
-        Dictionary<string, ProfileDefinition> normalized = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ProfileDefinition> normalized = [with(StringComparer.OrdinalIgnoreCase)];
         foreach ((string name, ProfileDefinition definition) in profiles)
         {
             AddProfile(normalized, name, definition, displayName);

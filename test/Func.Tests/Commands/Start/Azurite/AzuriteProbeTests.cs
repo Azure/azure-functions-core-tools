@@ -14,15 +14,15 @@ public class AzuriteProbeTests : IAsyncLifetime
     private readonly List<IDisposable> _disposables = [];
     private ServiceProvider? _services;
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         var collection = new ServiceCollection();
         collection.AddAzuriteProbe();
         _services = collection.BuildServiceProvider();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         foreach (var disposable in _disposables)
         {

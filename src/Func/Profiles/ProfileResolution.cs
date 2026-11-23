@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Result of resolving the active profile.
 /// </summary>
-internal abstract record ProfileResolution(IReadOnlyList<ProfileDiagnostic> Diagnostics)
+internal closed record ProfileResolution(IReadOnlyList<ProfileDiagnostic> Diagnostics)
 {
     private ProfileResolution()
         : this([])

@@ -13,7 +13,6 @@ using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Tests.Commands.Quickstart;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Console;
 

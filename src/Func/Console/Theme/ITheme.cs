@@ -57,4 +57,9 @@ internal interface ITheme
 
     /// <summary>Clickable URLs and hyperlinks in chrome (banner, route columns).</summary>
     public Style Hyperlink { get; }
+
+    /// <summary>
+    /// Selected log text, including monochrome terminals.
+    /// </summary>
+    public Style Selection { get; }
 }

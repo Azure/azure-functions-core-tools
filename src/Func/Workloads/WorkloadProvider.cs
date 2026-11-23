@@ -72,7 +72,7 @@ internal sealed class WorkloadProvider(IEnumerable<WorkloadInfo> workloads) : IW
             IReadOnlyList<TWorkload> workloads)
             where TWorkload : WorkloadInfo
         {
-            Dictionary<string, IReadOnlyList<TWorkload>> lookup = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, IReadOnlyList<TWorkload>> lookup = [with(StringComparer.OrdinalIgnoreCase)];
             foreach (IGrouping<string, TWorkload> group in workloads.GroupBy(w => w.PackageId, StringComparer.OrdinalIgnoreCase))
             {
                 lookup.Add(group.Key, [.. group]);
