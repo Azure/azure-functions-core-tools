@@ -13,8 +13,6 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
-using Microsoft.TemplateEngine.Abstractions;
-using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -66,6 +64,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly ITemplaterFactory _templaterFactory;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
     private readonly IReadOnlyList<Option> _stackSpecificOptions;
+    private readonly TemplateProjectInitializer _templateInitializer;
 
     public InitCommand(
         IInteractionService interaction,
@@ -95,6 +94,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _bundleScanner = bundleScanner;
         _templaterFactory = templaterFactory;
         _initializers = initializers.ToList();
+        _templateInitializer = new TemplateProjectInitializer(interaction);
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
@@ -332,24 +332,56 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             Language: language,
             Force: force);
 
-        int? templateResult = await TryInitializeFromTemplateAsync(
-            context, initializer, parseResult, persistedLanguage, cancellationToken);
-        if (templateResult is int templateExitCode)
+        IReadOnlyList<string> templateArguments = GetTemplateArgumentTokens(parseResult);
+        if (!string.IsNullOrWhiteSpace(language))
         {
-            return templateExitCode;
-        }
-
-        workingDirectory.CreateIfNotExists();
-        if (force)
-        {
-            if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))
+            using Templater templater = _templaterFactory.Create(new TemplateEngineContext(
+                workingDirectory,
+                new TemplateEngineProjectContext(workingDirectory, initializer.Stack, language)));
+            IReadOnlyList<FuncTemplateInfo> candidates;
+            try
             {
-                _interaction.WriteHint("Init cancelled. The directory was not modified.");
+                candidates = (await templater.ListProjectTemplatesAsync(language, cancellationToken)).Templates;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
+            {
+                _interaction.WriteError(ex.Message);
                 return 1;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            ClearDirectory(workingDirectory.Info);
+            // Once applicable templates exist, template failures never fall back to the existing Stack initializer.
+            if (candidates.Count > 0)
+            {
+                int templateExitCode = await _templateInitializer.InitializeAsync(
+                    templater,
+                    candidates,
+                    context,
+                    initializer.Stack,
+                    parseResult,
+                    _stackSpecificOptions,
+                    templateArguments,
+                    ct => PrepareDestinationAsync(context, ct),
+                    cancellationToken);
+                if (templateExitCode != 0)
+                {
+                    return templateExitCode;
+                }
+
+                WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
+                _interaction.WriteBlankLine();
+                return await ReportInitializedAsync(workingDirectory.Info, initializer.Stack, cancellationToken);
+            }
+        }
+
+        if (templateArguments.Count > 0)
+        {
+            return RejectUnmatchedTemplateArguments(templateArguments);
+        }
+
+        workingDirectory.CreateIfNotExists();
+        if (!await PrepareDestinationAsync(context, cancellationToken))
+        {
+            return 1;
         }
 
         WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
@@ -357,232 +389,37 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         await initializer.InitializeAsync(context, parseResult, cancellationToken);
 
+        return await ReportInitializedAsync(workingDirectory.Info, initializer.Stack, cancellationToken);
+    }
+
+    private async Task<bool> PrepareDestinationAsync(InitContext context, CancellationToken cancellationToken)
+    {
+        if (!context.Force)
+        {
+            return true;
+        }
+
+        context.WorkingDirectory.CreateIfNotExists();
+        if (!await ConfirmClearDirectoryAsync(context.WorkingDirectory.Info, cancellationToken))
+        {
+            _interaction.WriteHint("Init cancelled. The directory was not modified.");
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ClearDirectory(context.WorkingDirectory.Info);
+        return true;
+    }
+
+    private async Task<int> ReportInitializedAsync(DirectoryInfo projectDirectory, string stack, CancellationToken cancellationToken)
+    {
         _interaction.WriteLine(l => l
             .Success("✓ ")
             .Muted("Project initialized for ")
-            .Code(initializer.Stack)
+            .Code(stack)
             .Muted("."));
-
-        await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
-
+        await WarnIfBundleChannelNotInstalledAsync(projectDirectory, cancellationToken);
         return 0;
-    }
-
-    private async Task<int?> TryInitializeFromTemplateAsync(
-        InitContext context,
-        IProjectInitializer initializer,
-        ParseResult parseResult,
-        string? persistedLanguage,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(context.Language))
-        {
-            IReadOnlyList<string> unmatched = GetTemplateArgumentTokens(parseResult);
-            return unmatched.Count == 0 ? null : RejectUnmatchedTemplateArguments(unmatched);
-        }
-
-        var engineContext = new TemplateEngineContext(
-            context.WorkingDirectory,
-            new TemplateEngineProjectContext(context.WorkingDirectory, initializer.Stack, context.Language));
-        using Templater templater = _templaterFactory.Create(engineContext);
-
-        TemplateResolutionResult candidateResult;
-        try
-        {
-            candidateResult = await templater.ListProjectTemplatesAsync(context.Language, cancellationToken);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
-        {
-            _interaction.WriteError(ex.Message);
-            return 1;
-        }
-
-        if (candidateResult.Templates.Count == 0)
-        {
-            IReadOnlyList<string> unmatched = GetTemplateArgumentTokens(parseResult);
-            return unmatched.Count == 0 ? null : RejectUnmatchedTemplateArguments(unmatched);
-        }
-
-        string defaultShortName = $"func-{initializer.Stack}";
-        FuncTemplateInfo[] defaults = [.. candidateResult.Templates
-            .Where(template => template.ShortNameList.Contains(defaultShortName, StringComparer.OrdinalIgnoreCase))];
-        if (defaults.Length != 1)
-        {
-            string candidates = string.Join(", ", candidateResult.Templates.Select(template => template.Identity));
-            _interaction.WriteError(
-                $"Expected one default project template named '{defaultShortName}' for language '{context.Language}', " +
-                $"but found {defaults.Length}. Matching templates: {candidates}.");
-            return 1;
-        }
-
-        FuncTemplateInfo template = defaults[0];
-        IReadOnlyDictionary<string, string> parameters;
-        try
-        {
-            parameters = BindTemplateParameters(template, parseResult);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _interaction.WriteError(ex.Message);
-            return 1;
-        }
-
-        ITemplateCreationResult preflightResult = await templater.InstantiateAsync(
-            template,
-            context.ProjectName,
-            context.WorkingDirectory.Info.FullName,
-            parameters,
-            context.Force,
-            cancellationToken,
-            dryRun: true);
-        if ((preflightResult.Status != CreationResultStatus.Success
-                && !(context.Force && preflightResult.Status == CreationResultStatus.DestructiveChangesDetected))
-            || (!context.Force && HasExistingFileChanges(preflightResult)))
-        {
-            _interaction.WriteError(DescribeCreationFailure(template, preflightResult));
-            return 1;
-        }
-
-        DirectoryInfo workingDirectory = context.WorkingDirectory.Info;
-        if (context.Force)
-        {
-            context.WorkingDirectory.CreateIfNotExists();
-            if (!await ConfirmClearDirectoryAsync(workingDirectory, cancellationToken))
-            {
-                _interaction.WriteHint("Init cancelled. The directory was not modified.");
-                return 1;
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            ClearDirectory(workingDirectory);
-        }
-
-        ITemplateCreationResult result = await templater.InstantiateAsync(
-            template,
-            context.ProjectName,
-            workingDirectory.FullName,
-            parameters,
-            context.Force,
-            cancellationToken);
-        if (result.Status != CreationResultStatus.Success)
-        {
-            _interaction.WriteError(DescribeCreationFailure(template, result));
-            return 1;
-        }
-
-        WriteCliConfigurationFile(workingDirectory, initializer.Stack, persistedLanguage, context.Force);
-        _interaction.WriteBlankLine();
-        _interaction.WriteLine(l => l
-            .Success("✓ ")
-            .Muted("Project initialized for ")
-            .Code(initializer.Stack)
-            .Muted("."));
-        await WarnIfBundleChannelNotInstalledAsync(workingDirectory, cancellationToken);
-        return 0;
-    }
-
-    private IReadOnlyDictionary<string, string> BindTemplateParameters(FuncTemplateInfo template, ParseResult parseResult)
-    {
-        var templateCommand = new Command("template");
-        List<Option> declaredOptions = GetDeclaredOptions(parseResult.CommandResult.Command);
-        Dictionary<string, ITemplateParameter> parametersByAlias = [with(StringComparer.OrdinalIgnoreCase)];
-        Dictionary<Option, ITemplateParameter> parametersByOption = [];
-
-        foreach ((string parameterName, FuncTemplateSymbol symbol) in template.HostData.SymbolInfo)
-        {
-            if (!template.ParameterDefinitions.TryGetValue(parameterName, out ITemplateParameter? parameter))
-            {
-                continue;
-            }
-
-            string? longName = ReadTemplateOptionName(template, parameterName, "longName", symbol.LongName);
-            if (longName is null)
-            {
-                continue;
-            }
-
-            string? shortName = ReadTemplateOptionName(template, parameterName, "shortName", symbol.ShortName);
-            string[] aliases = shortName is null ? [$"--{longName}"] : [$"--{longName}", $"-{shortName}"];
-            foreach (string alias in aliases)
-            {
-                if (!parametersByAlias.TryAdd(alias, parameter))
-                {
-                    throw new InvalidOperationException(
-                        $"Template '{template.Identity}' has conflicting func.host.json option '{alias}'.");
-                }
-
-                Option? commandOption = declaredOptions
-                    .FirstOrDefault(option => HasOptionAlias(option, alias));
-                if (commandOption is not null && !_stackSpecificOptions.Contains(commandOption))
-                {
-                    throw new InvalidOperationException(
-                        $"Template '{template.Identity}' has func.host.json option '{alias}' that conflicts with a built-in init option.");
-                }
-            }
-
-            Option[] stackOptions = [.. _stackSpecificOptions
-                .Where(option => aliases.Any(alias => HasOptionAlias(option, alias)))
-                .Distinct()];
-            if (stackOptions.Length > 1)
-            {
-                throw new InvalidOperationException(
-                    $"Template '{template.Identity}' has func.host.json aliases that map to multiple init options.");
-            }
-
-            if (stackOptions.Length == 1)
-            {
-                continue;
-            }
-
-            Option templateOption = IsBooleanParameter(parameter)
-                ? new Option<bool>(aliases[0], aliases[1..])
-                : new Option<string>(aliases[0], aliases[1..])
-                {
-                    Arity = string.IsNullOrEmpty(parameter.DefaultIfOptionWithoutValue)
-                        ? ArgumentArity.ExactlyOne
-                        : ArgumentArity.ZeroOrOne
-                };
-            templateCommand.Options.Add(templateOption);
-            parametersByOption.Add(templateOption, parameter);
-        }
-
-        Dictionary<string, string> values = [with(StringComparer.Ordinal)];
-        foreach (Option option in _stackSpecificOptions)
-        {
-            if (parseResult.GetResult(option) is not { Implicit: false } optionResult)
-            {
-                continue;
-            }
-
-            string alias = optionResult.IdentifierToken?.Value ?? option.Name;
-            if (!parametersByAlias.TryGetValue(alias, out ITemplateParameter? parameter))
-            {
-                throw new InvalidOperationException($"Option '{alias}' is not supported by template '{template.Identity}'.");
-            }
-
-            AddTemplateParameterValue(values, parameter, optionResult);
-        }
-
-        ParseResult templateParseResult = templateCommand.Parse(["template", .. GetTemplateArgumentTokens(parseResult)]);
-        if (templateParseResult.UnmatchedTokens.Count > 0)
-        {
-            string token = templateParseResult.UnmatchedTokens[0];
-            throw new InvalidOperationException(token.StartsWith('-')
-                ? $"Unrecognized option '{token}'."
-                : $"Unrecognized argument '{token}'. Specify the project path before template options.");
-        }
-
-        if (templateParseResult.Errors.Count > 0)
-        {
-            throw new InvalidOperationException(templateParseResult.Errors[0].Message);
-        }
-
-        foreach ((Option option, ITemplateParameter parameter) in parametersByOption)
-        {
-            AddTemplateParameterValue(values, parameter, templateParseResult.GetResult(option));
-        }
-
-        return values;
     }
 
     private IReadOnlyList<string> GetTemplateArgumentTokens(ParseResult parseResult)
@@ -605,97 +442,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             : $"Unrecognized argument '{token}'. Specify the project path before template options.");
         return 1;
     }
-
-    private static void AddTemplateParameterValue(
-        Dictionary<string, string> values,
-        ITemplateParameter parameter,
-        OptionResult? optionResult)
-    {
-        if (optionResult is null || optionResult.Implicit)
-        {
-            return;
-        }
-
-        string alias = optionResult.IdentifierToken?.Value ?? optionResult.Option.Name;
-        if (optionResult.IdentifierTokenCount > 1)
-        {
-            throw new InvalidOperationException($"Option '{alias}' was specified more than once.");
-        }
-
-        if (optionResult.Tokens.Count > 0)
-        {
-            values[parameter.Name] = optionResult.Tokens[0].Value;
-        }
-        else if (!string.IsNullOrEmpty(parameter.DefaultIfOptionWithoutValue))
-        {
-            values[parameter.Name] = parameter.DefaultIfOptionWithoutValue;
-        }
-        else if (IsBooleanParameter(parameter))
-        {
-            values[parameter.Name] = "true";
-        }
-        else
-        {
-            throw new InvalidOperationException($"Option '{alias}' requires a value.");
-        }
-    }
-
-    private static string? ReadTemplateOptionName(
-        FuncTemplateInfo template,
-        string parameterName,
-        string propertyName,
-        string? name)
-    {
-        if (string.IsNullOrEmpty(name))
-        {
-            return null;
-        }
-
-        if (!char.IsLetterOrDigit(name[0]) || !name.All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or '.'))
-        {
-            throw new InvalidOperationException(
-                $"Template '{template.Identity}' has invalid func.host.json {propertyName} for symbol '{parameterName}'.");
-        }
-
-        return name;
-    }
-
-    private static bool IsBooleanParameter(ITemplateParameter parameter)
-        => string.Equals(parameter.DataType, "bool", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(parameter.DataType, "boolean", StringComparison.OrdinalIgnoreCase);
-
-    private static bool HasOptionAlias(Option option, string alias)
-        => string.Equals(option.Name, alias, StringComparison.OrdinalIgnoreCase)
-            || option.Aliases.Contains(alias, StringComparer.OrdinalIgnoreCase);
-
-    private static List<Option> GetDeclaredOptions(Command command)
-    {
-        List<Option> options = [.. command.Options];
-        for (Command? parent = command.Parents.OfType<Command>().FirstOrDefault(); parent is not null;
-            parent = parent.Parents.OfType<Command>().FirstOrDefault())
-        {
-            options.AddRange(parent.Options.Where(option => option.Recursive));
-        }
-
-        return options;
-    }
-
-    private static string DescribeCreationFailure(FuncTemplateInfo template, ITemplateCreationResult result)
-    {
-        if (HasExistingFileChanges(result) || result.Status == CreationResultStatus.DestructiveChangesDetected)
-        {
-            string files = string.Join(", ", result.CreationEffects?.FileChanges
-                .Where(change => change.ChangeKind != ChangeKind.Create)
-                .Select(change => change.TargetRelativePath) ?? []);
-            return $"Cannot initialize the project because these files already exist: {files}. "
-                + "Use --force to replace the directory contents.";
-        }
-
-        return $"Failed to initialize the project from template '{template.Identity}': {result.ErrorMessage ?? result.Status.ToString()}";
-    }
-
-    private static bool HasExistingFileChanges(ITemplateCreationResult result)
-        => result.CreationEffects?.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create) == true;
 
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
     // Warn when no bundle workload for that channel is installed, pointing at

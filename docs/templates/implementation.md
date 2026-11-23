@@ -12,6 +12,7 @@ The current CLI includes:
 - `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata and retain the original engine template. `HostConfigPlace` is available, but its file is not read yet.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
 - `func init` uses a template when project candidates are found for the resolved language and exactly one has the `func-{stack}` short name. It binds the selected template's host aliases to native parameter definitions, ignores stale host symbols, and leaves omitted values to Template Engine defaults. With no candidates, it falls back to the existing Stack initializer; when candidates exist without a unique default, it fails.
+- `TemplateProjectInitializer`: owns template-driven project initialization after `InitCommand` finds applicable candidates, including `func-{stack}` default selection, host-alias binding, unknown template-option rejection, Template Engine dry-run preflight, and creation through `Templater`. It never calls `IProjectInitializer`. `InitCommand` keeps routing, adoption and repair, the existing Stack initializer path, destination preparation for `--force`, and the `.func/config.json` write. Option registration remains on the public command for System.CommandLine parsing and help; semantic interpretation and execution are separated by flow.
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
@@ -21,11 +22,11 @@ This proof of concept uses installed content already present in the CLI hive; wo
 
 ### Existing initialization limitations
 
-The existing Stack initializer path retains its safety limitations: it can create the destination before all validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail. The template path validates with Template Engine dry-run before force confirmation, cleanup, generation, or configuration writes, and refuses planned overwrites unless `--force` is used.
+The existing Stack initializer path retains its safety limitations: it can create the destination before all validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail. The template path validates with Template Engine dry-run before force confirmation, cleanup, generation, or configuration writes, and refuses planned overwrites unless `--force` is used. Both paths share the `.func/config.json` write, which currently warns and completes when that write fails; returning failure as the [architecture](architecture.md) requires is a follow-up.
 
 These behaviors belong to the existing implementation. The proposed template-based path must correct them before replacing an initializer.
 
-Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
+Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/TemplateProjectInitializer.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
 
 ## Next implementation steps
 

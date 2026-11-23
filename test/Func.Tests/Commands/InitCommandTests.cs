@@ -501,6 +501,7 @@ public class InitCommandTests
                 templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
 
             exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
             File.ReadAllText(generatedFile).Should().Be("user content");
             File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeFalse();
         }
