@@ -39,6 +39,16 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         ITemplateCreationResult result = await GenerateAsync(template, "Sample.App", parameters);
 
         result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+        result.CreationResult!.PrimaryOutputs.Select(output => output.Path).Should().Equal("Sample.App.csproj");
+        IPostAction restore = result.CreationResult.PostActions.Should().ContainSingle().Subject;
+        restore.ActionId.Should().Be(new Guid("210D431B-A78B-4D2F-B762-4ED3E3EA9025"));
+        restore.ContinueOnError.Should().BeFalse();
+        restore.ManualInstructions.Should().Contain("dotnet restore");
+        using var restoreFiles = JsonDocument.Parse(restore.Args["files"]);
+        restoreFiles.RootElement.EnumerateArray().Select(file => file.GetString()).Should().Equal("*.csproj");
+        result.CreationEffects.Should().BeAssignableTo<ICreationEffects2>().Which.FileChanges
+            .Should().Contain(change => change.SourceRelativePath.EndsWith("FunctionsProject.csproj", StringComparison.Ordinal)
+                && change.TargetRelativePath.EndsWith("Sample.App.csproj", StringComparison.Ordinal));
         string output = result.OutputBaseDirectory!;
         var project = XDocument.Load(Path.Combine(output, "Sample.App.csproj"));
         project.Root!.Element("PropertyGroup")!.Element("TargetFramework")!.Value.Should().Be("net10.0");

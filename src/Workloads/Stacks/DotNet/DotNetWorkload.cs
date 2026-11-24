@@ -27,5 +27,6 @@ public sealed class DotNetWorkload(StackDescriptor descriptor) : Workload
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
         builder.AddProjectFactory<DotNetProjectFactory>();
+        builder.AddTemplateComponent<DotNetRestorePostActionProcessor>();
     }
 }
