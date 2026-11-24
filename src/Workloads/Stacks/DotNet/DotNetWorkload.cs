@@ -31,5 +31,6 @@ public sealed class DotNetWorkload : Workload
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
         builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();
         builder.AddProjectFactory<DotNetProjectFactory>();
+        builder.AddTemplateComponent<DotNetRestorePostActionProcessor>();
     }
 }

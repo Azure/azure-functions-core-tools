@@ -53,5 +53,18 @@
   ],
   "primaryOutputs": [
     { "path": "FunctionsProject.csproj" }
+  ],
+  "postActions": [
+    {
+      "description": "Restore NuGet packages required by this project.",
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": false,
+      "args": {
+        "files": [ "*.csproj" ]
+      },
+      "manualInstructions": [
+        { "text": "Run 'dotnet restore' in the generated project directory." }
+      ]
+    }
   ]
 }

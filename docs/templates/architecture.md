@@ -180,7 +180,9 @@ Render into command-scoped private temporary output within defined asset and exp
 - Dry runs list the actions that would run without evaluating predicates or executing processors.
 - No core run-script processor (`3A7C4B45-1F5D-4A30-959A-51B88E82B5D2`) is implemented. Without a matching workload processor it falls back to manual instructions; its allow, deny, or prompt policy is still to be designed.
 
-See [workload authoring](../building-a-workload.md#template-post-actions) for registration, context, reporting, and lifetime details. This API adds no concrete processors or command wiring.
+The .NET stack workload supplies the standard NuGet restore processor (`210D431B-A78B-4D2F-B762-4ED3E3EA9025`), declared by its bundled project template. Its `files` argument matches source paths with `dotnet new` semantics and falls back to primary outputs when no files match. Command wiring remains deferred.
+
+See [workload authoring](../building-a-workload.md#template-post-actions) for registration, context, reporting, and lifetime details.
 
 <a id="non-force-init"></a>
 

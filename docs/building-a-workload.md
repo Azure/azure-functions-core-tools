@@ -458,6 +458,13 @@ The CLI currently bridges post-action processors to the engine. Other
 `ITemplateComponent` contracts can be registered but are ignored until the CLI
 supports them; arbitrary template-engine types are not exposed.
 
+The .NET stack workload registers the standard NuGet restore action
+(`210D431B-A78B-4D2F-B762-4ED3E3EA9025`) for `dotnet` templates tagged with
+`C#`, `csharp`, `F#`, or `fsharp` (case-insensitive). Its optional `files`
+argument accepts the same source-relative patterns as `dotnet new`, either as a
+semicolon-delimited string or a JSON array. If no files match, it restores the
+primary outputs instead; no matching files and no primary outputs is a success.
+
 ### Selecting a Processor
 
 Implement `bool CanProcess(PostActionSelectionContext context)` to declare
