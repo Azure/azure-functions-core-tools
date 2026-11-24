@@ -197,8 +197,8 @@ internal static class TemplateFixtures
                 {
                   "symbolInfo": {
                     "TargetFramework": { "longName": "{{targetFrameworkAlias}}", "shortName": "{{targetFrameworkShortName}}" },
-                    "NoHttp": { "longName": "no-http" },
-                    "NoTelemetry": { "longName": "no-telemetry" },
+                    "NoHttp": { "longName": "no-http", "shortName": "x" },
+                    "NoTelemetry": { "longName": "no-telemetry", "shortName": "y" },
                     "RemovedParameter": { "longName": "stale" }
                   }
                 }

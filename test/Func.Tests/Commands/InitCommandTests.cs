@@ -650,6 +650,69 @@ public class InitCommandTests
     }
 
     [Fact]
+    public async Task InitCommand_LegacyShortOptionRequiresSeparateChannelValue()
+    {
+        string output = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            BundleChannel? observed = null;
+            var initializer = new FakeProjectInitializer(
+                "python", ["python"],
+                optionFactory: registry => [registry.GetOrAdd(CommonInitOptions.BundlesChannel())],
+                onInitialize: (init, parse) => observed = parse.GetValue((Option<BundleChannel>)init.ContributedOptions.Single()));
+
+            int combined = await RunInitAsync(output, initializer, language: "python", stack: "python", extraArgs: ["-cPreview"]);
+
+            combined.Should().Be(1);
+            _interaction.Lines.Should().Equal("ERROR: Unrecognized option '-cPreview'.");
+            Directory.Exists(output).Should().BeFalse();
+            initializer.WasInvoked.Should().BeFalse();
+
+            int separate = await RunInitAsync(output, initializer, language: "python", stack: "python", extraArgs: ["-c", "Preview"]);
+
+            separate.Should().Be(0);
+            observed.Should().Be(BundleChannel.Preview);
+        }
+        finally
+        {
+            CleanupDirectory(output);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateShortOptionsMustBePassedSeparately()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            await TemplateFixtures.InstallAsync(TemplateFixtures.WriteInitProjectPackage(root), Path.Combine(home, "templates"));
+            ITemplaterFactory factory = TemplateFixtures.CreateTemplaterFactory(home);
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int combined = await RunInitAsync(output, initializer, language: "python", stack: "python",
+                extraArgs: ["-xy"], templaterFactory: factory);
+
+            combined.Should().Be(1);
+            _interaction.Lines.Should().Equal("ERROR: Unrecognized option '-xy'.");
+            Directory.Exists(output).Should().BeFalse();
+            initializer.WasInvoked.Should().BeFalse();
+
+            int separate = await RunInitAsync(output, initializer, language: "python", stack: "python",
+                extraArgs: ["-x", "-y"], templaterFactory: factory);
+
+            separate.Should().Be(0);
+            File.Exists(Path.Combine(output, "Http.txt")).Should().BeFalse();
+            File.ReadAllText(Path.Combine(output, "Program.cs")).Should().NotContain("AddOpenTelemetry");
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task InitCommand_TemplateOnlySiblingAliasBindsWhenStackRegistersOtherOptions()
     {
         string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");

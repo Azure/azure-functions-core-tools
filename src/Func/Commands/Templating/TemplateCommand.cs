@@ -25,7 +25,11 @@ internal abstract class TemplateCommand : FuncCliCommand
     /// Parser configuration for re-parsing tokens this command's parse already produced. Response files were expanded
     /// by that parse and are not expanded again.
     /// </summary>
-    protected internal static ParserConfiguration TokenParserConfiguration { get; } = new() { ResponseFileTokenReplacer = null };
+    protected internal static ParserConfiguration TokenParserConfiguration { get; } = new()
+    {
+        EnablePosixBundling = false,
+        ResponseFileTokenReplacer = null,
+    };
 
     /// <summary>
     /// Returns, in command-line order, the tokens after this command that were not consumed by its options, its
