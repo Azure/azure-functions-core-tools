@@ -97,7 +97,7 @@ The Template Engine infrastructure is implemented under `src/Func/Templates/Engi
 
 Currently, `func new` reports scaffolding and `--list` temporarily unavailable and returns exit code 1 without modifying the target directory. The command skips first-run setup, so this error is returned without running setup.
 
-`func init`, Quickstart, setup, and Functions runtime execution remain available.
+`func init`, setup, and Functions runtime execution remain available.
 
 The v5 CLI is a ground-up rebuild using:
 

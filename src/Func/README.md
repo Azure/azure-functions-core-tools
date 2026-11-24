@@ -28,14 +28,6 @@ func <command> [options]
 | `setup` | Prepare local CLI dependencies (host, worker, stack, templates, extension bundle). |
 | `version` | Display the current CLI version. |
 
-### Quickstart
-
-| Command | Description |
-|---------|-------------|
-| `quickstart` | Browse and scaffold complete function apps from the template catalog. |
-| `quickstart list` | List available templates from the catalog. |
-| `quickstart info` | Show detailed information about a template. |
-
 ### Workload Management
 
 | Command | Description |
@@ -66,12 +58,6 @@ func new --template HttpTrigger --name MyFunction
 
 # Run the Functions host
 func run
-
-# Browse quickstart templates
-func quickstart list
-
-# Scaffold a quickstart template
-func quickstart --language python
 
 # Install a workload
 func workload install dotnet

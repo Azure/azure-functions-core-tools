@@ -4,13 +4,10 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Quickstart;
-using Azure.Functions.Cli.Tests.Commands.Quickstart;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
@@ -64,32 +61,6 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
 
         await initializer.Received(!stdoutInput || response == Response.Yes ? 1 : 0).InitializeAsync(
             Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
-    }
-
-    [Theory]
-    [MemberData(nameof(Profiles))]
-    public async Task Quickstart_Force_OnlyClearsWhenConfirmedOrInputUnavailable(
-        bool stdoutInput, bool stdoutAnsi, bool stderrInput, bool stderrAnsi, Response response)
-    {
-        var provider = QuickstartTestHelpers.CreateProvider();
-        var entry = QuickstartTestHelpers.CreateEntry();
-        var manifest = new QuickstartManifest([entry]);
-        var resolver = Substitute.For<IQuickstartProviderResolver>();
-        resolver.SelectProviderAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(provider);
-        resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>())
-            .Returns(("Python", (int?)null));
-        var manifestService = Substitute.For<IQuickstartManifestService>();
-        manifestService.GetManifestAsync(Arg.Any<CancellationToken>()).Returns(manifest);
-        var scaffolder = Substitute.For<IQuickstartScaffolder>();
-
-        await AssertForceConfirmationAsync(service => new QuickstartCommand(
-                new QuickstartListCommand(service, resolver, manifestService, [provider]),
-                new QuickstartInfoCommand(service, resolver, manifestService),
-                service, resolver, manifestService, scaffolder, [provider]),
-            stdoutInput, stdoutAnsi, stderrInput, stderrAnsi, response, CancellationToken.None);
-
-        await scaffolder.Received(!stdoutInput || response == Response.Yes ? 1 : 0).ScaffoldAsync(
-            entry, Arg.Any<string>(), Arg.Any<FetchMode>(), Arg.Any<CancellationToken>());
     }
 
     private async Task AssertForceConfirmationAsync(
