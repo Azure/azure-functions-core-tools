@@ -1,0 +1,21 @@
+{
+  "name": "functions-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/src/functions/*.js",
+  "scripts": {
+    "build": "npm run clean && tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf dist",
+    "start": "func start",
+    "test": "echo \"No tests yet...\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.x",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  }
+}

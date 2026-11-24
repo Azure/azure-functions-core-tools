@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "HTTP" ],
+  "identity": "Azure.Functions.Cli.Node.HttpTrigger.TypeScript",
+  "groupIdentity": "Azure.Functions.Cli.Node.HttpTrigger",
+  "name": "Azure Functions HTTP trigger (TypeScript)",
+  "description": "An HTTP trigger using the Node.js v4 programming model.",
+  "shortName": "httptrigger",
+  "tags": {
+    "language": "TypeScript",
+    "stack": "node",
+    "type": "item"
+  },
+  "symbols": {
+    "AuthLevel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "function",
+      "description": "The authorization level for the HTTP trigger.",
+      "choices": [
+        { "choice": "function", "description": "Require a function key." },
+        { "choice": "anonymous", "description": "Allow anonymous requests." },
+        { "choice": "admin", "description": "Require the host master key." }
+      ]
+    },
+    "AuthLevelExpression": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "authLevel: 'function'",
+      "parameters": {
+        "source": "AuthLevel",
+        "steps": [
+          { "regex": "^(.*)$", "replacement": "authLevel: '$1'" }
+        ]
+      }
+    }
+  },
+  "sourceName": "HttpFunction",
+  "primaryOutputs": [
+    { "path": "src/functions/HttpFunction.ts" }
+  ]
+}

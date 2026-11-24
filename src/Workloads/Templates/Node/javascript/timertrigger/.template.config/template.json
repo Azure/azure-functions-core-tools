@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Timer" ],
+  "identity": "Azure.Functions.Cli.Node.TimerTrigger.JavaScript",
+  "groupIdentity": "Azure.Functions.Cli.Node.TimerTrigger",
+  "name": "Azure Functions timer trigger (JavaScript)",
+  "description": "A timer trigger that runs every five minutes.",
+  "shortName": "timertrigger",
+  "tags": {
+    "language": "JavaScript",
+    "stack": "node",
+    "type": "item"
+  },
+  "sourceName": "TimerFunction",
+  "primaryOutputs": [
+    { "path": "src/functions/TimerFunction.js" }
+  ]
+}

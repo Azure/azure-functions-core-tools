@@ -8,6 +8,7 @@
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>node</WorkloadAlias>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
   </PropertyGroup>
 
   <ItemGroup>
