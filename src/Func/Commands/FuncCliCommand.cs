@@ -46,6 +46,12 @@ internal abstract class FuncCliCommand : Command
 
     internal string? GetHelpFooterHint() => HelpFooterHint;
 
+    /// <summary>
+    /// Returns the options help documents for this command. Defaults to <see cref="Command.Options"/>; commands that
+    /// parse some options only on a selected route add them here so they stay documented.
+    /// </summary>
+    internal virtual IEnumerable<Option> GetHelpOptions() => Options;
+
     internal StackDescriptor? GetOptionHelpStack(Option option)
     {
         ArgumentNullException.ThrowIfNull(option);

@@ -1,6 +1,6 @@
 # Implementing the Template Engine
 
-**Status:** Proposed implementation plan
+**Status:** Template-driven project initialization in `func init`; not release-qualified
 
 This document describes the existing CLI v5 infrastructure, what remains to be implemented, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) describes the proposed behavior and safety boundaries.
 
@@ -8,16 +8,19 @@ This document describes the existing CLI v5 infrastructure, what remains to be i
 
 The current CLI includes:
 
-- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, a persistent CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`. The factory gets engine components from `IFuncTemplateComponentProvider.Get()`, which combines built-in components, `ICoreTemplateComponent` registrations, and supported bridges for workload `ITemplateComponent` contracts; no separate engine-session abstraction is used.
-- `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata, retain the original engine template as `Template`, and expose parsed `func.host.json` metadata through `HostData`.
-- `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
+- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, a persistent CLI template hive, installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`, filtered project-template discovery, and native dry-run validation and instantiation through `FuncTemplateInfo.InstantiateAsync`, which delegates to `TemplateCreator`. `Templater` does not require a single project template; several can coexist. The factory gets engine components from `IFuncTemplateComponentProvider.Get()`, which combines built-in components, `ICoreTemplateComponent` registrations, and supported bridges for workload `ITemplateComponent` contracts; no separate engine-session abstraction is used.
+- `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata, retain the original engine template as `Template`, and expose parsed `func.host.json` metadata through `HostData`. Filtered project-template discovery also retains each candidate's native `ITemplateMatchInfo` in `TemplateResolutionResult.Matches`, keyed by the candidate; the caller still selects among all candidates.
+- `IProjectInitializer` and Stack metadata: six existing project initializers and their Stack-specific options. `InitializeAsync` remains the existing Stack scaffolding path until replacements are qualified. `ConfigureProjectAsync` is the Stack-owned, non-scaffolding setup hook for template-created projects; it defaults to no operation and the .NET initializer does not override it.
+- `func init` uses a template when project candidates are found for the resolved language and exactly one has the `func-{stack}` short name. Public parsing is route-neutral for Stack-contributed options: they are shown in help, but their typed validation does not run before routing. The template route binds every alias the selected template authors in `func.host.json` according to its native parameter definitions, including spellings a Stack also registers with a different type or arity, ignores stale host symbols, and leaves omitted values to Template Engine defaults. Stack-only aliases the template does not author are rejected, and a native parameter assigned more than once is rejected. With no candidates, the existing Stack route parses the same tokens against the Stack's typed options; when candidates exist without a unique default, it fails.
+- `src/Func/Commands/Init/`: `InitCommand` (a `TemplateCommand`) parses the request, detects the project state, and routes it. `NewInitCommand` owns template creation: `func-{stack}` default selection, host-alias binding, unknown template-option rejection, Template Engine dry-run preflight, destination preparation for `--force`, creation, the `.func/config.json` write attempt, and then `IProjectInitializer.ConfigureProjectAsync`. It checks for cancellation after Stack setup, so a cancelled setup never reports success; created files remain, and it never calls `InitializeAsync`. A marked seam after that check is reserved for calling the post-action dispatcher merged in #5963; `func init` does not call it yet. `NewInitCommand` also owns adoption and configuration repair of existing projects, which create no project content and therefore reject template and Stack options, including registered Stack options, before prompting or writing. `LegacyInitCommand` keeps the existing Stack scaffolding path through `InitializeAsync`, after typed validation of the Stack options. `InitWorkflow` holds helpers shared by both flows.
+- `TemplateCommand` and `TemplateArgumentBinder`: template commands disable treating unmatched tokens as errors; the binder receives the leftover tokens, binds recognized template options, and rejects the rest. Diagnostics come from System.CommandLine parse results, including invalid Boolean values such as `--no-http=garbage`. `PathArgument` never consumes a `-`-prefixed token, so other commands still report such tokens as unrecognized. The positional `[path]` is transitional: `func init <path> [template options]`. The path must precede template and Stack options, and a path that follows any of them is rejected.
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - Workload template roots: a workload can declare an optional `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, the loader resolves it for active runtime workloads, and `WorkloadTemplatePackageProviderFactory` exposes the roots to the engine as read-only template packages. The .NET, Go, Node.js, and Python workloads package their project, HTTP trigger, and Timer trigger templates under `content/templates` and declare that directory as `templateRoot`. The .NET HTTP trigger template declares an `AuthorizationLevel` parameter (`Anonymous`, `Function`, or `Admin`; default `Function`) with `--auth-level` and `-a` host aliases. Installs that predate `templateRoot` persistence need a reinstall.
 - Test-only local template installation in isolated hives.
 - Real-engine discovery tests cover persistent cache reuse, source addition/removal, missing roots, active-version replacement, same-version timestamp refresh, native duplicate precedence, and aggregation with a managed provider. The cache persists across commands; the workload source list is cached for each engine instance.
 
-The discovery foundation is not yet integrated with `func init` or `func new`. It does not apply host parameter mappings to CLI options, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
+The discovery foundation is integrated with `func init` only. `func new`, Functions-specific constraints, selected-content integrity checks, and private rendering remain out of scope, and post-action execution remains out of scope for `func init`; the #5963 dispatcher is merged but not yet wired. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 
 The Python HTTP trigger template declares `--auth-level` and `-a` host aliases for its `AuthorizationLevel` parameter; these require command integration before they can be used in `func new`.
 
@@ -25,29 +28,27 @@ Microsoft.TemplateEngine accepts an explicitly empty choice value even when it i
 
 ### Existing initialization limitations
 
-The current `func init` path has known safety limitations: it can create the destination before validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail.
+The existing Stack initializer path retains its safety limitations: it can create the destination before all validation, perform force cleanup before all Stack-specific checks, and report success after some required configuration writes fail. The template path validates with Template Engine dry-run before force confirmation, cleanup, generation, or configuration writes, and refuses planned overwrites unless `--force` is used. Both paths share the `--force` cleanup, which preserves a `.git` directory but deletes a `.git` pointer file, so `--force` is not yet safe for Git worktrees. Both paths also share the `.func/config.json` write, which currently warns and completes when that write fails; returning failure as the [architecture](architecture.md) requires is a follow-up.
 
 These behaviors belong to the existing implementation. The proposed template-based path must correct them before replacing an initializer.
 
-Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
+Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/Init/`, `src/Func/Commands/Templating/`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
 
 ## Next implementation steps
 
-The first increment provides an internal installed-template discovery API, but it is not exposed through CLI commands. Add the remaining behavior in small steps.
+`func init` provides one template-driven project initialization route. Remaining work should stay separate from this narrow integration.
 
 The next command slice is .NET 10 isolated/C# using the workload-provided, constraint-free project, HTTP trigger, and Timer trigger templates. Other Stacks, constraints, advanced post-actions, standalone package commands, and remote search are separate increments.
 
-1. **Build on the discovery API.** The factory creates a `Templater` with command context and DI-registered engine components. It lists installed templates as `FuncTemplateInfo` values in a `TemplateResolutionResult`. Add selection and invocation APIs when a command needs them, and do not add group or catalog types before they have a consumer.
+1. **Qualify the init path.** Exercise actual supported Stack templates and verify parameters, generated project resolution, force behavior, cancellation, and `.git` preservation, including Git worktree pointer files, on supported platforms. One CLI test runs the real .NET Stack with the shipped `func-dotnet` template; the remaining routing tests use local fixture templates.
 
-2. **Qualify the engine seam.** With project and HTTP-item templates staged under a workload root and an isolated persistent hive, prove language/kind filtering, exact selection, parameter evaluation, and invocation. Delegate template discovery, native duplicate precedence, parameter semantics, and rendering to Microsoft.TemplateEngine. Add richer metadata and custom constraints in their own increments.
+2. **Connect production content.** The .NET, Go, Node.js, and Python workloads already package their templates and emit `templateRoot`; other Stack workloads follow the same pattern. These core templates are versioned and serviced with the workload, so changing one requires a new workload version; see [template versioning](architecture.md#core-and-independently-packaged-template-versioning). The existing store, loader, and provider expose them to the engine without a separate managed-package installation. Verify the actual packaged install/update/uninstall path and advance timestamps on same-version reinstalls. Keep the missing-root diagnostic as explicit follow-up. Discovery must not install packages or force a cache rebuild on every command.
 
-3. **Integrate the CLI commands.** Preserve `func init` adoption/repair and current Stack behavior. Add one template-based project route and one `func new` item route for the same Stack. Keep unmigrated initializers working.
+3. **Implement `func new` separately.** Preserve its existing public command surface, resolve the initialized project context, and validate item collisions before publication. Keep the Quickstart route separate.
 
-4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
+4. **Strengthen publication safety.** The current init route relies on dry-run effects before generation and retains the existing directory-clearing policy for `--force`. A broader private-render and guarded-publication flow needs explicit review and cross-platform validation before release.
 
-5. **Connect production content.** The .NET, Go, Node.js, and Python workloads already package their templates and emit `templateRoot`; other Stack workloads follow the same pattern. These core templates are versioned and serviced with the workload, so changing one requires a new workload version; see [template versioning](architecture.md#core-and-independently-packaged-template-versioning). The existing store, loader, and provider expose them to the engine without a separate managed-package installation. Verify the actual packaged install/update/uninstall path and advance timestamps on same-version reinstalls. Keep the missing-root diagnostic as explicit follow-up. Discovery must not install packages or force a cache rebuild on every command.
-
-6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
+5. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
 Steps 3 and 4 form one safe command increment: no integrated route may change a destination before the guarded publication requirements are in place.
 
@@ -84,7 +85,7 @@ Engine work with isolated representative content does not need to wait for the e
 
 ## Tests and acceptance
 
-These are acceptance criteria for future integration, not a claim that the end-to-end journey or release qualification has completed.
+These are acceptance criteria for release qualification, not a claim that the complete end-to-end journey has completed.
 
 ### First working journey
 

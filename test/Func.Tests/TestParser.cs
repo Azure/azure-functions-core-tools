@@ -4,9 +4,11 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
@@ -66,9 +68,16 @@ internal static class TestParser
         services.AddSingleton(interaction);
         services.AddSingleton(Substitute.For<IPlatform>());
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddSingleton<IFileSystem, PhysicalFileSystem>();
+        services.AddSingleton(new CliConfigurationPathsOptions(
+            Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"))));
         services.AddOptions<StackOptions>();
         services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
+        services.AddSingleton<ITemplaterFactory>(provider =>
+            new TemplaterFactory(
+                provider.GetRequiredService<CliConfigurationPathsOptions>(),
+                new FuncTemplateComponentsProvider([], [], provider.GetRequiredService<IInteractionService>())));
         services.AddProfiles();
         services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
         services.AddSingleton<Cli.Projects.InstalledProjectStackCatalog>();
