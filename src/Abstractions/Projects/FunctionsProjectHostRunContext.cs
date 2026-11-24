@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
@@ -11,7 +13,7 @@ public sealed class FunctionsProjectHostRunContext
     public const string WorkerRuntimeEnvironmentVariable = "FUNCTIONS_WORKER_RUNTIME";
 
     private DirectoryInfo _startupDirectory;
-    private IFunctionsProjectHostRunReporter _reporter = NullFunctionsProjectHostRunReporter.Instance;
+    private IFunctionsReporter _reporter = NullFunctionsReporter.Instance;
 
     public FunctionsProjectHostRunContext(
         DirectoryInfo startupDirectory,
@@ -36,7 +38,7 @@ public sealed class FunctionsProjectHostRunContext
 
     public IDictionary<string, string> EnvironmentVariables { get; }
 
-    public IFunctionsProjectHostRunReporter Reporter
+    public IFunctionsReporter Reporter
     {
         get => _reporter;
         set => _reporter = value ?? throw new ArgumentNullException(nameof(value));

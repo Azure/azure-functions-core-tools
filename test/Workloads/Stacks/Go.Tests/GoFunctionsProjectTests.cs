@@ -71,8 +71,8 @@ public class GoFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "compiling example.com/myapp");
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "go: warning");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Info && e.Line == "compiling example.com/myapp");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Error && e.Line == "go: warning");
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class GoFunctionsProjectTests : IDisposable
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("go build");
         ex.Message.Should().Contain("exit 1");
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "compile error");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Error && e.Line == "compile error");
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public class GoFunctionsProjectTests : IDisposable
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("go mod tidy");
         ex.Message.Should().Contain("exit 1");
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "module not found");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Error && e.Line == "module not found");
     }
 
     [Fact]
@@ -208,12 +208,12 @@ public class GoFunctionsProjectTests : IDisposable
     private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
         => new(_projectDir, "go", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
 
-    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    private sealed class CapturingReporter : IFunctionsReporter
     {
-        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly List<(string Line, FunctionsReportSeverity Severity)> _logs = [];
         private readonly object _gate = new();
 
-        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        public IReadOnlyList<(string Line, FunctionsReportSeverity Severity)> Logs
         {
             get
             {
@@ -228,7 +228,7 @@ public class GoFunctionsProjectTests : IDisposable
         {
         }
 
-        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        public void WriteLog(string line, FunctionsReportSeverity severity = FunctionsReportSeverity.Info)
         {
             lock (_gate)
             {

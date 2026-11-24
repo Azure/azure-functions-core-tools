@@ -253,7 +253,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         renderer.Events.Any(ev => ev is StartInitializationLogEvent log
             && log.StepId == PrepareProjectHostRunInitializationStep.StepId
             && log.Line == "npm install output"
-            && log.Severity == FunctionsProjectReportSeverity.Warning).Should().BeTrue();
+            && log.Severity == FunctionsReportSeverity.Warning).Should().BeTrue();
     }
 
     [Fact]
@@ -264,7 +264,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         await using var reporter = new FunctionsProjectHostRunReporter(context, CancellationToken.None);
 
         reporter.ReportStatus("building");
-        reporter.WriteLog("build output", FunctionsProjectReportSeverity.Error);
+        reporter.WriteLog("build output", FunctionsReportSeverity.Error);
         await reporter.CompleteAsync();
 
         renderer.Events.Any(ev => ev is StartInitializationProgressEvent progress
@@ -274,7 +274,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         renderer.Events.Any(ev => ev is StartInitializationLogEvent log
             && log.StepId == "adapter_step"
             && log.Line == "build output"
-            && log.Severity == FunctionsProjectReportSeverity.Error).Should().BeTrue();
+            && log.Severity == FunctionsReportSeverity.Error).Should().BeTrue();
     }
 
     [Fact]
@@ -399,7 +399,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         public override Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
         {
             context.Reporter.ReportStatus("running npm install");
-            context.Reporter.WriteLog("npm install output", FunctionsProjectReportSeverity.Warning);
+            context.Reporter.WriteLog("npm install output", FunctionsReportSeverity.Warning);
             return Task.CompletedTask;
         }
     }

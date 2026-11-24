@@ -112,8 +112,8 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "added 42 packages");
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "npm warn deprecated");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Info && e.Line == "added 42 packages");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Error && e.Line == "npm warn deprecated");
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public class NodeFunctionsProjectTests : IDisposable
         ex.IsUserError.Should().BeTrue();
         ex.Message.Should().Contain("install");
         ex.Message.Should().Contain("exit 1");
-        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "ENOENT");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsReportSeverity.Error && e.Line == "ENOENT");
     }
 
     [Fact]
@@ -195,12 +195,12 @@ public class NodeFunctionsProjectTests : IDisposable
         {
         }, skipBuild);
 
-    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    private sealed class CapturingReporter : IFunctionsReporter
     {
-        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly List<(string Line, FunctionsReportSeverity Severity)> _logs = [];
         private readonly object _gate = new();
 
-        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        public IReadOnlyList<(string Line, FunctionsReportSeverity Severity)> Logs
         {
             get
             {
@@ -215,7 +215,7 @@ public class NodeFunctionsProjectTests : IDisposable
         {
         }
 
-        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        public void WriteLog(string line, FunctionsReportSeverity severity = FunctionsReportSeverity.Info)
         {
             lock (_gate)
             {

@@ -53,7 +53,7 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         if (context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
             && !string.IsNullOrWhiteSpace(stackConfiguration.StartupNotice))
         {
-            await context.ReportLogAsync(stackConfiguration.StartupNotice, FunctionsProjectReportSeverity.Info, cancellationToken);
+            await context.ReportLogAsync(stackConfiguration.StartupNotice, FunctionsReportSeverity.Info, cancellationToken);
         }
 
         var hostRunContext = new FunctionsProjectHostRunContext(

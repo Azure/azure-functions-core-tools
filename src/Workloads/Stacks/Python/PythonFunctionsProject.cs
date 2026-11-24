@@ -76,8 +76,8 @@ internal sealed class PythonFunctionsProject : FunctionsProject
             int exitCode = await RunCreateVenv(
                 root,
                 venvPath,
-                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Info),
+                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Error),
                 cancellationToken).ConfigureAwait(false);
 
             if (exitCode != 0)
@@ -107,8 +107,8 @@ internal sealed class PythonFunctionsProject : FunctionsProject
                 root,
                 pipPath,
                 requirementsPath,
-                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Info),
+                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Error),
                 cancellationToken).ConfigureAwait(false);
 
             if (exitCode != 0)
