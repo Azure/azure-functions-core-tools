@@ -343,12 +343,14 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         var arguments = new Dictionary<string, string> { ["command"] = "restore" };
         result.CreationResult!.PostActions[0].Args.Returns(arguments);
         ICreationPath output = Substitute.For<ICreationPath>();
-        output.Path.Returns("src/Create.txt");
+        output.Path.Returns("Function.cs");
         result.CreationResult.PrimaryOutputs.Returns([output]);
         var changes = Enum.GetValues<ChangeKind>().Select(kind =>
         {
             var change = Substitute.For<IFileChange>();
-            change.TargetRelativePath.Returns(Path.Combine("src", $"{kind}.txt"));
+            change.TargetRelativePath.Returns(kind == ChangeKind.Create
+                ? "./Function.cs"
+                : Path.Combine("src", $"{kind}.txt"));
             change.ChangeKind.Returns(kind);
             return change;
         }).ToArray();
@@ -369,10 +371,10 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         captured.Description.Should().Be("Restore dependencies");
         captured.ManualInstructions.Should().Be("Complete this manually.");
         captured.ContinueOnError.Should().BeTrue();
-        captured.PrimaryOutputs.Should().Equal("src/Create.txt");
+        captured.PrimaryOutputs.Should().Equal("Function.cs");
         PostActionFileChange[] expectedChanges =
         [
-            new("src/Create.txt", PostActionFileChangeKind.Create),
+            new("Function.cs", PostActionFileChangeKind.Create),
             new("src/Delete.txt", PostActionFileChangeKind.Delete),
             new("src/Overwrite.txt", PostActionFileChangeKind.Overwrite),
             new("src/Change.txt", PostActionFileChangeKind.Change),

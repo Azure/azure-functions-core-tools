@@ -55,16 +55,25 @@ internal sealed class WorkloadPostActionProcessor(
             action.ContinueOnError,
             context.OutputBasePath,
             context.CreationResult.PrimaryOutputs.Select(output => output.Path.Replace(Path.DirectorySeparatorChar, '/')).ToArray(),
-            context.CreationEffects.FileChanges.Select(change => new PostActionFileChange(
-                change.TargetRelativePath.Replace(Path.DirectorySeparatorChar, '/'),
-                change.ChangeKind switch
+            context.CreationEffects.FileChanges.Select(change =>
+            {
+                string targetRelativePath = change.TargetRelativePath.Replace(Path.DirectorySeparatorChar, '/');
+                if (targetRelativePath.StartsWith("./", StringComparison.Ordinal))
+                {
+                    targetRelativePath = targetRelativePath[2..];
+                }
+
+                return new PostActionFileChange(
+                    targetRelativePath,
+                    change.ChangeKind switch
                 {
                     ChangeKind.Create => PostActionFileChangeKind.Create,
                     ChangeKind.Delete => PostActionFileChangeKind.Delete,
                     ChangeKind.Overwrite => PostActionFileChangeKind.Overwrite,
                     ChangeKind.Change => PostActionFileChangeKind.Change,
                     _ => throw new InvalidOperationException($"Unknown template file change kind '{change.ChangeKind}'."),
-                })).ToArray());
+                });
+            }).ToArray());
         return matches[0].Processor.ProcessAsync(snapshot, cancellationToken);
     }
 }
