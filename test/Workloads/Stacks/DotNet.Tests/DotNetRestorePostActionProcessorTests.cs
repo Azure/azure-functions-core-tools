@@ -210,6 +210,7 @@ public sealed class DotNetRestorePostActionProcessorTests
 
     [Theory]
     [InlineData("exit")]
+    [InlineData("resolve")]
     [InlineData("start")]
     [InlineData("os")]
     public async Task ProcessAsync_ExpectedProcessFailure_ReportsFailureAndAttemptsRemainingTargets(string failure)
@@ -217,6 +218,7 @@ public sealed class DotNetRestorePostActionProcessorTests
         Exception exception = failure switch
         {
             "exit" => new DotnetCliException(1, "Restore failed", "", "restore"),
+            "resolve" => new GracefulException("Could not locate the dotnet host."),
             "start" => new InvalidOperationException("Failed to start dotnet process."),
             _ => new Win32Exception(2),
         };

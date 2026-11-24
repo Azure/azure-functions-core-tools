@@ -44,6 +44,11 @@ internal sealed class DotNetRestorePostActionProcessor(IDotnetCliRunner dotnetCl
             context.Reporter.WriteLog(ex.Message, FunctionsReportSeverity.Error);
             return false;
         }
+        catch (GracefulException ex)
+        {
+            context.Reporter.WriteLog(ex.Message, FunctionsReportSeverity.Error);
+            return false;
+        }
         catch (Win32Exception ex)
         {
             context.Reporter.WriteLog($"Could not start 'dotnet restore': {ex.Message}", FunctionsReportSeverity.Error);
