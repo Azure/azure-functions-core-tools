@@ -195,7 +195,7 @@ public sealed class GoTemplateTests : IAsyncLifetime
     }
 
     private Task<ITemplateInfo> GetTemplateAsync(string shortName)
-        => _host.GetTemplateAsync(shortName, TestContext.Current.CancellationToken);
+        => _host.GetTemplateAsync(shortName, cancellationToken: TestContext.Current.CancellationToken);
 
     private Task<ITemplateCreationResult> GenerateAsync(
         ITemplateInfo template, string name, IReadOnlyDictionary<string, string?>? parameters = null, string? outputDirectory = null)
