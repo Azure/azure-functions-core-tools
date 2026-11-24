@@ -12,6 +12,8 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// </summary>
 internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> options) : IPackageSourceProvider
 {
+    private const string WorkloadPackageKind = "Workload";
+
     /// <summary>
     /// Public nuget.org v3 service index, used when no source is configured.
     /// </summary>
@@ -37,7 +39,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
         return new PackageSource(DefaultSourceUrl, DefaultSourceName);
     }
 
-    internal static PackageSource Build(string value, string packageKind = "Workload")
+    internal static PackageSource Build(string value, string packageKind = WorkloadPackageKind)
     {
         // Only http(s) V3 NuGet feeds are supported as workload sources.
         // To install from a local .nupkg, pass the file path positionally to

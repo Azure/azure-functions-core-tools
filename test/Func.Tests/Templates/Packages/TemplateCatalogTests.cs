@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Packages;
 using Azure.Functions.Cli.Tests.Workloads.Catalog;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
@@ -202,7 +203,7 @@ public sealed class TemplateCatalogTests
         Func<Task> act = () => catalog.SearchAsync(null, null, false, CancellationToken.None);
 
         await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*invalid response*");
-        (await client.SearchAsync(new CatalogSearchQuery(), CancellationToken.None)).Should().BeEmpty();
+        (await client.SearchAsync(new CatalogSearchQuery(), WorkloadPackageTypes.Workload, CancellationToken.None)).Should().BeEmpty();
     }
 
     [Theory]

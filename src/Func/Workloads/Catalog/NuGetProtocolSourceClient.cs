@@ -32,7 +32,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     public PackageSource Source => _repository.PackageSource;
 
-    public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<CatalogSearchResult>> SearchWorkloadAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
         => SearchAsync(query, WorkloadPackageTypes.Workload, cancellationToken);
 
     public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
