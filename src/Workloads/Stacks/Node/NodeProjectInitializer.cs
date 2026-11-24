@@ -20,7 +20,7 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
     private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
 
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     // Internal seam so tests can stub out the `npm install` invocation
     // without spawning real processes.
@@ -55,7 +55,7 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
         ArgumentNullException.ThrowIfNull(parseResult);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (context.Language is { } language && !ProjectStack.SupportedLanguages.Contains(language))
+        if (context.Language is { } language && !Stack.SupportedLanguages.Contains(language))
         {
             throw new ArgumentException($"Language '{language.LanguageIdentifier}' is not supported by this initializer.", nameof(context));
         }
@@ -98,7 +98,7 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadLocalSettingsTemplate(_assembly, ProjectStack.Descriptor),
+            ProjectFiles.ReadLocalSettingsTemplate(_assembly, Stack.Descriptor),
             force);
 
         Directory.CreateDirectory(Path.Combine(root, "src", "functions"));

@@ -35,7 +35,7 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsDotNet()
     {
-        CreateInitializer().ProjectStack.Descriptor.StackIdentifier.Should().Be("dotnet");
+        CreateInitializer().Stack.Descriptor.StackIdentifier.Should().Be("dotnet");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void SupportedLanguages_ReturnsExpectedLanguages()
     {
-        CreateInitializer().ProjectStack.SupportedLanguages.Select(l => l.DisplayName).Should().Equal(["C#", "F#"]);
+        CreateInitializer().Stack.SupportedLanguages.Select(l => l.DisplayName).Should().Equal(["C#", "F#"]);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class DotNetProjectInitializerTests : IDisposable
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
         string projectPath = Path.Combine(_hivePath, "project");
-        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", initializer.ProjectStack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", initializer.Stack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
         using CancellationTokenSource cts = new();
         string[] expectedArguments =
         [
@@ -120,7 +120,7 @@ public class DotNetProjectInitializerTests : IDisposable
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
         string projectPath = Path.Combine(_hivePath, "project");
-        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", initializer.ProjectStack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", initializer.Stack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
 
         await initializer.InitializeAsync(context, root.Parse([]), CancellationToken.None);
 
@@ -140,7 +140,7 @@ public class DotNetProjectInitializerTests : IDisposable
         DotNetProjectInitializer initializer = CreateInitializer();
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
-        InitContext context = new(WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")), "MyApp", initializer.ProjectStack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")), "MyApp", initializer.Stack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
 
         GracefulException exception = (await FluentActions.Awaiting(() => initializer.InitializeAsync(context, root.Parse([option, framework]), CancellationToken.None))
             .Should().ThrowAsync<GracefulException>()

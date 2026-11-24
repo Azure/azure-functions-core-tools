@@ -40,7 +40,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
     {
         PowerShellFunctionsProject project = CreateProject();
 
-        Assert.Equal("powershell", project.ProjectStack.Descriptor.StackIdentifier);
+        Assert.Equal("powershell", project.Stack.Descriptor.StackIdentifier);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
     {
         PowerShellFunctionsProject project = CreateProject();
 
-        Assert.Equal("PowerShell", project.ProjectStack.Descriptor.DisplayName);
+        Assert.Equal("PowerShell", project.Stack.Descriptor.DisplayName);
     }
 
     [Fact]

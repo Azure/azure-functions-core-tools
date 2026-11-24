@@ -24,7 +24,7 @@ internal sealed class DemoProjectFactory : IFunctionsProjectFactory
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override IProjectStack ProjectStack { get; } = new DemoStack();
+        public override IProjectStack Stack { get; } = new DemoStack();
 
         public override bool SupportsExtensionBundles => false;
 

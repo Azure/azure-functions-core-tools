@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Quickstart;
 /// </summary>
 public interface IQuickstartProvider
 {
-    public IProjectStack ProjectStack { get; }
+    public IProjectStack Stack { get; }
 
     public IReadOnlyList<string> GetNextSteps(LanguageDescriptor language);
 }

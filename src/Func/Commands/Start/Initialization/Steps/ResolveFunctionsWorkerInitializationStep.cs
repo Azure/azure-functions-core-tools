@@ -40,7 +40,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         ArgumentNullException.ThrowIfNull(context);
 
         FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
-        ValidateSupportedRuntime(context, project.ProjectStack.Descriptor, project.WorkerReference.WorkerRuntime);
+        ValidateSupportedRuntime(context, project.Stack.Descriptor, project.WorkerReference.WorkerRuntime);
 
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges =
             context.State.ResolvedProfile?.WorkerVersionRanges
@@ -68,7 +68,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             FunctionsWorkerResolutionResult.NotResolved failed => throw ReportWorkerResolutionFailure(failed.Failure, context, workerVersionRanges),
         };
 
-        ValidateSupportedRuntime(context, project.ProjectStack.Descriptor, worker.WorkerRuntime);
+        ValidateSupportedRuntime(context, project.Stack.Descriptor, worker.WorkerRuntime);
         context.State.Worker = worker;
 
         string completionMessage = string.IsNullOrWhiteSpace(worker.Version)

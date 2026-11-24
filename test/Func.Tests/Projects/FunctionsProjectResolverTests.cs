@@ -28,7 +28,7 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
 
-        result.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.ProjectStack.Should().BeSameAs(_go);
+        result.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.Stack.Should().BeSameAs(_go);
         await goFactory.Registration.Factory.Received(1).TryCreateProjectAsync(new(_directory), TestContext.Current.CancellationToken);
         await otherFactory.Registration.Factory.DidNotReceiveWithAnyArgs().TryCreateProjectAsync(default!, TestContext.Current.CancellationToken);
         await _config.DidNotReceiveWithAnyArgs().CreateAsync(default!, default!, default, TestContext.Current.CancellationToken);
@@ -113,7 +113,7 @@ public sealed class FunctionsProjectResolverTests
     private static (IProjectStack Stack, WorkloadProjectFactoryRegistration Registration) Recognized(IProjectStack stack, LanguageDescriptor? language = null)
     {
         FunctionsProject project = Substitute.For<FunctionsProject>();
-        project.ProjectStack.Returns(stack);
+        project.Stack.Returns(stack);
         project.Language.Returns(language);
         return Factory(stack, ProjectCreationResults.Created(project, "matched"));
     }

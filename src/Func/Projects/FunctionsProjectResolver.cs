@@ -36,7 +36,7 @@ internal sealed class FunctionsProjectResolver(
                 // Adoption can proceed without fingerprints, but not when the only recognized project belongs to a different stack.
                 ProjectResolutionResult other = await DetectAsync(_factories.Except(eligible), creationContext, null, cancellationToken);
                 return other is ProjectResolutionResult.Resolved resolved
-                    ? ProjectResolutionResults.NotResolved($"Selected stack '{context.SelectedStack.Descriptor.StackIdentifier}' conflicts with detected project stack '{resolved.Project.ProjectStack.Descriptor.StackIdentifier}' ({resolved.Message}).")
+                    ? ProjectResolutionResults.NotResolved($"Selected stack '{context.SelectedStack.Descriptor.StackIdentifier}' conflicts with detected project stack '{resolved.Project.Stack.Descriptor.StackIdentifier}' ({resolved.Message}).")
                     : other;
             }
 
@@ -65,7 +65,7 @@ internal sealed class FunctionsProjectResolver(
                 continue;
             }
 
-            IProjectStack stack = created.Project.ProjectStack;
+            IProjectStack stack = created.Project.Stack;
             if (registration.Workload.Stack != stack.Descriptor)
             {
                 return ProjectResolutionResults.NotResolved($"Project factory in '{registration.Workload.PackageId}' returned stack '{stack.Descriptor.StackIdentifier}', which is not the package's declared stack.");
@@ -73,7 +73,7 @@ internal sealed class FunctionsProjectResolver(
 
             if (match is not null)
             {
-                return ProjectResolutionResults.NotResolved($"The directory was recognized by both '{match.Project.ProjectStack.Descriptor.StackIdentifier}' and '{stack.Descriptor.StackIdentifier}'. Specify the project's stack with 'func init --stack <id>'.");
+                return ProjectResolutionResults.NotResolved($"The directory was recognized by both '{match.Project.Stack.Descriptor.StackIdentifier}' and '{stack.Descriptor.StackIdentifier}'. Specify the project's stack with 'func init --stack <id>'.");
             }
 
             if (created.Project.Language is { } detected)

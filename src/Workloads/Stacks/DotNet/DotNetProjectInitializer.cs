@@ -27,7 +27,7 @@ internal sealed class DotNetProjectInitializer(
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
     private readonly ITemplateHivePathProvider _hivePathProvider = hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider));
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<string> FrameworkOption { get; private set; } = default!;
 
@@ -49,7 +49,7 @@ internal sealed class DotNetProjectInitializer(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);
 
-        if (context.Language is { } language && !ProjectStack.SupportedLanguages.Contains(language))
+        if (context.Language is { } language && !Stack.SupportedLanguages.Contains(language))
         {
             throw new ArgumentException($"Language '{language.LanguageIdentifier}' is not supported by this initializer.", nameof(context));
         }

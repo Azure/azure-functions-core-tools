@@ -67,7 +67,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         var renderer = new RecordingRenderer();
         var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            [FakeProject.Stack] = new StartHostConfiguration { StartupNotice = "Startup notice must not run." },
+            [FakeProject.NodeStack] = new StartHostConfiguration { StartupNotice = "Startup notice must not run." },
         };
         StartInitializationStepContext context = NewContext(project, renderer, stackConfigurations: stackConfigurations);
 
@@ -104,7 +104,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         var project = new FakeProject(_projectDir);
         var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            [FakeProject.Stack] = new StartHostConfiguration
+            [FakeProject.NodeStack] = new StartHostConfiguration
             {
                 EnvironmentVariables = new Dictionary<string, string> { ["StackKey"] = "fromStack" },
             },
@@ -283,7 +283,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         SetLocalSettings(new() { ["SharedKey"] = "fromFile" });
         var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            [FakeProject.Stack] = new StartHostConfiguration
+            [FakeProject.NodeStack] = new StartHostConfiguration
             {
                 EnvironmentVariables = new Dictionary<string, string>
                 {
@@ -379,9 +379,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         public override WorkingDirectory WorkingDirectory { get; } = WorkingDirectory.FromExplicit(directory);
 
-        internal static IProjectStack Stack { get; } = new TestProjectStack("node", "Node.js");
+        internal static IProjectStack NodeStack { get; } = new TestProjectStack("node", "Node.js");
 
-        public override IProjectStack ProjectStack => Stack;
+        public override IProjectStack Stack => NodeStack;
 
         public override bool SupportsExtensionBundles => true;
 

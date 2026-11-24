@@ -24,7 +24,7 @@ public class NodeWorkloadTests
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<NodeProjectStack>());
-        initializer.ProjectStack.Should().BeSameAs(stack);
+        initializer.Stack.Should().BeSameAs(stack);
         stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("javascript", "typescript");
     }

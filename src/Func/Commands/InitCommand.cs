@@ -51,8 +51,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _initializers = (initializers ?? throw new ArgumentNullException(nameof(initializers))).ToList();
 
-        StackOption.Description = BuildOptionDescription("The stack to use", _initializers.Select(i => i.ProjectStack.Descriptor.StackIdentifier));
-        LanguageOption.Description = BuildOptionDescription("The programming language", _initializers.SelectMany(i => i.ProjectStack.SupportedLanguages).Select(l => l.LanguageIdentifier));
+        StackOption.Description = BuildOptionDescription("The stack to use", _initializers.Select(i => i.Stack.Descriptor.StackIdentifier));
+        LanguageOption.Description = BuildOptionDescription("The programming language", _initializers.SelectMany(i => i.Stack.SupportedLanguages).Select(l => l.LanguageIdentifier));
         AddPathArgument();
         Options.Add(StackOption);
         Options.Add(NameOption);
@@ -62,7 +62,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         var registry = new InitOptionRegistry(this);
         foreach (IProjectInitializer initializer in _initializers)
         {
-            StackDescriptor descriptor = initializer.ProjectStack.Descriptor;
+            StackDescriptor descriptor = initializer.Stack.Descriptor;
             registry.SetActiveStack(descriptor.StackIdentifier);
             IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
             RegisterStackOptionHelp(descriptor, options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
@@ -97,7 +97,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return 1;
         }
 
-        IProjectStack stack = initializer.ProjectStack;
+        IProjectStack stack = initializer.Stack;
         LanguageDescriptor? language = explicitLanguage is null ? null : InstalledProjectStackCatalog.ResolveLanguage(stack, explicitLanguage, "--language");
         if (settings.Language is { } persistedLanguage)
         {
@@ -177,12 +177,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Dictionary<string, IProjectInitializer> eligible = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (IProjectInitializer initializer in _initializers)
         {
-            string id = initializer.ProjectStack.Descriptor.StackIdentifier;
+            string id = initializer.Stack.Descriptor.StackIdentifier;
             if (!eligible.TryAdd(id, initializer))
             {
                 throw new ProjectStackResolutionException($"Multiple installed initializers claim the '{id}' stack.");
             }
-            if (!installed.Any(owner => ReferenceEquals(owner, initializer.ProjectStack)))
+            if (!installed.Any(owner => ReferenceEquals(owner, initializer.Stack)))
             {
                 throw new ProjectStackResolutionException($"The initializer for '{id}' does not reference its registered project stack.");
             }
@@ -218,7 +218,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         if (!settings.IsAdoptable && _initializers is [var sole])
         {
-            RenderHint(WorkloadHintKind.AutoSelectedSoleWorkload, sole.ProjectStack.Descriptor.StackIdentifier);
+            RenderHint(WorkloadHintKind.AutoSelectedSoleWorkload, sole.Stack.Descriptor.StackIdentifier);
             return sole;
         }
 
@@ -235,7 +235,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return null;
         }
 
-        List<StackDescriptor> choices = [.. _initializers.Select(i => i.ProjectStack.Descriptor)];
+        List<StackDescriptor> choices = [.. _initializers.Select(i => i.Stack.Descriptor)];
         StackDescriptor picked = await _interaction.PromptForSelectionAsync(
             settings.IsAdoptable ? "Adopting an existing project. Which stack is it?" : "Select a stack:", choices,
             d => choices.Count(c => c.DisplayName.Equals(d.DisplayName, StringComparison.OrdinalIgnoreCase)) > 1 ? $"{d.DisplayName} ({d.StackIdentifier})" : d.DisplayName,
@@ -252,9 +252,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         FunctionsProject project = ((ProjectResolutionResult.Resolved)result).Project;
-        if (project.ProjectStack.Descriptor != stack.Descriptor)
+        if (project.Stack.Descriptor != stack.Descriptor)
         {
-            throw new ProjectStackResolutionException($"Selected stack '{stack.Descriptor.StackIdentifier}' conflicts with detected project stack '{project.ProjectStack.Descriptor.StackIdentifier}'.");
+            throw new ProjectStackResolutionException($"Selected stack '{stack.Descriptor.StackIdentifier}' conflicts with detected project stack '{project.Stack.Descriptor.StackIdentifier}'.");
         }
 
         return project.Language is not { } language ? null
@@ -280,7 +280,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     }
 
     private void RenderHint(WorkloadHintKind kind, string? requested = null)
-        => _hintRenderer.Render(new WorkloadHint(kind, "initialize a project", requested, [.. _initializers.Select(i => i.ProjectStack.Descriptor.StackIdentifier)]));
+        => _hintRenderer.Render(new WorkloadHint(kind, "initialize a project", requested, [.. _initializers.Select(i => i.Stack.Descriptor.StackIdentifier)]));
 
     private void WriteSuccess(string action, IProjectStack stack)
     {

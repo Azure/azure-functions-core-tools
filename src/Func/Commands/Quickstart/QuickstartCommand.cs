@@ -191,7 +191,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             .Muted("Scaffolded ")
             .Code(entry.DisplayName)
             .Muted(" for ")
-            .Code(provider.ProjectStack.Descriptor.DisplayName)
+            .Code(provider.Stack.Descriptor.DisplayName)
             .Muted("."));
 
         IReadOnlyList<string> steps = provider.GetNextSteps(language);

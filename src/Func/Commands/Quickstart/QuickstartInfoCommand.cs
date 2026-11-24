@@ -121,7 +121,7 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
         if (owner is { } match)
         {
             _interaction.WriteBlankLine();
-            _interaction.WriteLine(l => l.Muted($"  Run: func quickstart <path> --stack {match.Provider.ProjectStack.Descriptor.StackIdentifier} --language {match.Language.LanguageIdentifier} --template {entry.Id}"));
+            _interaction.WriteLine(l => l.Muted($"  Run: func quickstart <path> --stack {match.Provider.Stack.Descriptor.StackIdentifier} --language {match.Language.LanguageIdentifier} --template {entry.Id}"));
         }
 
         return 0;

@@ -16,10 +16,10 @@ internal abstract class DotNetProject(WorkingDirectory workingDirectory, DotNetP
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public override IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public override bool SupportsExtensionBundles => false;
 
     public override FunctionsWorkerReference WorkerReference
-        => FunctionsWorkerReference.FromWorkerInfo(ProjectStack.Descriptor.StackIdentifier, ProjectStack.Descriptor.WorkerRuntime, _workingDirectory.Info.FullName);
+        => FunctionsWorkerReference.FromWorkerInfo(Stack.Descriptor.StackIdentifier, Stack.Descriptor.WorkerRuntime, _workingDirectory.Info.FullName);
 }

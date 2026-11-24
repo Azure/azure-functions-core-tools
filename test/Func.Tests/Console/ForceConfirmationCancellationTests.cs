@@ -54,7 +54,7 @@ public class ForceConfirmationCancellationTests
             resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>()).Returns(_ =>
             {
                 if (gitOnly) cancellation.Cancel();
-                return Task.FromResult<LanguageDescriptor?>(provider.ProjectStack.SupportedLanguages.Single());
+                return Task.FromResult<LanguageDescriptor?>(provider.Stack.SupportedLanguages.Single());
             });
             var manifestService = Substitute.For<IQuickstartManifestService>();
             manifestService.GetManifestAsync(Arg.Any<CancellationToken>()).Returns(manifest);
@@ -69,9 +69,9 @@ public class ForceConfirmationCancellationTests
         else
         {
             var initializer = Substitute.For<IProjectInitializer>();
-            initializer.ProjectStack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
+            initializer.Stack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
 
-            initializer.ProjectStack.SupportedLanguages.Returns(_ =>
+            initializer.Stack.SupportedLanguages.Returns(_ =>
             {
                 if (gitOnly && commandConstructed) cancellation.Cancel();
                 return new LanguageDescriptor[] { new("python", "Python") };
@@ -85,7 +85,7 @@ public class ForceConfirmationCancellationTests
             bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
             command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.ProjectStack]), [initializer]);
+                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.Stack]), [initializer]);
         }
         commandConstructed = true;
 

@@ -1561,7 +1561,7 @@ public class StartInitializationTests : IDisposable
 
         public override WorkingDirectory WorkingDirectory => workingDirectory;
 
-        public override IProjectStack ProjectStack { get; } = new TestProjectStack(stackName, stackDisplayName);
+        public override IProjectStack Stack { get; } = new TestProjectStack(stackName, stackDisplayName);
 
         public override bool SupportsExtensionBundles => supportsExtensionBundles;
 

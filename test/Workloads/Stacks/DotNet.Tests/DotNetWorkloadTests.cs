@@ -24,7 +24,7 @@ public class DotNetWorkloadTests
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<DotNetProjectStack>());
-        initializer.ProjectStack.Should().BeSameAs(stack);
+        initializer.Stack.Should().BeSameAs(stack);
         stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("csharp", "fsharp");
     }
@@ -41,7 +41,7 @@ public class DotNetWorkloadTests
         ServiceProvider provider = services.BuildServiceProvider();
         IStartHostOptionContributor contributor = provider.GetRequiredService<IStartHostOptionContributor>();
         contributor.Should().BeOfType<DotNetStartOptionContributor>();
-        contributor.ProjectStack.Should().BeSameAs(provider.GetRequiredService<IProjectStack>());
+        contributor.Stack.Should().BeSameAs(provider.GetRequiredService<IProjectStack>());
     }
 
     [Fact]

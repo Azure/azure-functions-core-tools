@@ -131,8 +131,8 @@ public class PowerShellProjectFactoryTests : IDisposable
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("powershell", created.Project.ProjectStack.Descriptor.StackIdentifier);
-        Assert.Equal("PowerShell", created.Project.ProjectStack.Descriptor.DisplayName);
+        Assert.Equal("powershell", created.Project.Stack.Descriptor.StackIdentifier);
+        Assert.Equal("PowerShell", created.Project.Stack.Descriptor.DisplayName);
         Assert.Equal(expectedReason, created.Reason);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         Assert.Equal("powershell", worker.WorkerRuntime);

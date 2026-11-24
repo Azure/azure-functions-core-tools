@@ -29,9 +29,9 @@ public class PromptCapabilityConsumerTests
         stderr.Enqueue(ConsoleKey.Enter);
         var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.ProjectStack.Descriptor.Returns(new StackDescriptor("node", "node", "Node.js"));
+        initializer.Stack.Descriptor.Returns(new StackDescriptor("node", "node", "Node.js"));
 
-        initializer.ProjectStack.SupportedLanguages.Returns([new LanguageDescriptor("javascript", "JavaScript"), new LanguageDescriptor("typescript", "TypeScript")]);
+        initializer.Stack.SupportedLanguages.Returns([new LanguageDescriptor("javascript", "JavaScript"), new LanguageDescriptor("typescript", "TypeScript")]);
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
@@ -39,7 +39,7 @@ public class PromptCapabilityConsumerTests
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
         var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
             Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-            new InstalledBundleScanner(installed), new InstalledProjectStackCatalog([initializer.ProjectStack]), [initializer]);
+            new InstalledBundleScanner(installed), new InstalledProjectStackCatalog([initializer.Stack]), [initializer]);
         string directory = Path.Combine(Path.GetTempPath(), $"func-5511-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
 

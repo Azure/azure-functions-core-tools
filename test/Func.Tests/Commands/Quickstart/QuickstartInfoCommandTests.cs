@@ -53,7 +53,7 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        LanguageDescriptor language = provider.Stack.SupportedLanguages.Single();
         _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "http-py");
@@ -73,7 +73,7 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        LanguageDescriptor language = provider.Stack.SupportedLanguages.Single();
         _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
@@ -109,7 +109,7 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        LanguageDescriptor language = provider.Stack.SupportedLanguages.Single();
         _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
@@ -127,7 +127,7 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        LanguageDescriptor language = provider.Stack.SupportedLanguages.Single();
         _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "HTTP-PY");
@@ -143,11 +143,11 @@ public class QuickstartInfoCommandTests
     {
         LanguageDescriptor language = new("csharp", "Friendly C#", "c#");
         var provider = Substitute.For<IQuickstartProvider>();
-        provider.ProjectStack.Returns(new TestProjectStack("comet", "Same label", "native", language));
+        provider.Stack.Returns(new TestProjectStack("comet", "Same label", "native", language));
         var other = Substitute.For<IQuickstartProvider>();
-        other.ProjectStack.Returns(new TestProjectStack("other", "Same label", languages: [new("different", "Other language", "CSharp")]));
+        other.Stack.Returns(new TestProjectStack("other", "Same label", languages: [new("different", "Other language", "CSharp")]));
         IQuickstartProvider[] providers = anotherOwner ? [other, provider] : [provider];
-        var catalog = new InstalledProjectStackCatalog(providers.Select(p => p.ProjectStack));
+        var catalog = new InstalledProjectStackCatalog(providers.Select(p => p.Stack));
         var resolver = new QuickstartProviderResolver(_interaction, Substitute.For<IWorkloadHintRenderer>(), providers, catalog);
         var manifest = new QuickstartManifest([QuickstartTestHelpers.CreateEntry("hello", language: "CSharp")]);
         _manifestService.GetManifestAsync(Arg.Any<CancellationToken>()).Returns(manifest);

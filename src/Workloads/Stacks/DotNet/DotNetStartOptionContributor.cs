@@ -33,7 +33,7 @@ internal sealed class DotNetStartOptionContributor(DotNetProjectStack stack) : I
     internal const string DebuggerWaitNotice =
         "The .NET isolated worker will pause on startup until a debugger attaches.";
 
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<bool> DotNetIsolatedDebugOption { get; } = new("--dotnet-isolated-debug")
     {

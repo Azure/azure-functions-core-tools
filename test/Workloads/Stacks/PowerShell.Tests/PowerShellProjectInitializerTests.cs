@@ -21,13 +21,13 @@ public class PowerShellProjectInitializerTests
     [Fact]
     public void Stack_IsPowerShell()
     {
-        new PowerShellProjectInitializer(PowerShellWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier.Should().Be("powershell");
+        new PowerShellProjectInitializer(PowerShellWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("powershell");
     }
 
     [Fact]
     public void SupportedLanguages_ContainsPowerShell()
     {
-        new PowerShellProjectInitializer(PowerShellWorkloadTests.Stack).ProjectStack.SupportedLanguages.Select(l => l.DisplayName).Should().ContainSingle().Subject.Should().Be("PowerShell");
+        new PowerShellProjectInitializer(PowerShellWorkloadTests.Stack).Stack.SupportedLanguages.Select(l => l.DisplayName).Should().ContainSingle().Subject.Should().Be("PowerShell");
     }
 
     [Fact]

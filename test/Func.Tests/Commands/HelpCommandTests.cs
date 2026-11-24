@@ -378,7 +378,7 @@ public class HelpCommandTests
         string stack, string displayName, Func<IInitOptionRegistry, IReadOnlyList<Option>> options)
     {
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.ProjectStack.Returns(new TestProjectStack(stack, displayName));
+        initializer.Stack.Returns(new TestProjectStack(stack, displayName));
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>())
             .Returns(call => options(call.Arg<IInitOptionRegistry>()));
         return initializer;
@@ -388,7 +388,7 @@ public class HelpCommandTests
         string stack, string displayName, Func<StartOptionRegistry, IReadOnlyList<Option>> options)
     {
         var contributor = Substitute.For<IStartHostOptionContributor>();
-        contributor.ProjectStack.Returns(new TestProjectStack(stack, displayName));
+        contributor.Stack.Returns(new TestProjectStack(stack, displayName));
         contributor.GetStartOptions(Arg.Any<StartOptionRegistry>())
             .Returns(call => options(call.Arg<StartOptionRegistry>()));
         return contributor;

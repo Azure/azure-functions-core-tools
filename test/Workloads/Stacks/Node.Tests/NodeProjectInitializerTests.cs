@@ -44,7 +44,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        new NodeProjectInitializer(NodeWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier.Should().Be("node");
+        new NodeProjectInitializer(NodeWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("node");
     }
 
     [Fact]
@@ -249,7 +249,7 @@ public class NodeProjectInitializerTests : IDisposable
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: projectName,
-            Language: language is null ? null : initializer.ProjectStack.SupportedLanguages.SingleOrDefault(l => l.IsMatch(language)) ?? new(language, language),
+            Language: language is null ? null : initializer.Stack.SupportedLanguages.SingleOrDefault(l => l.IsMatch(language)) ?? new(language, language),
             Force: force);
 
         RootCommand root = [];

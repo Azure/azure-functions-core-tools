@@ -26,7 +26,7 @@ public class JavaWorkloadTests
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<JavaProjectStack>());
-        initializer.ProjectStack.Should().BeSameAs(stack);
+        initializer.Stack.Should().BeSameAs(stack);
         stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("java");
     }

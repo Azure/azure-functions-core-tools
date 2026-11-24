@@ -24,7 +24,7 @@ internal sealed class GoProjectInitializer(GoProjectStack stack) : IProjectIniti
     // without spawning real processes.
     internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidy;
 
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<bool> SkipGoModTidyOption { get; private set; } = default!;
 
@@ -99,7 +99,7 @@ internal sealed class GoProjectInitializer(GoProjectStack stack) : IProjectIniti
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadLocalSettingsTemplate(_assembly, ProjectStack.Descriptor),
+            ProjectFiles.ReadLocalSettingsTemplate(_assembly, Stack.Descriptor),
             force);
 
         if (!parseResult.GetValue(SkipGoModTidyOption))

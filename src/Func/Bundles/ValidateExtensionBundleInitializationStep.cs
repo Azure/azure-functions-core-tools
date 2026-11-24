@@ -43,7 +43,7 @@ internal sealed class ValidateExtensionBundleInitializationStep : FuncStartIniti
 
         if (context.State.Project is not { SupportsExtensionBundles: true } project)
         {
-            string stackName = context.State.Project?.ProjectStack.Descriptor.DisplayName ?? "unknown";
+            string stackName = context.State.Project?.Stack.Descriptor.DisplayName ?? "unknown";
             return StartInitializationStepResult.Completed($"No extension bundle required for {stackName}");
         }
 

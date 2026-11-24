@@ -20,7 +20,7 @@ internal static class QuickstartTestHelpers
         }
 
         IQuickstartProvider provider = Substitute.For<IQuickstartProvider>();
-        provider.ProjectStack.Returns(new TestProjectStack(stack, displayName, languages: [.. manifestLanguages.Select(l => new LanguageDescriptor(l.ToLowerInvariant(), l))]));
+        provider.Stack.Returns(new TestProjectStack(stack, displayName, languages: [.. manifestLanguages.Select(l => new LanguageDescriptor(l.ToLowerInvariant(), l))]));
         return provider;
     }
 

@@ -194,7 +194,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         var registry = new StartOptionRegistry(this);
         foreach (IStartHostOptionContributor contributor in _startOptionContributors)
         {
-            StackDescriptor descriptor = contributor.ProjectStack.Descriptor;
+            StackDescriptor descriptor = contributor.Stack.Descriptor;
             registry.SetActiveStack(descriptor.StackIdentifier);
             IReadOnlyList<Option> options = contributor.GetStartOptions(registry);
             RegisterStackOptionHelp(descriptor, options.Except(builtInOptions));
@@ -389,7 +389,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Dictionary<IProjectStack, StartHostConfiguration> configurations = [with(ReferenceEqualityComparer.Instance)];
         foreach (IStartHostOptionContributor contributor in _startOptionContributors)
         {
-            configurations[contributor.ProjectStack] = contributor.Configure(parseResult);
+            configurations[contributor.Stack] = contributor.Configure(parseResult);
         }
 
         return configurations;

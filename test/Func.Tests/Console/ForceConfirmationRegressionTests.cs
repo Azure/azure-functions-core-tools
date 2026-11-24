@@ -48,9 +48,9 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         bool stdoutInput, bool stdoutAnsi, bool stderrInput, bool stderrAnsi, Response response)
     {
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.ProjectStack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
+        initializer.Stack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
 
-        initializer.ProjectStack.SupportedLanguages.Returns([new LanguageDescriptor("python", "Python")]);
+        initializer.Stack.SupportedLanguages.Returns([new LanguageDescriptor("python", "Python")]);
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
@@ -60,7 +60,7 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         await AssertForceConfirmationAsync(
             service => new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.ProjectStack]), [initializer]),
+                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.Stack]), [initializer]),
             stdoutInput, stdoutAnsi, stderrInput, stderrAnsi, response, CancellationToken.None);
 
         await initializer.Received(!stdoutInput || response == Response.Yes ? 1 : 0).InitializeAsync(
@@ -77,7 +77,7 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         var manifest = new QuickstartManifest([entry]);
         var resolver = Substitute.For<IQuickstartProviderResolver>();
         resolver.SelectProviderAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(provider);
-        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        LanguageDescriptor language = provider.Stack.SupportedLanguages.Single();
         resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>())
             .Returns(language);
         var manifestService = Substitute.For<IQuickstartManifestService>();

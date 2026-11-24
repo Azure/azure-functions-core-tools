@@ -107,8 +107,8 @@ public class JavaProjectFactoryTests : IDisposable
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("java", created.Project.ProjectStack.Descriptor.StackIdentifier);
-        Assert.Equal("Java", created.Project.ProjectStack.Descriptor.DisplayName);
+        Assert.Equal("java", created.Project.Stack.Descriptor.StackIdentifier);
+        Assert.Equal("Java", created.Project.Stack.Descriptor.DisplayName);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         Assert.Equal("java", worker.WorkerRuntime);
         Assert.NotNull(created.Reason);

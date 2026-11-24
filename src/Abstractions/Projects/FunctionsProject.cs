@@ -13,7 +13,7 @@ public abstract class FunctionsProject
 {
     public abstract WorkingDirectory WorkingDirectory { get; }
 
-    public abstract IProjectStack ProjectStack { get; }
+    public abstract IProjectStack Stack { get; }
 
     /// <summary>
     /// Gets the detected language, or <c>null</c> if the project does not distinguish it.

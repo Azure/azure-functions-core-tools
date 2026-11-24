@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// </summary>
 internal sealed class DotNetQuickstartProvider(DotNetProjectStack stack) : IQuickstartProvider
 {
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public IReadOnlyList<string> GetNextSteps(LanguageDescriptor language) =>
     [

@@ -171,7 +171,7 @@ public class QuickstartListCommandTests
     {
         _resolver.SelectProviderAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(provider);
-        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single(l => l.IsMatch(manifestLanguage));
+        LanguageDescriptor language = provider.Stack.SupportedLanguages.Single(l => l.IsMatch(manifestLanguage));
         _resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>())
             .Returns(language);
     }

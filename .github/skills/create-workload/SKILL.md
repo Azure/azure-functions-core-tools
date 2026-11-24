@@ -126,7 +126,7 @@ Create the following files:
 
   internal sealed class <Name>ProjectInitializer(<Name>ProjectStack stack) : IProjectInitializer
   {
-      public IProjectStack ProjectStack { get; } = stack;
+      public IProjectStack Stack { get; } = stack;
 
       public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
       {

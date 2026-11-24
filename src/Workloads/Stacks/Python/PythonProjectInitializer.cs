@@ -16,7 +16,7 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
 {
     private static readonly Assembly _assembly = typeof(PythonProjectInitializer).Assembly;
 
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
@@ -39,7 +39,7 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
         ArgumentNullException.ThrowIfNull(parseResult);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (context.Language is { } language && !ProjectStack.SupportedLanguages.Contains(language))
+        if (context.Language is { } language && !Stack.SupportedLanguages.Contains(language))
         {
             throw new ArgumentException($"Language '{language.LanguageIdentifier}' is not supported by this initializer.", nameof(context));
         }
@@ -71,7 +71,7 @@ internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProj
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadLocalSettingsTemplate(_assembly, ProjectStack.Descriptor),
+            ProjectFiles.ReadLocalSettingsTemplate(_assembly, Stack.Descriptor),
             force);
 
         // Always lay down the base host.json so the project is valid even

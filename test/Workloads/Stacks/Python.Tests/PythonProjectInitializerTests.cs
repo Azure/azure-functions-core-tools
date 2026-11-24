@@ -44,7 +44,7 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsPython()
     {
-        new PythonProjectInitializer(PythonWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier.Should().Be("python");
+        new PythonProjectInitializer(PythonWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("python");
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public class PythonProjectInitializerTests : IDisposable
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: "test",
-            Language: language is null ? null : initializer.ProjectStack.SupportedLanguages.SingleOrDefault(l => l.IsMatch(language)) ?? new(language, language),
+            Language: language is null ? null : initializer.Stack.SupportedLanguages.SingleOrDefault(l => l.IsMatch(language)) ?? new(language, language),
             Force: force);
 
         RootCommand root = [];

@@ -117,7 +117,7 @@ public class StartCommandTests : IDisposable
 
     private sealed class FakeStartHostOptionContributor(string displayName = "fake") : IStartHostOptionContributor
     {
-        public IProjectStack ProjectStack { get; } = new TestProjectStack("fake", displayName);
+        public IProjectStack Stack { get; } = new TestProjectStack("fake", displayName);
 
         public Option<bool> Option { get; } = new("--fake-stack-option");
 
@@ -620,7 +620,7 @@ public class StartCommandTests : IDisposable
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override IProjectStack ProjectStack { get; } = new TestProjectStack("dotnet-isolated", ".NET");
+        public override IProjectStack Stack { get; } = new TestProjectStack("dotnet-isolated", ".NET");
 
         public override bool SupportsExtensionBundles => false;
 

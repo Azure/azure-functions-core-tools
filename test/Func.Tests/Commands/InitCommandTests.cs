@@ -52,7 +52,7 @@ public class InitCommandTests
         IEnumerable<IProjectStack>? stacks = null, ILocalSettingsProvider? localSettings = null, IFunctionsProjectResolver? projectResolver = null) =>
         new(interaction ?? _interaction, _hintRenderer, new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings ?? _localSettings),
             projectResolver ?? _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles),
-            new InstalledProjectStackCatalog(stacks ?? initializers.Select(i => i.ProjectStack)), initializers);
+            new InstalledProjectStackCatalog(stacks ?? initializers.Select(i => i.Stack)), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -1257,10 +1257,10 @@ public class InitCommandTests
         var other = new FakeProjectInitializer("native", workerRuntime: "other-host");
         var factory = Substitute.For<IFunctionsProjectFactory>();
         var project = Substitute.For<FunctionsProject>();
-        project.ProjectStack.Returns(go.ProjectStack);
+        project.Stack.Returns(go.Stack);
         factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>()).Returns(ProjectCreationResults.Created(project, "Go project"));
-        var owner = TestWorkloads.CreateInfo("Contoso.DevKit") with { Stack = go.ProjectStack.Descriptor };
-        var catalog = new InstalledProjectStackCatalog([other.ProjectStack, go.ProjectStack], [owner]);
+        var owner = TestWorkloads.CreateInfo("Contoso.DevKit") with { Stack = go.Stack.Descriptor };
+        var catalog = new InstalledProjectStackCatalog([other.Stack, go.Stack], [owner]);
         var local = new LocalSettingsProvider();
         var resolver = new FunctionsProjectResolver([new(owner, factory)], catalog, new ProjectStackConfiguration(new PhysicalFileSystem(), local));
         var root = new RootCommand { CreateCommand([other, go], localSettings: local, projectResolver: resolver) };
@@ -1371,7 +1371,7 @@ public class InitCommandTests
         {
             languageLabels.Should().Equal("Script (type-a)", "Script (type-b)");
             AssertConfigJsonHasShape(directory.Path, "right", "type-b");
-            right.SelectedLanguage.Should().BeSameAs(right.ProjectStack.SupportedLanguages[1]);
+            right.SelectedLanguage.Should().BeSameAs(right.Stack.SupportedLanguages[1]);
         }
         else
         {
@@ -1385,7 +1385,7 @@ public class InitCommandTests
         using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
         var go = new FakeProjectInitializer("go", workerRuntime: "native");
         var other = new TestProjectStack("GO", "Renamed", "native", new LanguageDescriptor("go", "Go"));
-        var root = new RootCommand { CreateCommand([go], stacks: [go.ProjectStack, other]) };
+        var root = new RootCommand { CreateCommand([go], stacks: [go.Stack, other]) };
 
         int result = await root.Parse(["init", directory.Path, "--stack", "go"]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
@@ -1420,7 +1420,7 @@ public class InitCommandTests
         using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
         var go = new FakeProjectInitializer("go");
         var other = new TestProjectStack("other", "Other", languages: [new("go", "Go")]);
-        InitCommand command = CreateCommand([go], stacks: [other, go.ProjectStack]);
+        InitCommand command = CreateCommand([go], stacks: [other, go.Stack]);
         var root = new RootCommand { command };
 
         int result = await root.Parse(["init", directory.Path, "--stack", "other"]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
@@ -1438,7 +1438,7 @@ public class InitCommandTests
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override IProjectStack ProjectStack { get; } = new TestProjectStack(stackName, stackName, languages: language is null ? [] : [language]);
+        public override IProjectStack Stack { get; } = new TestProjectStack(stackName, stackName, languages: language is null ? [] : [language]);
 
         public override LanguageDescriptor? Language { get; } = language;
 
@@ -1455,7 +1455,7 @@ public class InitCommandTests
         string? workerRuntime = null,
         string? displayName = null) : IProjectInitializer
     {
-        public IProjectStack ProjectStack { get; } = new TestProjectStack(stack, displayName ?? stack, workerRuntime, supportedLanguages ?? [new(stack, stack)]);
+        public IProjectStack Stack { get; } = new TestProjectStack(stack, displayName ?? stack, workerRuntime, supportedLanguages ?? [new(stack, stack)]);
 
         public bool WasInvoked { get; private set; }
 

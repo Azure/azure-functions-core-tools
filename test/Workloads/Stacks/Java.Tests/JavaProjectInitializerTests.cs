@@ -45,7 +45,7 @@ public class JavaProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsJava()
     {
-        Assert.Equal("java", new JavaProjectInitializer(JavaWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier);
+        Assert.Equal("java", new JavaProjectInitializer(JavaWorkloadTests.Stack).Stack.Descriptor.StackIdentifier);
     }
 
     [Fact]

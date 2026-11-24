@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public interface IProjectInitializer
 {
-    public IProjectStack ProjectStack { get; }
+    public IProjectStack Stack { get; }
 
     /// <summary>
     /// Stack-default validator for function names, applied by <c>func new</c>'s

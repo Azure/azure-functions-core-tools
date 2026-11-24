@@ -21,7 +21,7 @@ internal sealed class JavaProjectInitializer(JavaProjectStack stack) : IProjectI
     private const string DefaultArtifactId = "azure-functions-java";
 
     private static readonly Assembly _assembly = typeof(JavaProjectInitializer).Assembly;
-    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
@@ -64,7 +64,7 @@ internal sealed class JavaProjectInitializer(JavaProjectStack stack) : IProjectI
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadLocalSettingsTemplate(_assembly, ProjectStack.Descriptor),
+            ProjectFiles.ReadLocalSettingsTemplate(_assembly, Stack.Descriptor),
             force);
 
         ProjectFiles.WriteIfMissing(

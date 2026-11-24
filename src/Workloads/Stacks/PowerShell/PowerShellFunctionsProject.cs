@@ -21,13 +21,13 @@ internal sealed class PowerShellFunctionsProject : FunctionsProject
     public PowerShellFunctionsProject(WorkingDirectory workingDirectory, PowerShellProjectStack stack)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        ProjectStack = stack ?? throw new ArgumentNullException(nameof(stack));
+        Stack = stack ?? throw new ArgumentNullException(nameof(stack));
         _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.StackIdentifier, stack.Descriptor.WorkerRuntime);
     }
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override IProjectStack ProjectStack { get; }
+    public override IProjectStack Stack { get; }
 
     public override bool SupportsExtensionBundles => true;
 

@@ -13,11 +13,11 @@ namespace Azure.Functions.Cli.Projects;
 /// The options an implementation registers via <see cref="GetStartOptions"/> appear in
 /// <c>--help</c> only while the owning workload is installed. Their parsed values are read back
 /// inside <see cref="Configure"/>, and the resulting <see cref="StartHostConfiguration"/> is
-/// applied only to projects belonging to <see cref="ProjectStack"/>.
+/// applied only to projects belonging to <see cref="Stack"/>.
 /// </summary>
 public interface IStartHostOptionContributor
 {
-    public IProjectStack ProjectStack { get; }
+    public IProjectStack Stack { get; }
 
     /// <summary>
     /// Registers the options this contributor adds to the start command via

@@ -250,7 +250,7 @@ namespace Azure.Functions.Cli.Workloads.Node;
 
 internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectInitializer
 {
-    public IProjectStack ProjectStack { get; } = stack;
+    public IProjectStack Stack { get; } = stack;
 
     // Workload-specific options. Registered through the supplied IInitOptionRegistry,
     // which is what lets options like `--no-bundles` that multiple stacks contribute
@@ -383,7 +383,7 @@ var packageManager = parseResult.GetValue(PackageManagerOption);
 
 This is how workloads read their own options without the CLI needing to know about them.
 
-`func init` and `func run` / `func start` group contributed options under `ProjectStack.Descriptor.DisplayName`. Stack headings follow the general `Options` section in ordinal, case-insensitive alphabetical order; options within each group retain their registration order. Return the canonical options from the registry so shared options remain in the general `Options` section without duplicates. Built-in and bundle options also stay in that general section.
+`func init` and `func run` / `func start` group contributed options under `Stack.Descriptor.DisplayName`. Stack headings follow the general `Options` section in ordinal, case-insensitive alphabetical order; options within each group retain their registration order. Return the canonical options from the registry so shared options remain in the general `Options` section without duplicates. Built-in and bundle options also stay in that general section.
 
 ## Testing
 
@@ -403,7 +403,7 @@ public void Configure_RegistersInitializer()
     using var sp = services.BuildServiceProvider();
     var initializer = Assert.Single(sp.GetServices<IProjectInitializer>());
     Assert.IsType<NodeProjectInitializer>(initializer);
-    Assert.Same(descriptor, initializer.ProjectStack.Descriptor);
+    Assert.Same(descriptor, initializer.Stack.Descriptor);
 }
 ```
 
