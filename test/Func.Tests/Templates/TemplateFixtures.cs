@@ -2,11 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -121,7 +123,9 @@ internal static class TemplateFixtures
     public static async Task InstallAsync(string packageDirectory, string settingsLocation)
     {
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
-        using EngineEnvironmentSettings settings = new(new FuncTemplateEngineHost(context, []), settingsLocation: settingsLocation);
+        using EngineEnvironmentSettings settings = new(
+            new FuncTemplateEngineHost(context, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get()),
+            settingsLocation: settingsLocation);
         using TemplatePackageManager packageManager = new(settings);
 
         IManagedTemplatePackageProvider provider = packageManager.GetBuiltInManagedProvider(InstallationScope.Global);

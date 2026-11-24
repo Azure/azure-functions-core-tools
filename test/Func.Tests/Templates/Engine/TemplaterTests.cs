@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.TemplateEngine.Abstractions;
@@ -308,7 +309,10 @@ public sealed class TemplaterTests : IDisposable
     public void Constructor_RegistersSuppliedComponents()
     {
         TestComponent component = new();
-        using Templater templater = new(Context(), _hive, [new TestTemplateComponent<ITestComponent>(component)]);
+        ICoreTemplateComponent registration = Substitute.For<ICoreTemplateComponent>();
+        registration.InterfaceType.Returns(typeof(ITestComponent));
+        registration.Instance.Returns(component);
+        using Templater templater = new(Context(), _hive, [registration]);
 
         templater.Settings.Components.OfType<ITestComponent>().Should().ContainSingle().Which.Should().BeSameAs(component);
     }
@@ -326,13 +330,16 @@ public sealed class TemplaterTests : IDisposable
 
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
-    private Templater CreateTemplater() => new(Context(), _hive, []);
+    private Templater CreateTemplater()
+        => new(Context(), _hive, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get());
 
     private Templater CreateWorkloadTemplater(IWorkloadProvider provider)
     {
         WorkloadTemplateSource source = new(provider, new PhysicalFileSystem());
         WorkloadTemplatePackageProviderFactory factory = new(source);
-        return new(Context(), _hive, [new TestTemplateComponent<ITemplatePackageProviderFactory>(factory)]);
+        IReadOnlyList<ICoreTemplateComponent> components = new FuncTemplateComponentsProvider(
+            [new TestTemplateComponent<ITemplatePackageProviderFactory>(factory)], [], Substitute.For<IInteractionService>()).Get();
+        return new(Context(), _hive, components);
     }
 
     private static RuntimeWorkloadInfo CreateWorkload(string templateRoot, string packageId = "Test.Workload.A", string version = "1.0.0")
@@ -351,7 +358,7 @@ public sealed class TemplaterTests : IDisposable
         public Guid Id { get; } = Guid.NewGuid();
     }
 
-    private sealed class TestTemplateComponent<TInterface>(TInterface instance) : ITemplateComponent
+    private sealed class TestTemplateComponent<TInterface>(TInterface instance) : ICoreTemplateComponent
         where TInterface : IIdentifiedComponent
     {
         public Type InterfaceType => typeof(TInterface);

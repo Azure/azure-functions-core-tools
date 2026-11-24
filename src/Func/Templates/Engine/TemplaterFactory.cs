@@ -9,9 +9,10 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// Creates templaters using the configured template engine components and settings location.
 /// </summary>
 /// <param name="configurationPaths">The service to resolve configuration paths from.</param>
-/// <param name="components">The template engine components to use.</param>
+/// <param name="componentProvider">The provider that builds template engine components.</param>
 internal sealed class TemplaterFactory(
-    CliConfigurationPathsOptions configurationPaths, IEnumerable<ITemplateComponent> components) : ITemplaterFactory
+    CliConfigurationPathsOptions configurationPaths, IFuncTemplateComponentProvider componentProvider)
+    : ITemplaterFactory
 {
     /// <summary>
     /// Sub-directory (under the func home) that holds the engine's settings,
@@ -21,13 +22,13 @@ internal sealed class TemplaterFactory(
 
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths
         ?? throw new ArgumentNullException(nameof(configurationPaths));
-    private readonly IEnumerable<ITemplateComponent> _components = components
-        ?? throw new ArgumentNullException(nameof(components));
+    private readonly IFuncTemplateComponentProvider _componentProvider = componentProvider
+        ?? throw new ArgumentNullException(nameof(componentProvider));
 
     public Templater Create(TemplateEngineContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(context, settingsLocation, _components);
+        return new Templater(context, settingsLocation, _componentProvider.Get());
     }
 }

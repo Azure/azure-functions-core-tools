@@ -8,7 +8,7 @@ This document describes the existing CLI v5 infrastructure, what remains to be i
 
 The current CLI includes:
 
-- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, a persistent CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`. The factory passes DI-registered `ITemplateComponent` instances directly to the host; no separate engine-session abstraction is used.
+- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, a persistent CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`. The factory gets engine components from `IFuncTemplateComponentProvider.Get()`, which combines built-in components, `ICoreTemplateComponent` registrations, and supported bridges for workload `ITemplateComponent` contracts; no separate engine-session abstraction is used.
 - `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata, retain the original engine template as `Template`, and expose parsed `func.host.json` metadata through `HostData`.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.

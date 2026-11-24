@@ -10,32 +10,14 @@ using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Provides func-owned TemplateEngine components.
+/// Registers template services and core CLI components.
 /// </summary>
-internal static class FuncTemplateComponents
+internal static class TemplateServiceCollectionExtensions
 {
-    /// <summary>
-    /// Combines built-in engine components with func components.
-    /// </summary>
-    /// <param name="components">The components supplied by dependency injection.</param>
-    /// <returns>The components to register with the template engine host.</returns>
-    public static IReadOnlyList<(Type Type, IIdentifiedComponent Instance)> Get(
-        IEnumerable<ITemplateComponent> components)
-    {
-        ArgumentNullException.ThrowIfNull(components);
-
-        return
-        [
-            ..Microsoft.TemplateEngine.Edge.Components.AllComponents,
-            ..Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components.AllComponents,
-            ..GetFuncComponents(components),
-        ];
-    }
-
     extension(IServiceCollection services)
     {
         /// <summary>
-        /// Registers a template component with singleton lifetime.
+        /// Registers a core template component with singleton lifetime.
         /// </summary>
         /// <typeparam name="TInterface">The interface used to resolve the component in the template engine.</typeparam>
         /// <typeparam name="TImplementation">The identified component implementation.</typeparam>
@@ -45,7 +27,7 @@ internal static class FuncTemplateComponents
         {
             ArgumentNullException.ThrowIfNull(services);
 
-            services.AddSingleton<ITemplateComponent, Component<TInterface>>(sp =>
+            services.AddSingleton<ICoreTemplateComponent, Component<TInterface>>(sp =>
             {
                 if (sp.GetService<TImplementation>() is { } implementation)
                 {
@@ -67,6 +49,7 @@ internal static class FuncTemplateComponents
         {
             ArgumentNullException.ThrowIfNull(services);
             services.TryAddSingleton<ITemplaterFactory, TemplaterFactory>();
+            services.TryAddSingleton<IFuncTemplateComponentProvider, FuncTemplateComponentsProvider>();
             services.TryAddSingleton<IWorkloadTemplateSource, WorkloadTemplateSource>();
             services.TryAddSingleton<PostActionDispatcher>();
             services.AddTemplateComponent<PostActionDispatcher, PostActionDispatcher>();
@@ -75,22 +58,16 @@ internal static class FuncTemplateComponents
         }
     }
 
-    private static IEnumerable<(Type Type, IIdentifiedComponent Instance)> GetFuncComponents(
-        IEnumerable<ITemplateComponent> components)
-    {
-        foreach (ITemplateComponent component in components)
-        {
-            yield return (component.InterfaceType, component.Instance);
-        }
-    }
-
     private sealed class Component<TInterface>(IIdentifiedComponent implementation, bool dispose)
-        : ITemplateComponent, IAsyncDisposable
+        : ICoreTemplateComponent, IAsyncDisposable
     {
+        /// <inheritdoc />
         public Type InterfaceType => typeof(TInterface);
 
+        /// <inheritdoc />
         public IIdentifiedComponent Instance { get; } = implementation ?? throw new ArgumentNullException(nameof(implementation));
 
+        /// <inheritdoc />
         public ValueTask DisposeAsync()
         {
             if (!dispose)

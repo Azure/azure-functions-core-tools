@@ -403,6 +403,93 @@ This produces `func durable get-instances`, `func durable start-new`, and so on.
 
 > The host wraps your `FuncCommand` in an internal adapter that carries the owning `WorkloadInfo`, so `func` can identify the source workload in collision warnings and diagnostics. Don't register raw `System.CommandLine.Command` services through `builder.Services` — the parser only consumes commands registered through `RegisterCommand`.
 
+## Template Post Actions
+
+Workloads can implement `Azure.Functions.Cli.Templates.PostActions.IPostActionProcessor`
+and register it during `Configure`:
+
+```csharp
+public override void Configure(FunctionsCliBuilder builder)
+{
+    builder.AddTemplateComponent<MyPostActionProcessor>();
+}
+```
+
+`IPostActionProcessor` extends the CLI-owned `ITemplateComponent`. Its `Guid Id`
+matches a template's `postActions[].actionId`, and its
+`Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken)`
+returns `true` on success or `false` when the action failed and manual instructions
+should be displayed. Forward cancellation to any asynchronous work. Unexpected
+exceptions propagate; they are not converted into successful actions.
+
+The context contains the action ID, read-only arguments, description, manual
+instructions, `ContinueOnError`, output directory, relative primary output paths,
+and file-change metadata. Collections are independent, immutable snapshots.
+Both primary outputs and file-change target paths use `/` directory separators
+on all platforms. File changes describe effects evaluated by the engine, not a
+filesystem audit.
+Workloads need only the `Abstractions` reference: no `Microsoft.TemplateEngine`
+types, engine settings, or engine service providers cross the boundary.
+
+The generic registration activates the processor through DI and retains it as a
+singleton. An already-registered implementation is reused and remains owned by
+DI. Otherwise the CLI creates and disposes it. The instance overload,
+`builder.AddTemplateComponent(processor)`, leaves disposal to its caller.
+The CLI currently bridges post-action processors to the engine. Other
+`ITemplateComponent` contracts can be registered but are ignored until the CLI
+supports them; arbitrary template-engine types are not exposed.
+
+### Selecting a Processor
+
+Implement `bool CanProcess(PostActionSelectionContext context)` to declare
+applicability. The immutable context contains the selected template's `Stack` and
+`Language` tags, trimmed but otherwise unchanged. Missing or blank tags are
+represented by empty strings, so workloads can reject them in `CanProcess`.
+A runtime workload can contribute processors for any stack without registering
+an `IProjectStack`:
+
+```csharp
+public bool CanProcess(PostActionSelectionContext context)
+{
+    ArgumentNullException.ThrowIfNull(context);
+    return string.Equals(context.Stack, "node", StringComparison.OrdinalIgnoreCase)
+        && (string.Equals(context.Language, "TypeScript", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(context.Language, "ts", StringComparison.OrdinalIgnoreCase));
+}
+```
+
+Processors choose accepted values and aliases explicitly; the CLI does not
+resolve them through installed stacks. `CanProcess` must be synchronous and
+side-effect-free. For example, the predicate above accepts this template:
+
+```json
+{
+  "tags": {
+    "stack": "node",
+    "language": "TypeScript"
+  }
+}
+```
+
+Core CLI processors always win for their action IDs, without evaluating workload
+predicates. Otherwise the CLI evaluates every registered candidate's `CanProcess`
+for that action ID before executing any processor. Exactly one must accept the
+context. No eligible processor or multiple eligible
+registrations produce a diagnostic without executing a workload processor.
+Overlaps are detected for the selected template at dispatch, not at registration.
+Conflict diagnostics identify the contributing workloads and processor types.
+Repeated registration of the same eligible instance is also a conflict.
+
+There is no registration-order or first-success fallback, even when only one
+processor is installed. A `false` execution result is a failure, not permission
+to try another processor after possible side effects. Manual instructions and
+`continueOnError` apply as for other post-action failures. Predicate exceptions
+propagate just like unexpected execution exceptions.
+
+The dispatcher is not yet wired into `func init` or `func new`; registering a
+processor alone does not activate template-based generation. Dry runs never
+evaluate predicates or execute processors. Script permission policy remains deferred.
+
 ## Reading Workload-Specific Options
 
 Built-in commands collect options from every registered provider during command construction, so they appear in `--help` automatically. Inside `InitializeAsync` (or any other provider method), read your option values from the supplied `ParseResult`:
@@ -424,7 +511,8 @@ The contract is plain DI, so tests don't need the host:
 public void Configure_RegistersInitializer()
 {
     var services = new ServiceCollection();
-    var builder  = new TestBuilder(services);
+    var builder = Substitute.For<FunctionsCliBuilder>();
+    builder.Services.Returns(services);
 
     new NodeWorkload().Configure(builder);
 
@@ -433,12 +521,12 @@ public void Configure_RegistersInitializer()
     Assert.Single(initializers);
     Assert.IsType<NodeProjectInitializer>(initializers[0]);
 }
-
-private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuilder
-{
-    public override IServiceCollection Services { get; } = services;
-}
 ```
+
+Use NSubstitute to verify `AddTemplateComponent<T>()` or instance registrations
+without starting the host. Test processors directly with a `PostActionContext`
+and substitute their I/O dependencies. The CLI's integration tests cover
+predicate selection, overlap rejection, core precedence, and isolated assembly loading.
 
 Initializers are themselves easy to unit-test: drive them with a temp directory and a synthetic `ParseResult`.
 

@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,7 +17,7 @@ namespace Azure.Functions.Cli.Hosting;
 /// </summary>
 /// <remarks>
 /// A builder constructed without a workload is used during host bootstrap;
-/// calling <c>RegisterCommand</c> or <c>AddProjectFactory</c> on it
+/// calling workload registration methods on it
 /// throws so an untracked registration can never reach the parser.
 /// </remarks>
 internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, RuntimeWorkloadInfo? workload) : FunctionsCliBuilder
@@ -83,6 +85,45 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Ru
         {
             TFactory factory = ActivatorUtilities.GetServiceOrCreateInstance<TFactory>(sp);
             return new WorkloadProjectFactoryRegistration(workload, factory);
+        });
+    }
+
+    /// <inheritdoc />
+    public override void AddTemplateComponent(ITemplateComponent component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        RuntimeWorkloadInfo workload = RequireWorkload();
+        RegisterTemplateComponent(workload, _ => (component, false));
+    }
+
+    /// <inheritdoc />
+    public override void AddTemplateComponent<TComponent>()
+    {
+        if (typeof(TComponent).IsAbstract)
+        {
+            throw new ArgumentException("Register a concrete ITemplateComponent implementation.", nameof(TComponent));
+        }
+
+        RuntimeWorkloadInfo workload = RequireWorkload();
+        RegisterTemplateComponent(workload, sp =>
+        {
+            if (sp.GetService<TComponent>() is { } existing)
+            {
+                return (existing, false);
+            }
+
+            return (ActivatorUtilities.CreateInstance<TComponent>(sp), true);
+        });
+    }
+
+    private void RegisterTemplateComponent(
+        RuntimeWorkloadInfo workload, Func<IServiceProvider, (ITemplateComponent Component, bool OwnsComponent)> factory)
+    {
+        Services.AddSingleton(sp =>
+        {
+            (ITemplateComponent component, bool ownsComponent) = factory(sp);
+            return new WorkloadTemplateComponentRegistration(
+                workload, component, ownsComponent);
         });
     }
 
