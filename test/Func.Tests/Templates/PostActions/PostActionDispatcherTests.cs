@@ -187,7 +187,7 @@ public sealed class PostActionDispatcherTests : IDisposable
     }
 
     [Fact]
-    public async Task ProcessAsync_FailureWithContinueOnError_ContinuesAndReturnsSuccess()
+    public async Task ProcessAsync_FailureWithContinueOnError_ContinuesAndReturnsFailure()
     {
         ITemplateCreationResult result = CreateResult(
             [CreateAction(Guid.NewGuid(), continueOnError: true), CreateAction(_knownActionId)]);
@@ -195,7 +195,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
             _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
 
-        status.Should().Be(PostActionExecutionStatus.Success);
+        status.Should().Be(PostActionExecutionStatus.Failure);
         await _processor.ReceivedWithAnyArgs(1).ProcessAsync(default!, TestContext.Current.CancellationToken);
     }
 

@@ -31,8 +31,8 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
     /// <param name="isDryRun"><c>true</c> to only list the actions that would run.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>
-    /// The combined status. A failed action with <see cref="IPostAction.ContinueOnError"/> doesn't contribute
-    /// <see cref="PostActionExecutionStatus.Failure"/>; any other failure stops processing of later actions.
+    /// The combined status. A failed action with <see cref="IPostAction.ContinueOnError"/> doesn't stop
+    /// processing of later actions, but still contributes <see cref="PostActionExecutionStatus.Failure"/>.
     /// </returns>
     public async Task<PostActionExecutionStatus> ProcessAsync(
         Templater templater,
@@ -102,13 +102,9 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
                 }
             }
 
-            if (action.ContinueOnError)
-            {
-                actionStatus &= ~PostActionExecutionStatus.Failure;
-            }
-
             status |= actionStatus;
-            if (actionStatus != PostActionExecutionStatus.Success)
+            if (actionStatus != PostActionExecutionStatus.Success
+                && !(action.ContinueOnError && actionStatus == PostActionExecutionStatus.Failure))
             {
                 break;
             }

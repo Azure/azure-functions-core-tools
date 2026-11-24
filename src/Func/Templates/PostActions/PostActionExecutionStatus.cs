@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Templates.PostActions;
 internal enum PostActionExecutionStatus
 {
     /// <summary>
-    /// All post actions succeeded, or failed with <c>continueOnError</c>.
+    /// All post actions succeeded.
     /// </summary>
     Success = 0,
 

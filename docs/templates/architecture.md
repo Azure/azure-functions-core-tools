@@ -125,7 +125,7 @@ Render into command-scoped private temporary output within defined asset and exp
 
 - Call `templater.ProcessPostActionsAsync(creationResult, isDryRun, cancellationToken)` to resolve the dispatcher from the template engine components and run it. `AddTemplating()` registers the dispatcher with dependency injection and the engine.
 - Each action is resolved through the template engine components by `actionId`. Processors implement `IPostActionProcessor` and are registered with `AddTemplateComponent<IPostActionProcessor, T>()`. No processors are registered yet.
-- When no processor is found, or a processor returns `false`, the dispatcher reports the failure with the action's description and manual instructions, if any. The action counts as a failure unless it sets `continueOnError`; a failure without `continueOnError` stops later actions.
+- When no processor is found, or a processor returns `false`, the dispatcher reports the failure with the action's description and manual instructions, if any. A failure remains in the aggregate status; `continueOnError` controls whether later actions run.
 - Dry runs list the actions that would run without processing them.
 - Run-script (`3A7C4B45-1F5D-4A30-959A-51B88E82B5D2`) is not implemented. It currently falls back to manual instructions; its allow, deny, or prompt policy is still to be designed.
 
