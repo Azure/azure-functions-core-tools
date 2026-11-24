@@ -9,31 +9,25 @@ namespace Azure.Functions.Cli.Workloads.Python.Tests;
 
 public class PythonWorkloadTests
 {
+    internal static PythonProjectStack Stack { get; } = new(new("python", "python", "Python"));
+
     [Fact]
     public void Configure_RegistersProjectInitializer()
     {
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
+        builder.StackDescriptor.Returns(Stack.Descriptor);
 
         new PythonWorkload().Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        initializer.Should().BeOfType<PythonProjectInitializer>();
-        initializer.Stack.Should().Be("python");
-        initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("Python");
-
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
-        stack.Should().BeOfType<PythonProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<PythonProjectStack>());
-        stack.Should().NotBeAssignableTo<IProjectInitializer>();
-        stack.Stack.Should().Be(initializer.Stack);
-        stack.DisplayName.Should().Be("Python").And.Be(initializer.DisplayName);
-        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
-        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
-        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
-        stack.SupportedLanguageAliases["Python"].Should().Equal("py");
+        initializer.ProjectStack.Should().BeSameAs(stack);
+        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("python");
     }
 
     [Fact]
@@ -48,6 +42,7 @@ public class PythonWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
+        builder.StackDescriptor.Returns(Stack.Descriptor);
 
         new PythonWorkload().Configure(builder);
 

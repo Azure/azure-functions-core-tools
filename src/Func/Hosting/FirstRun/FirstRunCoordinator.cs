@@ -4,6 +4,8 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Hosting.FirstRun;
 
@@ -17,19 +19,18 @@ namespace Azure.Functions.Cli.Hosting.FirstRun;
 internal sealed class FirstRunCoordinator(
     IInteractionService interaction,
     IFirstRunStateStore stateStore,
-    ISetupRunner setupRunner) : IFirstRunCoordinator
+    ISetupRunner setupRunner,
+    IOptions<WorkloadCatalogOptions> catalogOptions) : IFirstRunCoordinator
 {
     private const string PromptParagraph1 =
         "Looks like this is your first time running func.";
 
     private const string PromptParagraph2 =
-        "The new CLI uses installable workloads to bring in language stacks "
-        + "(Node.js, Python, .NET, Go) and the host runtime. Running `func setup` "
-        + "now will install the host and the dev environment / dependencies for "
-        + "the stack(s) you pick.";
+        "Azure Functions CLI uses workloads to install language stacks and the Functions host. "
+        + "Run `func setup` to choose a stack and install its development dependencies.";
 
     private const string PromptParagraph3 =
-        "You can always add more later with `func setup --features <node|dotnet|go|python>`.";
+        "You can also discover stack packages later with `func workload search --stack`.";
 
     private const string PromptMessage = "Run `func setup` now?";
 
@@ -64,6 +65,7 @@ internal sealed class FirstRunCoordinator(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IFirstRunStateStore _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
     private readonly ISetupRunner _setupRunner = setupRunner ?? throw new ArgumentNullException(nameof(setupRunner));
+    private readonly WorkloadCatalogOptions _catalogOptions = catalogOptions?.Value ?? throw new ArgumentNullException(nameof(catalogOptions));
 
     public async Task<int?> EnsureFirstRunPromptedAsync(string commandName, ParseResult parseResult, CancellationToken cancellationToken)
     {
@@ -102,6 +104,13 @@ internal sealed class FirstRunCoordinator(
 
     private static bool IsSkipped(string commandName, ParseResult parseResult)
     {
+        // A bare invocation has the telemetry name "help" too, but only the
+        // explicit help command must stay entirely outside setup and discovery.
+        if (string.Equals(parseResult.CommandResult.Command.Name, "help", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (!string.IsNullOrEmpty(commandName))
         {
             int spaceIndex = commandName.IndexOf(' ');
@@ -209,7 +218,7 @@ internal sealed class FirstRunCoordinator(
             ProfileNames: [],
             Source: null,
             InstallPolicy: SetupInstallPolicy.LatestCompatible,
-            IncludePrerelease: true,
+            IncludePrerelease: _catalogOptions.IncludePrerelease,
             NonInteractive: false,
             AssumeYes: false,
             Check: false,

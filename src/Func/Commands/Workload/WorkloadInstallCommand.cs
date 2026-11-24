@@ -158,6 +158,10 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             }
             return 0;
         }
+        catch (WorkloadCatalogException ex)
+        {
+            throw new GracefulException($"Workload discovery is unavailable: {ex.Message}", ex, isUserError: true);
+        }
         catch (WorkloadPackageNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
@@ -247,10 +251,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        // Prefer the first alias for user-facing messages; fall back to the
-        // canonical package id when no alias is published.
-        IReadOnlyList<string> aliases = logical?.Aliases ?? match.Aliases;
-        string display = aliases.Count > 0 ? aliases[0] : logical?.PackageId ?? match.PackageId;
+        string display = match.Stack?.DisplayName ?? identifier;
         string installedVersion = logical?.PackageVersion ?? match.PackageVersion;
         string updateIdentifier = logical?.PackageId ?? match.PackageId;
         string prompt = $"'{display}' is already installed at {installedVersion}. Update instead?";
@@ -344,7 +345,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return;
         }
 
-        if (!SetupFeatureCatalog.TryGetFeatureForPackageId(entry.PackageId, out string feature))
+        if (SetupFeatureCatalog.GetFeatureForInstalledPackage(entry) is not { } feature)
         {
             return;
         }
@@ -353,7 +354,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         {
             SetupFeatureCatalog.RuntimeFeature => "the Functions host and the extension bundle",
             SetupFeatureCatalog.HostFeature => "the Functions host",
-            _ => $"the full {feature} dev environment (host, worker, stack, templates, bundle)",
+            _ => $"the {entry.Stack!.DisplayName} development dependencies",
         };
 
         _interaction.WriteHint(

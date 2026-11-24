@@ -4,11 +4,11 @@
 using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Workloads.Storage;
-using Microsoft.Extensions.Configuration;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
@@ -46,8 +46,7 @@ public sealed class SetupDefaultHintTests
     [InlineData("node", null)]
     [InlineData("runtime", "python")]
     [InlineData(null, "node")]
-    [InlineData(null, " dotnet-isolated ")]
-    [InlineData(null, "runtime")]
+    [InlineData(null, " dotnet ")]
     public async Task RunAsync_ExplicitOrConfiguredFeatures_DoesNotSuggestFallback(string? feature, string? configuredRuntime)
     {
         Fixture fixture = new(configuredRuntime: configuredRuntime);
@@ -59,7 +58,7 @@ public sealed class SetupDefaultHintTests
         fixture.Hints.Should().BeEmpty();
         if (feature is not null)
         {
-            fixture.Configuration.DidNotReceive().GetProjectConfiguration(Arg.Any<DirectoryInfo>());
+            fixture.Configuration.DidNotReceive().Read(Arg.Any<DirectoryInfo>());
         }
     }
 
@@ -157,7 +156,7 @@ public sealed class SetupDefaultHintTests
             {
                 Values = new Dictionary<string, string> { [CliConfigurationNames.WorkerRuntimeSettingName] = runtime },
             });
-            CliConfigurationProvider configuration = new(localSettings, new CliConfigurationPathsOptions(directory.FullName));
+            ProjectStackConfiguration configuration = new(Substitute.For<IFileSystem>(), localSettings);
             Fixture fixture = new(configuration: configuration);
 
             SetupRunResult result = await fixture.Runner.RunAsync(
@@ -184,7 +183,7 @@ public sealed class SetupDefaultHintTests
     private sealed class Fixture
     {
         public IInteractionService Interaction { get; } = Substitute.For<IInteractionService>();
-        public ICliConfigurationProvider Configuration { get; } = Substitute.For<ICliConfigurationProvider>();
+        public IProjectStackConfiguration Configuration { get; }
         public IWorkloadStore Store { get; } = Substitute.For<IWorkloadStore>();
         public ISetupProfileScopeResolver Profiles { get; } = Substitute.For<ISetupProfileScopeResolver>();
         public IHostJsonBundleSectionReader BundleReader { get; } = Substitute.For<IHostJsonBundleSectionReader>();
@@ -195,14 +194,13 @@ public sealed class SetupDefaultHintTests
         public List<SetupDependencyKind> Dependencies { get; } = [];
         public SetupRunner Runner { get; }
 
-        public Fixture(bool interactive = true, string? configuredRuntime = null, ICliConfigurationProvider? configuration = null)
+        public Fixture(bool interactive = true, string? configuredRuntime = null, IProjectStackConfiguration? configuration = null)
         {
             Interaction.IsInteractive.Returns(interactive);
             Interaction.When(interaction => interaction.WriteHint(Arg.Any<string>())).Do(call => Hints.Add(call.Arg<string>()));
             Interaction.When(interaction => interaction.WriteRawLine(Arg.Any<string>())).Do(call => JsonLines.Add(call.Arg<string>()));
             Interaction.ClearReceivedCalls();
-            Configuration.GetProjectConfiguration(Arg.Any<DirectoryInfo>()).Returns(new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?> { ["stack:runtime"] = configuredRuntime }).Build());
+            Configuration = configuration ?? SetupTestInventory.Configuration(configuredRuntime);
             Store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
             Profiles.ResolveProfileScopesAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<SetupRenderer>(), Arg.Any<CancellationToken>())
                 .Returns([SetupProfileScope.Unconstrained]);
@@ -215,7 +213,7 @@ public sealed class SetupDefaultHintTests
                     return SetupDependencyResult.Satisfied(dependency, dependency.PackageId, "1.0.0", "Already installed.");
                 });
             FirstRun.MarkCompleteAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-            SetupFeatureResolver features = new(Interaction, Store, configuration ?? Configuration);
+            SetupFeatureResolver features = new(Interaction, SetupTestInventory.StackPackages(Store, SetupTestInventory.Catalog(SetupTestInventory.Packages)), Configuration);
             Runner = new SetupRunner(Interaction, features, Profiles, new SetupDependencyPlanBuilder(BundleReader), Installer, FirstRun);
         }
     }

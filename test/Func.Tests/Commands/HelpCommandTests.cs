@@ -314,29 +314,21 @@ public class HelpCommandTests
     [InlineData("help run")]
     public async Task RunHelp_GroupsStackOptionsAlphabeticallyAndKeepsBuiltInAndSharedOptionsGeneral(string commandLine)
     {
-        var dotnet = CreateStartContributor("dotnet", registry =>
+        var dotnet = CreateStartContributor("dotnet", ".NET", registry =>
         [
             registry.GetOrAdd(new Option<bool>("--first-only")),
             registry.GetOrAdd(new Option<int?>("--port")),
             registry.GetOrAdd(new Option<bool>("--shared")),
         ]);
-        var node = CreateStartContributor("node", registry =>
+        var node = CreateStartContributor("node", "Node.js", registry =>
         [
             registry.GetOrAdd(new Option<bool>("--second-only")),
             registry.GetOrAdd(new Option<bool>("--shared")),
         ]);
-        var dotnetStack = Substitute.For<IProjectStack>();
-        dotnetStack.Stack.Returns("dotnet");
-        dotnetStack.DisplayName.Returns(".NET");
-        var nodeStack = Substitute.For<IProjectStack>();
-        nodeStack.Stack.Returns("node");
-        nodeStack.DisplayName.Returns("Node.js");
         var provider = TestParser.BuildServiceProviderWith(_interaction, services =>
         {
             services.AddSingleton(node);
             services.AddSingleton(dotnet);
-            services.AddSingleton(nodeStack);
-            services.AddSingleton(dotnetStack);
         });
         var root = Parser.CreateCommand(provider);
 
@@ -370,9 +362,9 @@ public class HelpCommandTests
     }
 
     [Fact]
-    public void GetOptionHelpHeading_NullOption_Throws()
+    public void GetOptionHelpStack_NullOption_Throws()
     {
-        var act = () => _helpCommand.GetOptionHelpHeading(null!);
+        var act = () => _helpCommand.GetOptionHelpStack(null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("option");
     }
@@ -386,18 +378,17 @@ public class HelpCommandTests
         string stack, string displayName, Func<IInitOptionRegistry, IReadOnlyList<Option>> options)
     {
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns(stack);
-        initializer.DisplayName.Returns(displayName);
+        initializer.ProjectStack.Returns(new TestProjectStack(stack, displayName));
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>())
             .Returns(call => options(call.Arg<IInitOptionRegistry>()));
         return initializer;
     }
 
     private static IStartHostOptionContributor CreateStartContributor(
-        string stack, Func<StartOptionRegistry, IReadOnlyList<Option>> options)
+        string stack, string displayName, Func<StartOptionRegistry, IReadOnlyList<Option>> options)
     {
         var contributor = Substitute.For<IStartHostOptionContributor>();
-        contributor.Stack.Returns(stack);
+        contributor.ProjectStack.Returns(new TestProjectStack(stack, displayName));
         contributor.GetStartOptions(Arg.Any<StartOptionRegistry>())
             .Returns(call => options(call.Arg<StartOptionRegistry>()));
         return contributor;

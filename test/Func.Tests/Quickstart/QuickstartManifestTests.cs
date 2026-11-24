@@ -29,7 +29,7 @@ public sealed class QuickstartManifestTests
             CreateEntry(id: "node-entry", language: "TypeScript"),
         ]);
 
-        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "Python");
+        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: new("Python", "Label"));
 
         results.Should().ContainSingle();
         results[0].Id.Should().Be("python-entry");
@@ -40,7 +40,7 @@ public sealed class QuickstartManifestTests
     {
         QuickstartManifest manifest = new([CreateEntry(language: "Python")]);
 
-        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "python");
+        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: new("python", "Label"));
 
         results.Should().ContainSingle();
     }
@@ -125,7 +125,7 @@ public sealed class QuickstartManifestTests
             CreateEntry(id: "wrong-resource", language: "Python", resource: "timer"),
         ]);
 
-        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "Python", resource: "http");
+        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: new("Python", "Label"), resource: "http");
 
         results.Should().ContainSingle();
         results[0].Id.Should().Be("match");
@@ -168,7 +168,7 @@ public sealed class QuickstartManifestTests
     {
         QuickstartManifest manifest = new([CreateEntry(language: "Python")]);
 
-        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "Go");
+        IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: new("Go", "Label"));
 
         results.Should().BeEmpty();
     }

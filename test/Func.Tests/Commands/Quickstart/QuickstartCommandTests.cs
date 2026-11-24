@@ -49,7 +49,7 @@ public class QuickstartCommandTests
     }
 
     [Fact]
-    public void QuickstartCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
+    public void QuickstartCommand_StackOptionDescription_ListsInstalledStacks_SortedByIdentifier()
     {
         QuickstartCommand cmd = CreateCommand(
             QuickstartTestHelpers.CreateProvider(stack: "Python"),
@@ -57,7 +57,7 @@ public class QuickstartCommandTests
             QuickstartTestHelpers.CreateProvider(stack: "node"));
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        description.Should().Contain("Supported values: dotnet, node, python.");
+        description.Should().Contain("Supported values: dotnet, node, Python.");
     }
 
     [Fact]

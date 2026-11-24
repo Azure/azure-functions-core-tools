@@ -15,16 +15,13 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// </summary>
 public sealed class PowerShellWorkload : Workload
 {
-    public override string DisplayName => "PowerShell Stack";
-
-    public override string Description => "Azure Functions CLI tooling for PowerShell projects.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<PowerShellProjectStack>();
-        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PowerShellProjectStack>());
+        PowerShellProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
+        builder.Services.AddSingleton(stack);
+        builder.Services.AddSingleton<IProjectStack>(stack);
         builder.Services.AddSingleton<IProjectInitializer, PowerShellProjectInitializer>();
-        builder.AddProjectFactory(new PowerShellProjectFactory());
+        builder.AddProjectFactory(new PowerShellProjectFactory(stack));
     }
 }

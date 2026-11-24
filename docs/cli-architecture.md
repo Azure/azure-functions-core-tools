@@ -144,10 +144,10 @@ AddPathArgument(); // adds optional [path] argument
 
 ## Stacks
 
-A "stack" describes a language/runtime target (`dotnet`, `node`, `python`, `java`, `powershell`, `custom`). The `Stacks` registry in `Common/Stacks.cs` is the single source of truth for stack identifiers and the languages each one supports.
+A stack is a workload-owned project target. Its manifest supplies `StackIdentifier`, `WorkerRuntime`, and `DisplayName`; its `IProjectStack` supplies the ordered language descriptors.
 
-- `--stack` / `-s` is the user-facing option on `func init`.
-- `IProjectDetector` (registered by a workload through `FunctionsCliBuilder.RegisterDetector`) declares the project markers (e.g. `*.csproj`, `package.json`) and worker-runtime ids the workload claims, and returns a confidence verdict for a given directory. `IWorkloadResolver` runs the spec §5.2 algorithm (selector → `FUNCTIONS_WORKER_RUNTIME` lookup → detector pass) against those contributions to pick the workload that owns a directory.
+- `--stack` / `-s` on `func init` selects a stack by CLI ID. `FUNCTIONS_WORKER_RUNTIME` in `local.settings.json` identifies a stack only by its host runtime.
+- Each workload's project factory recognizes its own project markers. The CLI project resolver applies the persisted stack choice, or the local host runtime when no CLI config exists, before probing the eligible factories.
 
 ## Console / UI Layer
 
@@ -239,11 +239,11 @@ The abstractions library exposes the surface workload authors program against:
 
 | Type | Role |
 |------|------|
-| `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
-| `FunctionsCliBuilder` | The DI seam handed to a workload. Exposes `Services` for plain DI registrations and `RegisterCommand(...)` overloads (instance / type / factory) for contributing top-level commands. Abstract base so we can grow the surface without breaking workloads. |
-| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `DisplayName`, `SupportedLanguages`, registers init options via `IInitOptionRegistry`, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `Workload` | The entry point. Its `Configure(FunctionsCliBuilder)` method registers capabilities; package identity and presentation come from package metadata. |
+| `FunctionsCliBuilder` | Supplies this installed version's `StackDescriptor` (if declared), `Services`, and methods to register commands and project factories. |
+| `IProjectInitializer` | Contributes initialization for its `ProjectStack`. Registers init options via `IInitOptionRegistry` and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
 | `IInitOptionRegistry` / `CommonInitOptions` | The registry de-dupes options that multiple workloads contribute (e.g. `--no-bundles`) so each option appears once in `--help` and every workload reads the same parsed value. `CommonInitOptions` is a small factory of the shared options themselves (`NoBundle`, `BundlesChannel`). |
-| `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
+| `InitContext` | Carries the working directory, project name, resolved language descriptor, and force flag to an initializer. |
 | `FuncCommand` | Parser-independent base for workload-contributed top-level commands. Describes `Name`, `Description`, `Options`, `Arguments`, `Subcommands`, and an `ExecuteAsync(FuncCommandInvocationContext, CancellationToken)`. |
 | `FuncCommandOption` / `FuncCommandArgument` | Typed descriptors used by `FuncCommand`. Identity matters — pass the same descriptor instance to `context.GetValue(...)` to read parsed values. |
 | `FuncCommandInvocationContext` | Read parsed option / argument values without depending on `System.CommandLine`. |
@@ -373,53 +373,44 @@ If a newer version is found, a notice is printed after the command completes.
 ### `func init`
 
 ```
-1. Determine stack (--stack or, when multiple initializers are installed, prompt)
-2. Resolve the matching IProjectInitializer via CanHandle(stack)
-   ├── No initializers installed  → "No language workloads installed." (exit 1)
-   └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
-3. Detect existing project state:
-   ├── .func/config.json present  → fully initialized; refuse without --force
-   ├── host.json only             → adopt mode (see below); skip scaffolding
-   └── empty                      → scaffold via IProjectInitializer.InitializeAsync
-4. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
-5. Delegate to IProjectInitializer.InitializeAsync(context, parseResult) (skipped in adopt mode)
+1. Read project identity without discovering or executing workloads.
+2. Resolve a stack ID and one of its declared languages using installed stack descriptors.
+   The picker lists only stacks with an initializer. Duplicate display labels do not merge choices.
+3. If all selectors and project signals agree:
+   ├── .func/config.json present → complete a missing language on a multi-language stack; otherwise refuse
+   ├── host.json only            → adopt; write CLI config and skip scaffolding
+   └── new project              → write CLI config and scaffold with the resolved InitContext
 ```
 
 **Adopt mode** (host.json present, no `.func/config.json`):
 
-1. Resolve `project_runtime` from `local.settings.json`'s `FUNCTIONS_WORKER_RUNTIME`. The process env var is intentionally ignored: adoption is about the on-disk project shape.
-2. Apply:
+`--stack` accepts a CLI `StackIdentifier`, never a display label or an alternate host spelling.
+`FUNCTIONS_WORKER_RUNTIME` in `local.settings.json`, on the other hand, matches only the descriptor's `WorkerRuntime`.
+For example `native` matches Go; the config stores `"runtime": "go"`. If several stacks share a worker runtime, specify the matching `--stack` ID. An unknown or conflicting value is an error, not a fallback. With no signal, select a stack interactively or supply `--stack`.
 
-   | `project_runtime` → | `--stack` omitted | `--stack X` (installed) agrees | `--stack X` conflicts |
-   |---|---|---|---|
-   | null | interactive: prompt "Adopting an existing project. Which stack is it?". Non-interactive: refuse with "Couldn't detect the project's stack". | adopt with `X` | n/a |
-   | installed | adopt + snap | adopt with `X` | refuse (use `--force`) |
-   | uninstalled | refuse with `func setup --features <stack>` hint | refuse (same hint) | refuse |
-
-   Any candidate stack (from `--stack` or `local.settings.json`) that doesn't match an installed initializer (by canonical `Stack` id or by one of its `WorkerRuntimeAliases`) is refused. Aliases let runtime values like `dotnet-isolated` resolve to the `dotnet` stack and `native` to `go`. The hint uses a literal `<stack>` placeholder rather than the raw runtime value, because the value itself may not be a valid feature id (e.g. typos).
-
-3. Write `.func/config.json` with the resolved stack. Skip scaffolding so user source is untouched. `--force` always bypasses adopt mode and takes the full scaffold path.
+The CLI compares the selected stack and language with the detected project's descriptors before writing. Language inputs match a language ID or explicit alias in that stack; the file records the canonical `LanguageIdentifier` only for a multi-language stack. Once `.func/config.json` exists it is authoritative: project resolution does not reinterpret local settings as a CLI ID, implicitly adopt the directory, or rewrite its configuration. `--force` explicitly requests a new scaffold rather than adoption.
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
-Help groups stack-specific options under the initializer's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section, followed by stack headings sorted alphabetically using an ordinal, case-insensitive comparison. Options within each group retain their registration order. `func run` (alias `start`) follows the same grouping using the matching `IProjectStack.DisplayName`, falling back to the contributor's stack ID when no descriptor is registered. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
+Help groups stack-specific options under the owning descriptor's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section. `func run` (alias `start`) uses each contributor's owning descriptor in the same way. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
 
 ### `func setup`
 
-Runtime features without a built-in stack mapping are resolved through their worker
-workload, allowing custom runtimes. If neither an installed compatible worker nor
-a matching catalog version is available, setup reports a feature-resolution error
-and exits nonzero, including with `--check`. Missing worker packages remain optional
-for features with a stack mapping; setup still requires their stack workload.
+Use `--features host` for the Functions host, `--features runtime` for the host
+and extension bundle, or a stack's CLI identifier for its setup recipe. Installed
+manifests and the selected workload source supply the stack-to-package association;
+display names, install aliases, and package naming conventions do not.
 
-#### Go projects
+If a stack has no setup recipe, setup fails before installing any dependencies and
+suggests `func workload install <package-id> --exact`. Use `func workload search
+--stack` to list packages that declare a stack. Standalone worker features remain
+supported; they require a matching worker workload. A missing worker remains
+optional for recipes that install a stack.
 
-When inferring setup features from project configuration, `func setup` maps the Go
-worker runtime `native` to the `go` feature, even before the Go stack is installed.
-It reconciles the Go stack and worker using the profile's `go` runtime constraints,
-just like explicit `--features go`. `--check` reports missing Go dependencies without
-installing them. This setup-only mapping does not change `FUNCTIONS_WORKER_RUNTIME`:
-the Functions host still receives `native`.
+Setup reads `.func/config.json`'s `stack.runtime` as a CLI identifier. Without that
+file, it resolves `FUNCTIONS_WORKER_RUNTIME` from `local.settings.json` against the
+declared host runtime. For example, Go declares host runtime `native`, but explicit
+selection is `--features go`, and the profile worker key remains `go`.
 
 ### `func new`
 

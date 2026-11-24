@@ -538,7 +538,7 @@ public class WorkloadInstallCommandTests
             {
                 PackageId = "Test.Workload",
                 PackageVersion = "1.2.3",
-                Aliases = ["alias1"],
+                Aliases = ["different-first-alias", "alias1"],
             },
         });
 
@@ -765,13 +765,11 @@ public class WorkloadInstallNextStepsHintTests
     private WorkloadInstallCommand NewInstall() => new(_interaction, _installer, _store, new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions), _testCatalogOptions);
 
     [Theory]
-    [InlineData("Azure.Functions.Cli.Workloads.Workers.go", "go")]
-    [InlineData("Azure.Functions.Cli.Workloads.Workers.node", "node")]
-    [InlineData("Azure.Functions.Cli.Workloads.Go", "go")]
-    [InlineData("Azure.Functions.Cli.Workloads.Python", "python")]
+    [InlineData("Contoso.DevKit", "go")]
+    [InlineData("Azure.Functions.Cli.Workloads.Python", "node")]
     public async Task Install_KnownFeaturePackage_PrintsSetupHint(string packageId, string expectedFeature)
     {
-        StubInstall(packageId);
+        StubInstall(packageId, stack: expectedFeature);
 
         await InvokeAsync(NewInstall(), packageId);
 
@@ -797,7 +795,7 @@ public class WorkloadInstallNextStepsHintTests
     public async Task Install_HostPackage_SuggestsHostFeature()
     {
         const string hostPackageId = "Azure.Functions.Cli.Workloads.Host.osx-arm64";
-        StubInstall(hostPackageId);
+        StubInstall(hostPackageId, rid: "osx-arm64");
 
         await InvokeAsync(NewInstall(), hostPackageId);
 
@@ -841,7 +839,7 @@ public class WorkloadInstallNextStepsHintTests
             l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
     }
 
-    private void StubInstall(string packageId, bool alreadyInstalled = false) =>
+    private void StubInstall(string packageId, bool alreadyInstalled = false, string? stack = null, string? rid = null) =>
         _installer.InstallFromCatalogAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
                 Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>())
@@ -850,6 +848,8 @@ public class WorkloadInstallNextStepsHintTests
                 {
                     PackageId = packageId,
                     PackageVersion = "1.0.0",
+                    Stack = stack is null ? null : new(stack, "custom-runtime", "Custom title"),
+                    RuntimeIdentifier = rid,
                     EntryPoint = new EntryPointSpec { AssemblyPath = "x.dll", Type = "T" },
                 },
                 alreadyInstalled));

@@ -48,6 +48,6 @@ public class WorkloadPathsOptionsTests
     {
         var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
-        options.GetInstallDirectory("Azure.Functions.Cli.Workloads.Dotnet", "1.2.3").Should().Be(Path.Combine(options.Home, "workloads", "Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"));
+        options.GetInstallDirectory("Contoso.DevKit", "1.2.3").Should().Be(Path.Combine(options.Home, "workloads", "contoso.devkit", "1.2.3"));
     }
 }

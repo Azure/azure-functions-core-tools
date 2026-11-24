@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Title>Python Stack</Title>
+    <Title>Python</Title>
     <Description>Azure Functions CLI tooling for Python projects.</Description>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
-    <WorkloadAlias>python</WorkloadAlias>
+    <StackIdentifier>python</StackIdentifier>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
   </PropertyGroup>
 

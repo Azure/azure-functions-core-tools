@@ -37,7 +37,7 @@ public class GoProjectFactoryTests : IDisposable
     [Fact]
     public async Task Empty_directory_does_not_match()
     {
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>()
@@ -51,7 +51,7 @@ public class GoProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.Created>();
@@ -63,7 +63,7 @@ public class GoProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("requirements.txt", string.Empty);
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
@@ -75,7 +75,7 @@ public class GoProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", "{}");
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
@@ -89,12 +89,12 @@ public class GoProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.StackName.Should().Be("go");
-        created.Project.StackDisplayName.Should().Be("Go");
+        created.Project.ProjectStack.Descriptor.StackIdentifier.Should().Be("go");
+        created.Project.ProjectStack.Descriptor.DisplayName.Should().Be("Go");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         worker.WorkerRuntime.Should().Be("native");
         created.Reason.Should().NotBeNull();
@@ -107,7 +107,7 @@ public class GoProjectFactoryTests : IDisposable
         WriteFile("go.mod", "module example");
         WriteFile("main.go", "package main");
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found go.mod");
@@ -118,7 +118,7 @@ public class GoProjectFactoryTests : IDisposable
     {
         WriteFile("host.json", "{}");
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
@@ -134,7 +134,7 @@ public class GoProjectFactoryTests : IDisposable
         _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
             .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
 
-        ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
@@ -148,7 +148,7 @@ public class GoProjectFactoryTests : IDisposable
     [Fact]
     public async Task NullContext_throws()
     {
-        await FluentActions.Awaiting(() => new GoProjectFactory().TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
+        await FluentActions.Awaiting(() => new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     private void WriteFile(string name, string contents)

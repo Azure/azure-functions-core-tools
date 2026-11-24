@@ -3,7 +3,9 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands.Quickstart;
@@ -51,8 +53,8 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        _resolver.FindProviderForLanguage("Python").Returns(provider);
-        provider.GetDisplayLanguage("Python").Returns("Python");
+        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "http-py");
 
@@ -71,8 +73,8 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        _resolver.FindProviderForLanguage("Python").Returns(provider);
-        provider.GetDisplayLanguage("Python").Returns("Python");
+        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
 
@@ -92,8 +94,6 @@ public class QuickstartInfoCommandTests
         _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
             .Returns(new QuickstartManifest([entry]));
 
-        _resolver.FindProviderForLanguage("FSharp").Returns((IQuickstartProvider?)null);
-
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
 
         exit.Should().Be(0);
@@ -109,8 +109,8 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        _resolver.FindProviderForLanguage("Python").Returns(provider);
-        provider.GetDisplayLanguage("Python").Returns("Python");
+        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
 
@@ -127,8 +127,8 @@ public class QuickstartInfoCommandTests
             .Returns(new QuickstartManifest([entry]));
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
-        _resolver.FindProviderForLanguage("Python").Returns(provider);
-        provider.GetDisplayLanguage("Python").Returns("Python");
+        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
+        _resolver.FindUniqueProviderForLanguage("Python").Returns((provider, language));
 
         int exit = await InvokeAsync(CreateCommand(), "HTTP-PY");
 
@@ -136,7 +136,39 @@ public class QuickstartInfoCommandTests
         _interaction.Lines.Should().Contain(l => l.Contains("http-py"));
     }
 
-    // --- helpers ---
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Info_EmitsCanonicalIdsOnlyWhenTheManifestLanguageHasOneOwner(bool anotherOwner)
+    {
+        LanguageDescriptor language = new("csharp", "Friendly C#", "c#");
+        var provider = Substitute.For<IQuickstartProvider>();
+        provider.ProjectStack.Returns(new TestProjectStack("comet", "Same label", "native", language));
+        var other = Substitute.For<IQuickstartProvider>();
+        other.ProjectStack.Returns(new TestProjectStack("other", "Same label", languages: [new("different", "Other language", "CSharp")]));
+        IQuickstartProvider[] providers = anotherOwner ? [other, provider] : [provider];
+        var catalog = new InstalledProjectStackCatalog(providers.Select(p => p.ProjectStack));
+        var resolver = new QuickstartProviderResolver(_interaction, Substitute.For<IWorkloadHintRenderer>(), providers, catalog);
+        var manifest = new QuickstartManifest([QuickstartTestHelpers.CreateEntry("hello", language: "CSharp")]);
+        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>()).Returns(manifest);
+
+        int exit = await InvokeAsync(new QuickstartInfoCommand(_interaction, resolver, _manifestService), "hello");
+
+        exit.Should().Be(0);
+        if (anotherOwner)
+        {
+            _interaction.Lines.Should().NotContain(l => l.Contains("Run:"));
+        }
+        else
+        {
+            _interaction.Lines.Should().Contain(l => l.Contains("--stack comet --language csharp --template hello"));
+        }
+
+        IQuickstartProvider? selected = await resolver.SelectProviderAsync("CoMeT", "scaffold", TestContext.Current.CancellationToken);
+        selected.Should().BeSameAs(provider);
+        (await resolver.ResolveOrPromptLanguageAsync(" c# ", selected!, manifest, TestContext.Current.CancellationToken)).Should().BeSameAs(language);
+        (await resolver.SelectProviderAsync("native", "scaffold", TestContext.Current.CancellationToken)).Should().BeNull();
+    }
 
     private static Task<int> InvokeAsync(QuickstartInfoCommand cmd, params string[] args)
     {

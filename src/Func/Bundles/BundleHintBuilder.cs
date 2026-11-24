@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using System.Text;
-using Azure.Functions.Cli.Commands.Setup;
 
 namespace Azure.Functions.Cli.Bundles;
 
@@ -15,12 +14,12 @@ internal static class BundleHintBuilder
     private const string InstallCommandPrefix =
         $"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}";
 
-    public static string WorkloadMissing(string? workerRuntime = null)
+    public static string WorkloadMissing()
     {
         var sb = new StringBuilder();
         sb.AppendLine("host.json declares an extensionBundle but no bundles workload is installed. Install one with:");
         sb.Append(CultureInfo.InvariantCulture, $"  {InstallCommandPrefix}@<version>");
-        AppendSetupHint(sb, workerRuntime);
+        AppendSetupHint(sb);
         return sb.ToString();
     }
 
@@ -54,8 +53,7 @@ internal static class BundleHintBuilder
         string bundleId,
         string constraintRange,
         IReadOnlyList<string> installedVersions,
-        string? suggestedVersion,
-        string? workerRuntime = null)
+        string? suggestedVersion)
     {
         var sb = new StringBuilder();
         sb.AppendLine(CultureInfo.InvariantCulture,
@@ -75,7 +73,7 @@ internal static class BundleHintBuilder
             sb.Append(CultureInfo.InvariantCulture, $"  {InstallCommandPrefix}@{suggestedVersion} --force");
         }
 
-        AppendSetupHint(sb, workerRuntime);
+        AppendSetupHint(sb);
         return sb.ToString();
     }
 
@@ -83,16 +81,10 @@ internal static class BundleHintBuilder
     // signals a host.json/profile range mismatch, not a missing install, so the
     // remediation is to edit host.json or pick a different profile rather than
     // run `func setup`.
-    private static void AppendSetupHint(StringBuilder sb, string? workerRuntime)
+    private static void AppendSetupHint(StringBuilder sb)
     {
-        if (!SetupFeatureCatalog.TryGetFeatureForRuntime(workerRuntime, out string feature))
-        {
-            return;
-        }
-
         sb.AppendLine();
         sb.AppendLine();
-        sb.Append(CultureInfo.InvariantCulture,
-            $"Or run 'func setup --features {feature}' to install the full {feature} dev environment (host, worker, stack, templates, bundle).");
+        sb.Append("Or run 'func setup --features runtime' to install the Functions host and extension bundle.");
     }
 }

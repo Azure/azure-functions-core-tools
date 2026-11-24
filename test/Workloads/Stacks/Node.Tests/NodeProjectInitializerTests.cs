@@ -44,22 +44,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        new NodeProjectInitializer(new NodeProjectStack()).Stack.Should().Be("node");
-    }
-
-    [Theory]
-    [InlineData(null, "JavaScript")]
-    [InlineData("", "JavaScript")]
-    [InlineData("js", "JavaScript")]
-    [InlineData("JS", "JavaScript")]
-    [InlineData("JavaScript", "JavaScript")]
-    [InlineData("ts", "TypeScript")]
-    [InlineData("TS", "TypeScript")]
-    [InlineData("TypeScript", "TypeScript")]
-    [InlineData("unknown", "unknown")]
-    public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
-    {
-        new NodeProjectInitializer(new NodeProjectStack()).NormalizeLanguage(input).Should().Be(expected);
+        new NodeProjectInitializer(NodeWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier.Should().Be("node");
     }
 
     [Fact]
@@ -91,7 +76,7 @@ public class NodeProjectInitializerTests : IDisposable
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new NodeProjectInitializer(new NodeProjectStack()).GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new NodeProjectInitializer(NodeWorkloadTests.Stack).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         names.Should().Contain("--no-bundles");
@@ -254,7 +239,7 @@ public class NodeProjectInitializerTests : IDisposable
         string[]? args = null,
         Action<NodeProjectInitializer>? configure = null)
     {
-        NodeProjectInitializer initializer = new(new NodeProjectStack())
+        NodeProjectInitializer initializer = new(NodeWorkloadTests.Stack)
         {
             // Stub by default so tests don't spawn real npm.
             RunNpmInstall = (_, _) => Task.FromResult((0, string.Empty)),
@@ -264,7 +249,7 @@ public class NodeProjectInitializerTests : IDisposable
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: projectName,
-            Language: language,
+            Language: language is null ? null : initializer.ProjectStack.SupportedLanguages.SingleOrDefault(l => l.IsMatch(language)) ?? new(language, language),
             Force: force);
 
         RootCommand root = [];

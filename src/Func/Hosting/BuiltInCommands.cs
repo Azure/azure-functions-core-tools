@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Hosting;
@@ -47,6 +48,7 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, ProfileCommand>();
 
         // Setup command and dependencies
+        services.AddSingleton<StackPackageCatalog>();
         services.AddSingleton<ISetupFeatureResolver, SetupFeatureResolver>();
         services.AddSingleton<ISetupProfileScopeResolver, SetupProfileScopeResolver>();
         services.AddSingleton<ISetupDependencyPlanBuilder, SetupDependencyPlanBuilder>();

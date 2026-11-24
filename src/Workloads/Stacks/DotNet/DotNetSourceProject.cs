@@ -13,15 +13,16 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// A .NET Functions project detected from source (has a .csproj/.fsproj).
 /// Requires building before host startup.
 /// </summary>
-internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirectory, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory)
+internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirectory, string projectFilePath, IDotnetCliRunner dotnetCli, DotNetProjectStack stack)
+    : DotNetProject(workingDirectory, stack)
 {
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
     public string ProjectFilePath { get; } = projectFilePath ?? throw new ArgumentNullException(nameof(projectFilePath));
 
-    public override string? Language => Path.GetExtension(ProjectFilePath).Equals(".fsproj", StringComparison.OrdinalIgnoreCase)
-        ? "F#"
-        : "C#";
+    public override LanguageDescriptor Language => Path.GetExtension(ProjectFilePath).Equals(".fsproj", StringComparison.OrdinalIgnoreCase)
+        ? DotNetProjectStack.FSharp
+        : DotNetProjectStack.CSharp;
 
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {

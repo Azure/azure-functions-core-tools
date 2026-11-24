@@ -10,7 +10,7 @@ public class DotNetStartOptionContributorTests
 {
     private static (DotNetStartOptionContributor Contributor, RootCommand Root) CreateContributor()
     {
-        var contributor = new DotNetStartOptionContributor();
+        var contributor = new DotNetStartOptionContributor(DotNetWorkloadTests.Stack);
         RootCommand root = [];
         contributor.GetStartOptions(new StartOptionRegistry(root));
         return (contributor, root);
@@ -19,7 +19,7 @@ public class DotNetStartOptionContributorTests
     [Fact]
     public void Stack_IsDotNet()
     {
-        new DotNetStartOptionContributor().Stack.Should().Be("dotnet");
+        new DotNetStartOptionContributor(DotNetWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier.Should().Be("dotnet");
     }
 
     [Fact]

@@ -50,7 +50,7 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 
         // Emit stack-specific startup notices through the structured renderer so JSON mode
         // is not corrupted by plain-text writes.
-        if (context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
+        if (context.Options.StackHostConfigurations.TryGetValue(project.ProjectStack, out StartHostConfiguration? stackConfiguration)
             && !string.IsNullOrWhiteSpace(stackConfiguration.StartupNotice))
         {
             await context.ReportLogAsync(stackConfiguration.StartupNotice, FunctionsProjectReportSeverity.Info, cancellationToken);
@@ -119,7 +119,7 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 
         // Stack-specific host adjustments (e.g. .NET worker debug wait / JSON output) sit on top:
         // the user asked for them explicitly on the command line, so they win over inherited values.
-        if (context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration))
+        if (context.Options.StackHostConfigurations.TryGetValue(project.ProjectStack, out StartHostConfiguration? stackConfiguration))
         {
             foreach ((string name, string value) in stackConfiguration.EnvironmentVariables)
             {

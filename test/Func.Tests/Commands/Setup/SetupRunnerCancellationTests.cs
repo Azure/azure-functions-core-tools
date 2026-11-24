@@ -472,6 +472,9 @@ internal sealed class SetupRecordingInteraction : IInteractionService
     public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
         => _inner.PromptForSelectionAsync(title, choices, cancellationToken);
 
+    public Task<T> PromptForSelectionAsync<T>(string title, IEnumerable<T> choices, Func<T, string> display, CancellationToken cancellationToken = default) where T : notnull
+        => _inner.PromptForSelectionAsync(title, choices, display, cancellationToken);
+
     public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
         => _inner.PromptForMultiSelectionAsync(title, choices, cancellationToken);
 

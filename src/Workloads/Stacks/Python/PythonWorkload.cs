@@ -16,17 +16,14 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// </summary>
 public sealed class PythonWorkload : Workload
 {
-    public override string DisplayName => "Python Stack";
-
-    public override string Description => "Azure Functions CLI tooling for Python projects.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<PythonProjectStack>();
-        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PythonProjectStack>());
+        PythonProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
+        builder.Services.AddSingleton(stack);
+        builder.Services.AddSingleton<IProjectStack>(stack);
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, PythonQuickstartProvider>();
-        builder.AddProjectFactory(new PythonProjectFactory());
+        builder.AddProjectFactory(new PythonProjectFactory(stack));
     }
 }

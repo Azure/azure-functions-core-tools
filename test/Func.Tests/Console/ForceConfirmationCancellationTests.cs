@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
@@ -53,7 +54,7 @@ public class ForceConfirmationCancellationTests
             resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>()).Returns(_ =>
             {
                 if (gitOnly) cancellation.Cancel();
-                return Task.FromResult<(string?, int?)>(("Python", null));
+                return Task.FromResult<LanguageDescriptor?>(provider.ProjectStack.SupportedLanguages.Single());
             });
             var manifestService = Substitute.For<IQuickstartManifestService>();
             manifestService.GetManifestAsync(Arg.Any<CancellationToken>()).Returns(manifest);
@@ -68,12 +69,12 @@ public class ForceConfirmationCancellationTests
         else
         {
             var initializer = Substitute.For<IProjectInitializer>();
-            initializer.Stack.Returns("python");
-            initializer.DisplayName.Returns("Python");
-            initializer.SupportedLanguages.Returns(_ =>
+            initializer.ProjectStack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
+
+            initializer.ProjectStack.SupportedLanguages.Returns(_ =>
             {
                 if (gitOnly && commandConstructed) cancellation.Cancel();
-                return new[] { "python" };
+                return new LanguageDescriptor[] { new("python", "Python") };
             });
             initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
             initializer.InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>())
@@ -82,9 +83,9 @@ public class ForceConfirmationCancellationTests
             localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
             var bundles = Substitute.For<IInstalledBundleWorkloads>();
             bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
-            command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), localSettings,
+            command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), [initializer]);
+                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.ProjectStack]), [initializer]);
         }
         commandConstructed = true;
 

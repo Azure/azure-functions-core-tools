@@ -16,16 +16,13 @@ namespace Azure.Functions.Cli.Workloads.Java;
 /// </summary>
 public sealed class JavaWorkload : Workload
 {
-    public override string DisplayName => "Java Stack";
-
-    public override string Description => "Azure Functions CLI tooling for Java projects.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<JavaProjectStack>();
-        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<JavaProjectStack>());
+        JavaProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
+        builder.Services.AddSingleton(stack);
+        builder.Services.AddSingleton<IProjectStack>(stack);
         builder.Services.AddSingleton<IProjectInitializer, JavaProjectInitializer>();
-        builder.AddProjectFactory(new JavaProjectFactory());
+        builder.AddProjectFactory(new JavaProjectFactory(stack));
     }
 }

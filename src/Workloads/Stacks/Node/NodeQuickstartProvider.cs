@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 
 namespace Azure.Functions.Cli.Workloads.Node;
@@ -8,24 +9,11 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// <summary>
 /// Quickstart provider for the Node stack (JavaScript and TypeScript).
 /// </summary>
-internal sealed class NodeQuickstartProvider : IQuickstartProvider
+internal sealed class NodeQuickstartProvider(NodeProjectStack stack) : IQuickstartProvider
 {
-    public string Stack => "node";
+    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
-    public string DisplayName => "Node";
-
-    public IReadOnlyList<string> ManifestLanguages { get; } = ["TypeScript", "JavaScript"];
-
-    public string GetDisplayLanguage(string manifestLanguage) => manifestLanguage;
-
-    public string? ResolveManifestLanguage(string userInput) => userInput.ToLowerInvariant() switch
-    {
-        "javascript" or "js" => "JavaScript",
-        "typescript" or "ts" => "TypeScript",
-        _ => null
-    };
-
-    public IReadOnlyList<string> GetNextSteps(string manifestLanguage) =>
+    public IReadOnlyList<string> GetNextSteps(LanguageDescriptor language) =>
     [
         "Run `npm install` to install dependencies",
         "Run `func run [path]` where path is folder containing host.json to launch the app"

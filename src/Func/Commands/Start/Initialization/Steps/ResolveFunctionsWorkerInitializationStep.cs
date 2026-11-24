@@ -40,7 +40,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         ArgumentNullException.ThrowIfNull(context);
 
         FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
-        ValidateSupportedRuntime(context, project.StackName, project.WorkerReference.WorkerRuntime, project.StackDisplayName);
+        ValidateSupportedRuntime(context, project.ProjectStack.Descriptor, project.WorkerReference.WorkerRuntime);
 
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges =
             context.State.ResolvedProfile?.WorkerVersionRanges
@@ -68,7 +68,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             FunctionsWorkerResolutionResult.NotResolved failed => throw ReportWorkerResolutionFailure(failed.Failure, context, workerVersionRanges),
         };
 
-        ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: worker.WorkerRuntime, project.StackDisplayName);
+        ValidateSupportedRuntime(context, project.ProjectStack.Descriptor, worker.WorkerRuntime);
         context.State.Worker = worker;
 
         string completionMessage = string.IsNullOrWhiteSpace(worker.Version)
@@ -233,9 +233,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
     /// </summary>
     private static void ValidateSupportedRuntime(
         StartInitializationStepContext context,
-        string stackName,
-        string runtimeIdentifier,
-        string stackDisplayName)
+        StackDescriptor stack, string runtimeIdentifier)
     {
         if (context.State.ResolvedProfile is not { SupportedRuntimes: { } supportedRuntimes } profile)
         {
@@ -243,13 +241,13 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         }
 
         if (supportedRuntimes.Any(runtime =>
-            string.Equals(runtime, stackName, StringComparison.OrdinalIgnoreCase)
+            string.Equals(runtime, stack.StackIdentifier, StringComparison.OrdinalIgnoreCase)
             || string.Equals(runtime, runtimeIdentifier, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        string message = $"Profile '{profile.Name}' does not support the '{stackDisplayName}' stack. "
+        string message = $"Profile '{profile.Name}' does not support the '{stack.DisplayName}' stack. "
             + $"Supported runtimes: {string.Join(", ", supportedRuntimes)}.";
         throw new GracefulException(message, isUserError: true);
     }

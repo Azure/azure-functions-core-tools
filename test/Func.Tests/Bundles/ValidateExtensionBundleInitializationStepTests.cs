@@ -323,9 +323,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
     {
         public override WorkingDirectory WorkingDirectory { get; } = WorkingDirectory.FromExplicit(directory);
 
-        public override string StackName => "node";
-
-        public override string StackDisplayName => "Node.js";
+        public override IProjectStack ProjectStack { get; } = new Azure.Functions.Cli.Tests.TestProjectStack("node", "Node.js");
 
         public override bool SupportsExtensionBundles => true;
 

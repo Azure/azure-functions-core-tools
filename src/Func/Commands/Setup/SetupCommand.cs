@@ -17,8 +17,8 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string[]?> FeaturesOption { get; } = new("--features")
     {
-        Description = "Components to install, repeatable or comma-separated: node, python, go, dotnet, java, or powershell for full stack setup; "
-            + "runtime for host and extension bundle; host for host only.",
+        Description = "Components to install, repeatable or comma-separated: a stack ID with a setup recipe, "
+            + "a worker name, 'runtime' for host and extension bundle, or 'host' for host only.",
         Arity = ArgumentArity.OneOrMore,
     };
 

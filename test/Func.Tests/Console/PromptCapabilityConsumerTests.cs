@@ -29,16 +29,17 @@ public class PromptCapabilityConsumerTests
         stderr.Enqueue(ConsoleKey.Enter);
         var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns("node");
-        initializer.DisplayName.Returns("Node.js");
-        initializer.SupportedLanguages.Returns(["javascript", "typescript"]);
+        initializer.ProjectStack.Descriptor.Returns(new StackDescriptor("node", "node", "Node.js"));
+
+        initializer.ProjectStack.SupportedLanguages.Returns([new LanguageDescriptor("javascript", "JavaScript"), new LanguageDescriptor("typescript", "TypeScript")]);
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
         var installed = Substitute.For<IInstalledBundleWorkloads>();
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
-        var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), localSettings,
-            Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed), [initializer]);
+        var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
+            Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
+            new InstalledBundleScanner(installed), new InstalledProjectStackCatalog([initializer.ProjectStack]), [initializer]);
         string directory = Path.Combine(Path.GetTempPath(), $"func-5511-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
 
@@ -83,7 +84,8 @@ public class PromptCapabilityConsumerTests
         var store = Substitute.For<IFirstRunStateStore>();
         store.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.NeverPrompted);
         var setup = Substitute.For<ISetupRunner>();
-        var coordinator = new FirstRunCoordinator(service, store, setup);
+        var coordinator = new FirstRunCoordinator(service, store, setup,
+            Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
 
         (await coordinator.EnsureFirstRunPromptedAsync("unknown", new RootCommand().Parse([]), CancellationToken.None)).Should().BeNull();
 

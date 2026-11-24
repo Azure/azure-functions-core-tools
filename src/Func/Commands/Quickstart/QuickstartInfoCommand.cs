@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 
 namespace Azure.Functions.Cli.Commands.Quickstart;
@@ -66,8 +67,8 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
             return 1;
         }
 
-        IQuickstartProvider? provider = _resolver.FindProviderForLanguage(entry.Language);
-        string displayLanguage = provider?.GetDisplayLanguage(entry.Language) ?? entry.Language;
+        (IQuickstartProvider Provider, LanguageDescriptor Language)? owner = _resolver.FindUniqueProviderForLanguage(entry.Language);
+        string displayLanguage = owner?.Language.DisplayName ?? entry.Language;
 
         if (json)
         {
@@ -117,9 +118,11 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
             }
         }
 
-        _interaction.WriteBlankLine();
-        string stack = provider?.Stack ?? entry.Language.ToLowerInvariant();
-        _interaction.WriteLine(l => l.Muted($"  Run: func quickstart <path> --stack {stack} --language {displayLanguage.ToLowerInvariant()} --template {entry.Id}"));
+        if (owner is { } match)
+        {
+            _interaction.WriteBlankLine();
+            _interaction.WriteLine(l => l.Muted($"  Run: func quickstart <path> --stack {match.Provider.ProjectStack.Descriptor.StackIdentifier} --language {match.Language.LanguageIdentifier} --template {entry.Id}"));
+        }
 
         return 0;
     }

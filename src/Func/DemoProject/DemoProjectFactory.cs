@@ -24,12 +24,16 @@ internal sealed class DemoProjectFactory : IFunctionsProjectFactory
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override string StackName => "dotnet-isolated";
-
-        public override string StackDisplayName => ".NET";
+        public override IProjectStack ProjectStack { get; } = new DemoStack();
 
         public override bool SupportsExtensionBundles => false;
 
         public override FunctionsWorkerReference WorkerReference => _workerReference;
+    }
+
+    private sealed class DemoStack : IProjectStack
+    {
+        public StackDescriptor Descriptor { get; } = new("dotnet", "dotnet-isolated", ".NET");
+        public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("csharp", "C#", "c#")];
     }
 }

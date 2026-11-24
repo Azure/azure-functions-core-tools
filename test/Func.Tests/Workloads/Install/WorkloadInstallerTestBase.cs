@@ -89,14 +89,14 @@ public abstract class WorkloadInstallerTestBase : IDisposable
         => new(id, NuGetVersion.Parse(version), new PackageSource("https://example/v3/index.json", "test"));
 
     private protected WorkloadInstaller NewInstaller(bool includePrerelease = false, IWorkloadMetadataReader? metadataReader = null,
-        IWorkloadPackageTrust? packageTrust = null)
+        IWorkloadPackageTrust? packageTrust = null, IWorkloadStore? store = null)
     {
         IWorkloadMetadataReader reader = metadataReader ?? _metadataReader;
         WorkloadRidPackageSelector selector = new(_runtimeIdentifierProvider);
         WorkloadPackageInspector inspector = new(reader, selector);
         WorkloadPackageSource packageSource =
             new(_catalog, inspector, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
-        WorkloadDeploymentService deploymentService = new(_paths, _store, reader);
+        WorkloadDeploymentService deploymentService = new(_paths, store ?? _store, reader);
         IWorkloadPackageTrust trust = packageTrust ?? Substitute.For<IWorkloadPackageTrust>();
         if (packageTrust is null)
         {

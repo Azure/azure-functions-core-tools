@@ -2,183 +2,130 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Quickstart;
 
-/// <summary>
-/// Default implementation of <see cref="IQuickstartProviderResolver"/>.
-/// Centralises stack and language resolution so individual quickstart
-/// subcommands stay thin.
-/// </summary>
-internal sealed class QuickstartProviderResolver(
-    IInteractionService interaction,
-    IWorkloadHintRenderer hintRenderer,
-    IEnumerable<IQuickstartProvider> providers) : IQuickstartProviderResolver
+internal sealed class QuickstartProviderResolver(IInteractionService interaction, IWorkloadHintRenderer hintRenderer, IEnumerable<IQuickstartProvider> providers, InstalledProjectStackCatalog catalog) : IQuickstartProviderResolver
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadHintRenderer _hintRenderer = hintRenderer ?? throw new ArgumentNullException(nameof(hintRenderer));
-    private readonly IReadOnlyList<IQuickstartProvider> _providers = (providers ?? throw new ArgumentNullException(nameof(providers))).ToList();
+    private readonly IReadOnlyList<IQuickstartProvider> _providers = [.. providers ?? throw new ArgumentNullException(nameof(providers))];
+    private readonly InstalledProjectStackCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
 
     public async Task<IQuickstartProvider?> SelectProviderAsync(string? requestedStack, string actionDescription, CancellationToken cancellationToken)
     {
-        string[] installed = [.. _providers.Select(p => p.Stack)];
+        string[] installed = [.. _providers.Select(p => p.ProjectStack.Descriptor.StackIdentifier)];
+        IQuickstartProvider[] candidates = requestedStack is null ? [.. _providers] : [.. _providers.Where(p =>
+            string.Equals(p.ProjectStack.Descriptor.StackIdentifier, requestedStack.Trim(), StringComparison.OrdinalIgnoreCase))];
 
-        if (_providers.Count == 0)
+        if (candidates.Length == 0)
         {
-            _hintRenderer.Render(new WorkloadHint(
-                WorkloadHintKind.NoWorkloadsInstalled, actionDescription, null, installed));
+            WorkloadHintKind kind = _providers.Count == 0 ? WorkloadHintKind.NoWorkloadsInstalled : WorkloadHintKind.NoMatchingStack;
+            _hintRenderer.Render(new WorkloadHint(kind, actionDescription, requestedStack, installed));
             return null;
         }
 
-        if (!string.IsNullOrEmpty(requestedStack))
+        string? conflict = candidates.Select(GetProviderConflict).FirstOrDefault(message => message is not null);
+        if (conflict is not null)
         {
-            IQuickstartProvider? match = _providers.FirstOrDefault(p =>
-                string.Equals(p.Stack, requestedStack, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
+            _interaction.WriteError(conflict);
+            return null;
+        }
+
+        if (candidates.Length == 1)
+        {
+            if (requestedStack is null)
             {
-                return match;
+                _hintRenderer.Render(new WorkloadHint(WorkloadHintKind.AutoSelectedSoleWorkload, actionDescription, candidates[0].ProjectStack.Descriptor.StackIdentifier, installed));
             }
 
-            _hintRenderer.Render(new WorkloadHint(
-                WorkloadHintKind.NoMatchingStack, actionDescription, requestedStack, installed));
-            return null;
-        }
-
-        if (_providers.Count == 1)
-        {
-            IQuickstartProvider sole = _providers[0];
-            _hintRenderer.Render(new WorkloadHint(
-                WorkloadHintKind.AutoSelectedSoleWorkload, actionDescription, sole.Stack, installed));
-            return sole;
+            return candidates[0];
         }
 
         if (!_interaction.IsInteractive)
         {
-            _hintRenderer.Render(new WorkloadHint(
-                WorkloadHintKind.AmbiguousStackChoice, actionDescription, null, installed));
+            _hintRenderer.Render(new WorkloadHint(WorkloadHintKind.AmbiguousStackChoice, actionDescription, null, installed));
             return null;
         }
 
-        var displayToProvider = new Dictionary<string, IQuickstartProvider>(StringComparer.Ordinal);
-        foreach (IQuickstartProvider p in _providers)
-        {
-            displayToProvider.TryAdd(p.DisplayName, p);
-        }
-        string picked = await _interaction.PromptForSelectionAsync(
-            "Select a stack:",
-            displayToProvider.Keys,
-            cancellationToken);
-
-        return displayToProvider.TryGetValue(picked, out IQuickstartProvider? chosen) ? chosen : null;
+        return await _interaction.PromptForSelectionAsync("Select a stack:", candidates, p => $"{p.ProjectStack.Descriptor.DisplayName} ({p.ProjectStack.Descriptor.StackIdentifier})", cancellationToken);
     }
 
-    public string? ResolveLanguage(string? requestedLanguage, IQuickstartProvider provider, QuickstartManifest manifest)
+    public async Task<LanguageDescriptor?> ResolveOrPromptLanguageAsync(string? requestedLanguage, IQuickstartProvider provider, QuickstartManifest manifest, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(requestedLanguage))
+        IProjectStack stack = provider.ProjectStack;
+        string id = stack.Descriptor.StackIdentifier;
+        LanguageDescriptor[] available = [.. stack.SupportedLanguages.Where(l => manifest.Entries.Any(e => l.IsMatch(e.Language)))];
+        if (requestedLanguage is not null)
         {
+            LanguageDescriptor language;
+            try
+            {
+                language = InstalledProjectStackCatalog.ResolveLanguage(stack, requestedLanguage, "--language");
+            }
+            catch (ProjectStackResolutionException ex)
+            {
+                _interaction.WriteError(ex.Message);
+                return null;
+            }
+
+            if (available.Contains(language))
+            {
+                return language;
+            }
+
+            _interaction.WriteError($"No quickstart templates found for language '{language.DisplayName}' in the '{id}' stack.");
             return null;
         }
 
-        string? manifestLanguage = provider.ResolveManifestLanguage(requestedLanguage.Trim());
-        if (manifestLanguage is null)
+        if (available.Length == 0)
         {
-            IEnumerable<string> displayNames = GetAvailableManifestLanguages(provider, manifest)
-                .Select(provider.GetDisplayLanguage);
-            _interaction.WriteError(
-                $"Language '{requestedLanguage}' is not supported by the '{provider.Stack}' stack. " +
-                $"Supported values: {string.Join(", ", displayNames)}.");
+            _interaction.WriteError($"No quickstart templates found for the '{id}' stack.");
             return null;
         }
 
-        IReadOnlyList<string> available = GetAvailableManifestLanguages(provider, manifest);
-        if (!available.Contains(manifestLanguage, StringComparer.OrdinalIgnoreCase))
+        if (available.Length == 1)
         {
-            _interaction.WriteError(
-                $"No quickstart templates found for language '{provider.GetDisplayLanguage(manifestLanguage)}' " +
-                $"in the '{provider.Stack}' stack.");
-            return null;
-        }
-
-        return manifestLanguage;
-    }
-
-    public async Task<(string? Language, int? ErrorCode)> ResolveOrPromptLanguageAsync(
-        string? requestedLanguage,
-        IQuickstartProvider provider,
-        QuickstartManifest manifest,
-        CancellationToken cancellationToken)
-    {
-        string? resolved = ResolveLanguage(requestedLanguage, provider, manifest);
-        if (resolved is null && requestedLanguage is not null)
-        {
-            return (null, 1);
-        }
-
-        if (resolved is not null)
-        {
-            return (resolved, null);
-        }
-
-        return await PromptForLanguageAsync(provider, manifest, cancellationToken);
-    }
-
-    public async Task<(string? Language, int? ErrorCode)> PromptForLanguageAsync(
-        IQuickstartProvider provider,
-        QuickstartManifest manifest,
-        CancellationToken cancellationToken)
-    {
-        IReadOnlyList<string> available = GetAvailableManifestLanguages(provider, manifest);
-
-        if (available.Count == 0)
-        {
-            _interaction.WriteError(
-                $"No quickstart templates found for the '{provider.Stack}' stack.");
-            return (null, 1);
-        }
-
-        if (available.Count == 1)
-        {
-            return (available[0], null);
+            return available[0];
         }
 
         if (!_interaction.IsInteractive)
         {
-            IEnumerable<string> displayNames = available.Select(provider.GetDisplayLanguage);
-            _interaction.WriteError(
-                $"The '{provider.Stack}' stack supports multiple languages. " +
-                $"Re-run with --language <{string.Join("|", displayNames)}>.");
-            return (null, 1);
+            _interaction.WriteError($"The '{id}' stack supports multiple languages. Re-run with --language <{string.Join("|", available.Select(l => l.LanguageIdentifier))}>.");
+            return null;
         }
 
-        var displayToManifest = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string lang in available)
+        return await _interaction.PromptForSelectionAsync("Select a language:", available, l => $"{l.DisplayName} ({l.LanguageIdentifier})", cancellationToken);
+    }
+
+    public (IQuickstartProvider Provider, LanguageDescriptor Language)? FindUniqueProviderForLanguage(string manifestLanguage)
+    {
+        (IQuickstartProvider Provider, LanguageDescriptor Language)[] matches = [.. _providers
+            .SelectMany(p => p.ProjectStack.SupportedLanguages.Where(l => l.IsMatch(manifestLanguage)).Select(l => (p, l))).Take(2)];
+        if (matches.Length != 1)
         {
-            string display = provider.GetDisplayLanguage(lang);
-            displayToManifest.TryAdd(display, lang);
+            return null;
         }
 
-        string picked = await _interaction.PromptForSelectionAsync(
-            "Select a language:",
-            displayToManifest.Keys,
-            cancellationToken);
-
-        return (displayToManifest[picked], null);
+        return GetProviderConflict(matches[0].Provider) is null ? matches[0] : null;
     }
 
-    public IReadOnlyList<string> GetAvailableManifestLanguages(IQuickstartProvider provider, QuickstartManifest manifest)
+    private string? GetProviderConflict(IQuickstartProvider provider)
     {
-        HashSet<string> manifestLanguages = new(
-            manifest.Entries.Select(e => e.Language),
-            StringComparer.OrdinalIgnoreCase);
+        StackDescriptor stack = provider.ProjectStack.Descriptor;
+        IProjectStack? owner;
+        try
+        {
+            owner = _catalog.FindStack(stack.StackIdentifier);
+        }
+        catch (ProjectStackResolutionException ex)
+        {
+            return ex.Message;
+        }
 
-        return [.. provider.ManifestLanguages
-            .Where(manifestLanguages.Contains)];
-    }
-
-    public IQuickstartProvider? FindProviderForLanguage(string manifestLanguage)
-    {
-        return _providers.FirstOrDefault(p =>
-            p.ManifestLanguages.Contains(manifestLanguage, StringComparer.OrdinalIgnoreCase));
+        return ReferenceEquals(owner, provider.ProjectStack) && _providers.Count(p => p.ProjectStack.Descriptor == stack) == 1
+            ? null : $"Stack '{stack.StackIdentifier}' does not have a unique installed quickstart provider.";
     }
 }

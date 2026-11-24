@@ -17,32 +17,7 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public interface IProjectInitializer
 {
-    /// <summary>The canonical stack id this initializer owns (e.g. "dotnet").</summary>
-    public string Stack { get; }
-
-    /// <summary>
-    /// Additional <c>FUNCTIONS_WORKER_RUNTIME</c> values that should resolve
-    /// to this stack. Used during <c>func init</c> adoption to map the
-    /// runtime string in <c>local.settings.json</c> (e.g. "dotnet-isolated",
-    /// "native") to the canonical <see cref="Stack"/> id. Matching is
-    /// case-insensitive. Defaults to an empty list, which means
-    /// "<see cref="Stack"/> is the only accepted runtime value".
-    /// </summary>
-    public IReadOnlyList<string> WorkerRuntimeAliases => [];
-
-    /// <summary>
-    /// Human-friendly name for this stack shown in interactive prompts and help text
-    /// (e.g. ".NET", "Node.js"). Defaults to <see cref="Stack"/> when not overridden.
-    /// </summary>
-    public string DisplayName => Stack;
-
-    /// <summary>Display labels for the languages this initializer supports (e.g. "C#", "F#").</summary>
-    public IReadOnlyList<string> SupportedLanguages { get; }
-
-    /// <summary>
-    /// Maps each canonical language name to its accepted aliases (e.g. "C#" → ["csharp"]).
-    /// </summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+    public IProjectStack ProjectStack { get; }
 
     /// <summary>
     /// Stack-default validator for function names, applied by <c>func new</c>'s
@@ -67,7 +42,7 @@ public interface IProjectInitializer
     public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry);
 
     /// <summary>
-    /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.
+    /// Scaffolds a new project at <see cref="InitContext.WorkingDirectory"/>.
     /// </summary>
     public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default);
 }

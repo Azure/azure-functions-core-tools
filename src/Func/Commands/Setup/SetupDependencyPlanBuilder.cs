@@ -66,9 +66,11 @@ internal sealed class SetupDependencyPlanBuilder(
                 dependencies.Add(SetupDependency.Worker(runtimeFeature.Name, workerRange));
             }
 
-            if (SetupDependency.SupportsStack(runtimeFeature.Name))
+            if (runtimeFeature.Package is { } package)
             {
-                dependencies.Add(SetupDependency.Stack(runtimeFeature.Name));
+                VersionRange? selectedVersion = package.Installed ? null : new VersionRange(package.Version, true, package.Version, true);
+                dependencies.Add(new SetupDependency(SetupDependencyKind.Stack, package.Stack.StackIdentifier,
+                    $"{package.Stack.DisplayName} stack", package.PackageId, selectedVersion, RangeText: null, ResolvedPackageId: null));
             }
         }
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
@@ -79,6 +80,42 @@ public sealed class CliHostFactoryTests : IDisposable
 
         rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         interaction.Lines.Should().NotContain(l => l.StartsWith("WARNING:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RegisterWorkloads_ProvidesOnlyTheOwningInstalledDescriptorWithoutAFeed()
+    {
+        var paths = new WorkloadPathsOptions(_home);
+        var store = new WorkloadStore(paths);
+        var token = TestContext.Current.CancellationToken;
+        async Task Stage(string id, StackDescriptor? stack)
+        {
+            StageFixtureWorkload(id, "1.0.0", CommandWorkloadType);
+            await store.SaveWorkloadAsync(new WorkloadEntry
+            {
+                PackageId = id,
+                PackageVersion = "1.0.0",
+                DisplayName = "Package title",
+                Description = "Package description",
+                Stack = stack,
+                EntryPoint = new() { AssemblyPath = FixtureAssembly, Type = CommandWorkloadType },
+            }, token);
+        }
+
+        await Stage("Contoso.DevKit", new("comet", "native", "Comet v1"));
+        await Stage("Other.Publisher", new("lunar", "lunar", "Lunar"));
+        await Stage("Tool.WithoutStack", null);
+        var services = new ServiceCollection();
+
+        await WorkloadRegistration.RegisterWorkloadsAsync(services, paths, new TestInteractionService(), token);
+
+        using var provider = services.BuildServiceProvider();
+        var commands = provider.GetServices<FuncCliCommand>().OfType<ExternalCommand>().ToDictionary(c => c.Workload.PackageId);
+        commands["Contoso.DevKit"].Source.Description.Should().Be("Comet v1");
+        commands["Other.Publisher"].Source.Description.Should().Be("Lunar");
+        commands["Tool.WithoutStack"].Source.Description.Should().Be("Test command contributed by a fixture workload.");
+        commands["Tool.WithoutStack"].Workload.DisplayName.Should().Be("Package title");
+        provider.GetServices<StackDescriptor>().Should().BeEmpty();
     }
 
     [Fact]
@@ -290,7 +327,7 @@ public sealed class CliHostFactoryTests : IDisposable
         // typeName is unused at the filesystem layer; it lives in the registry entry
         // (see WriteRegistry). It's a method parameter purely for callsite readability.
         _ = typeName;
-        var installDir = Path.Combine(_home, "workloads", packageId, version, "tools", "any");
+        var installDir = Path.Combine(new WorkloadPathsOptions(_home).GetInstallDirectory(packageId, version), "tools", "any");
         Directory.CreateDirectory(installDir);
 
         var stagedFixtureRoot = Path.Combine(AppContext.BaseDirectory, "tools", "any");

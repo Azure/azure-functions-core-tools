@@ -20,7 +20,7 @@ internal sealed record CatalogSearchQuery
     /// <summary>Number of results to skip; defaults to 0.</summary>
     public int Skip { get; init; }
 
-    /// <summary>Maximum number of results to return; defaults to <see cref="DefaultTake"/>.</summary>
+    /// <summary>Number of packages to request per page; defaults to <see cref="DefaultTake"/>.</summary>
     public int? Take { get; init; }
 
     /// <summary>Optional <c>--source</c> override; <c>null</c> uses the configured / default source.</summary>

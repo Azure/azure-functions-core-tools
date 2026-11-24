@@ -65,6 +65,15 @@ public static class ProjectFiles
     }
 
     /// <summary>
+    /// Renders the workload's local settings template with its host runtime, not its CLI identifier.
+    /// </summary>
+    public static string ReadLocalSettingsTemplate(Assembly assembly, StackDescriptor stack)
+    {
+        ArgumentNullException.ThrowIfNull(stack);
+        return ReadTemplate(assembly, "local.settings.json").Replace("\"{WorkerRuntime}\"", JsonSerializer.Serialize(stack.WorkerRuntime), StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Loads <paramref name="hostJsonPath"/>, applies <paramref name="mutate"/>, and writes it back.
     /// Falls back to a fresh object when missing or malformed so merges always succeed.
     /// </summary>

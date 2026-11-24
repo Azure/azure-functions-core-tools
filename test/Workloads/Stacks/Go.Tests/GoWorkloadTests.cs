@@ -9,31 +9,25 @@ namespace Azure.Functions.Cli.Workloads.Go.Tests;
 
 public class GoWorkloadTests
 {
+    internal static GoProjectStack Stack { get; } = new(new("go", "native", "Go"));
+
     [Fact]
     public void Configure_RegistersProjectInitializer()
     {
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
+        builder.StackDescriptor.Returns(Stack.Descriptor);
 
         new GoWorkload().Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        initializer.Should().BeOfType<GoProjectInitializer>();
-        initializer.Stack.Should().Be("go");
-        initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("Go");
-
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
-        stack.Should().BeOfType<GoProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<GoProjectStack>());
-        stack.Should().NotBeAssignableTo<IProjectInitializer>();
-        stack.Stack.Should().Be(initializer.Stack);
-        stack.DisplayName.Should().Be("Go").And.Be(initializer.DisplayName);
-        stack.WorkerRuntimeAliases.Should().Equal("native").And.Equal(initializer.WorkerRuntimeAliases);
-        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
-        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
-        stack.SupportedLanguageAliases["Go"].Should().Equal("golang");
+        initializer.ProjectStack.Should().BeSameAs(stack);
+        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("go");
     }
 
     [Fact]
@@ -48,6 +42,7 @@ public class GoWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
+        builder.StackDescriptor.Returns(Stack.Descriptor);
 
         new GoWorkload().Configure(builder);
 

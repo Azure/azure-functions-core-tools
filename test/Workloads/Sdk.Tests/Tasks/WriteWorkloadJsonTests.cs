@@ -41,6 +41,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
         doc.RootElement.TryGetProperty("packages", out _).Should().BeFalse();
         doc.RootElement.TryGetProperty("runtimeIdentifier", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("stack", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -77,6 +78,46 @@ public sealed class WriteWorkloadJsonTests : IDisposable
 
         using JsonDocument doc = ParseOutput(outputPath);
         doc.RootElement.GetProperty("templateRoot").GetString().Should().Be("content/templates");
+    }
+
+    [Fact]
+    public void Execute_StackWorkload_WritesItsDeclaredDescriptor()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
+            entryPointAssemblyPath: "Contoso.DevKit.dll", entryPointType: "DevKit.Workload");
+        task.PackageId = "Contoso.DevKit";
+        task.StackIdentifier = "comet";
+        task.WorkerRuntime = "native";
+        task.DisplayName = "Comet SDK";
+        task.Description = "Tools for Comet.";
+
+        task.Execute().Should().BeTrue();
+
+        using JsonDocument doc = ParseOutput(outputPath);
+        JsonElement stack = doc.RootElement.GetProperty("stack");
+        stack.GetProperty("stackIdentifier").GetString().Should().Be("comet");
+        stack.GetProperty("workerRuntime").GetString().Should().Be("native");
+        stack.GetProperty("displayName").GetString().Should().Be("Comet SDK");
+        stack.GetProperty("description").GetString().Should().Be("Tools for Comet.");
+    }
+
+    [Theory]
+    [InlineData("two tags", "native", "Comet")]
+    [InlineData("comet", "native,other", "Comet")]
+    [InlineData("comet", "native", " ")]
+    [InlineData("", "native", "Comet")]
+    public void Execute_InvalidStackDeclaration_RejectsPackage(string id, string runtime, string title)
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
+            entryPointAssemblyPath: "DevKit.dll", entryPointType: "DevKit.Workload");
+        task.StackIdentifier = id;
+        task.WorkerRuntime = runtime;
+        task.DisplayName = title;
+
+        task.Execute().Should().BeFalse();
+        File.Exists(outputPath).Should().BeFalse();
     }
 
     [Theory]

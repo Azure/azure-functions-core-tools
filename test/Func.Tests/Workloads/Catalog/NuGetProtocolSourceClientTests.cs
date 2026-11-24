@@ -33,7 +33,7 @@ public sealed class NuGetProtocolSourceClientTests
             """);
 
         CatalogSearchResult only = NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle().Subject;
-        only.PackageId.Should().Be("workloads.python");
+        only.PackageId.Should().Be("Workloads.Python");
         only.Aliases.Should().Equal(["python"]);
     }
 
@@ -72,9 +72,9 @@ public sealed class NuGetProtocolSourceClientTests
         var results = NuGetProtocolSourceClient.ParseV3Hits(response, _source);
 
         results.Count.Should().Be(3);
-        results.Single(r => r.PackageId == "workloads.python").Kind.Should().Be("workload");
-        results.Single(r => r.PackageId == "workloads.host").Kind.Should().Be("content");
-        results.Single(r => r.PackageId == "workloads.nokind").Kind.Should().BeNull();
+        results.Single(r => r.PackageId == "Workloads.Python").Kind.Should().Be("workload");
+        results.Single(r => r.PackageId == "Workloads.Host").Kind.Should().Be("content");
+        results.Single(r => r.PackageId == "Workloads.NoKind").Kind.Should().BeNull();
     }
 
     [Fact]
@@ -132,9 +132,9 @@ public sealed class NuGetProtocolSourceClientTests
         var results = NuGetProtocolSourceClient.ParseV3Hits(response, _source);
 
         results.Count.Should().Be(2);
-        results.Should().Contain(r => r.PackageId == "workloads.python");
-        results.Should().Contain(r => r.PackageId == "workloads.nopackagetypes");
-        results.Should().NotContain(r => r.PackageId == "azure.functions.cli.abstractions");
+        results.Should().Contain(r => r.PackageId == "Workloads.Python");
+        results.Should().Contain(r => r.PackageId == "Workloads.NoPackageTypes");
+        results.Should().NotContain(r => r.PackageId == "Azure.Functions.Cli.Abstractions");
     }
 
     [Fact]

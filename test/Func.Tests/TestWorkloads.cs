@@ -14,16 +14,15 @@ internal static class TestWorkloads
 {
     public static RuntimeWorkloadInfo CreateInfo(string packageId = "Test.Workload.A", string version = "1.0.0")
     {
-        var instance = new TestWorkload(packageId);
         return new RuntimeWorkloadInfo(
-            Instance: instance,
+            Instance: new TestWorkload(),
             PackageId: packageId,
             PackageVersion: version,
             Aliases: [],
             InstallDirectory: AppContext.BaseDirectory,
             ContentRoot: AppContext.BaseDirectory,
-            DisplayName: instance.DisplayName,
-            Description: instance.Description,
+            DisplayName: packageId,
+            Description: $"{packageId} for tests",
             LoadContext: null!);
     }
 
@@ -41,12 +40,8 @@ internal static class TestWorkloads
     /// Minimal <see cref="Workloads.Workload"/> used by tests that need a
     /// runtime instance to back a <see cref="WorkloadInfo"/>.
     /// </summary>
-    private sealed class TestWorkload(string name) : Workload
+    private sealed class TestWorkload : Workload
     {
-        public override string DisplayName { get; } = name;
-
-        public override string Description => $"{DisplayName} for tests";
-
         public override void Configure(FunctionsCliBuilder builder)
         {
         }

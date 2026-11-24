@@ -5,19 +5,12 @@ using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Node;
 
-internal sealed class NodeProjectStack : IProjectStack
+internal sealed class NodeProjectStack(StackDescriptor descriptor) : IProjectStack
 {
-    public string Stack => "node";
+    internal static LanguageDescriptor JavaScript { get; } = new("javascript", "JavaScript", "js");
+    internal static LanguageDescriptor TypeScript { get; } = new("typescript", "TypeScript", "ts");
 
-    public string DisplayName => "Node.js";
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    public IReadOnlyList<string> WorkerRuntimeAliases => [];
-
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
-    {
-        { "JavaScript", ["js"] },
-        { "TypeScript", ["ts"] }
-    };
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [JavaScript, TypeScript];
 }

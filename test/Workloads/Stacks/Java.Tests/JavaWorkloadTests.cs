@@ -11,31 +11,25 @@ namespace Azure.Functions.Cli.Workloads.Java.Tests;
 
 public class JavaWorkloadTests
 {
+    internal static JavaProjectStack Stack { get; } = new(new("java", "java", "Java"));
+
     [Fact]
     public void Configure_RegistersProjectInitializer()
     {
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
+        builder.StackDescriptor.Returns(Stack.Descriptor);
 
         new JavaWorkload().Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        Assert.IsType<JavaProjectInitializer>(initializer);
-        Assert.Equal("java", initializer.Stack);
-        Assert.Equal("Java", Assert.Single(initializer.SupportedLanguages));
-
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
-        stack.Should().BeOfType<JavaProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<JavaProjectStack>());
-        stack.Should().NotBeAssignableTo<IProjectInitializer>();
-        stack.Stack.Should().Be(initializer.Stack);
-        stack.DisplayName.Should().Be("Java").And.Be(initializer.DisplayName);
-        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
-        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
-        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
-        stack.SupportedLanguageAliases["Java"].Should().BeEmpty();
+        initializer.ProjectStack.Should().BeSameAs(stack);
+        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("java");
     }
 
     [Fact]
@@ -50,18 +44,10 @@ public class JavaWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
+        builder.StackDescriptor.Returns(Stack.Descriptor);
 
         new JavaWorkload().Configure(builder);
 
         builder.Received(1).AddProjectFactory(Arg.Any<JavaProjectFactory>());
-    }
-
-    [Fact]
-    public void DisplayName_And_Description_AreSet()
-    {
-        var workload = new JavaWorkload();
-
-        Assert.Equal("Java Stack", workload.DisplayName);
-        Assert.False(string.IsNullOrWhiteSpace(workload.Description));
     }
 }

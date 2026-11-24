@@ -1,119 +1,128 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Workloads;
+
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
-/// Describes stack capabilities contributed by installed workloads without selecting an initializer.
+/// Resolves installed stack identities without conflating CLI IDs, host runtimes, or display labels.
 /// </summary>
-internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks)
+internal sealed class InstalledProjectStackCatalog
 {
-    public IReadOnlyList<IProjectStack> Stacks { get; } = ValidateStacks(stacks);
+    private readonly Lazy<IReadOnlyList<IProjectStack>> _stacks;
 
-    /// <summary>
-    /// Finds a stack by canonical ID or worker runtime alias, or returns null for an unknown value.
-    /// </summary>
-    public IProjectStack? FindStack(string stack)
+    public InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks, IEnumerable<WorkloadInfo> workloads)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
-        string candidate = stack.Trim();
-        return Stacks.SingleOrDefault(s =>
-            string.Equals(s.Stack, candidate, StringComparison.OrdinalIgnoreCase)
-            || s.WorkerRuntimeAliases.Contains(candidate, StringComparer.OrdinalIgnoreCase));
+        ArgumentNullException.ThrowIfNull(stacks);
+        ArgumentNullException.ThrowIfNull(workloads);
+        List<IProjectStack> installed = [.. stacks];
+        List<WorkloadInfo> packages = [.. workloads.Where(w => w.Stack is not null)];
+        // A conflict must not prevent unrelated commands (including workload uninstall) from running.
+        _stacks = new(() => Validate(installed, packages));
     }
 
-    /// <summary>
-    /// Resolves a language name or alias to its canonical spelling, or returns null for an unknown value.
-    /// </summary>
-    public string? GetCanonicalLanguage(string language)
+    internal InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks) : this(stacks, [])
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(language);
-        string candidate = language.Trim();
-        foreach (IProjectStack stack in Stacks)
+    }
+
+    public IReadOnlyList<IProjectStack> Stacks => _stacks.Value;
+
+    public IProjectStack? FindStack(string stackIdentifier)
+    {
+        ArgumentNullException.ThrowIfNull(stackIdentifier);
+        return Stacks.SingleOrDefault(stack => string.Equals(stack.Descriptor.StackIdentifier, stackIdentifier.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IProjectStack? ResolveProjectStack(ProjectStackSettings settings, IProjectStack? selected = null)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        IReadOnlyList<IProjectStack> installed = Stacks;
+        if (settings.HasProjectConfig)
         {
-            foreach (string canonical in stack.SupportedLanguages)
+            IProjectStack persisted = settings.StackIdentifier is { } id && FindStack(id) is { } stack
+                ? stack
+                : throw new ProjectStackResolutionException($"{ProjectStackSettings.StackSource} '{settings.StackIdentifier}' does not identify an installed stack.");
+
+            if (selected is not null && selected.Descriptor != persisted.Descriptor)
             {
-                if (string.Equals(canonical, candidate, StringComparison.OrdinalIgnoreCase)
-                    || stack.SupportedLanguageAliases.Any(entry =>
-                        string.Equals(entry.Key, canonical, StringComparison.OrdinalIgnoreCase)
-                        && entry.Value.Contains(candidate, StringComparer.OrdinalIgnoreCase)))
-                {
-                    return canonical;
-                }
+                throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.StackIdentifier}' conflicts with {ProjectStackSettings.StackSource} '{settings.StackIdentifier}'.");
+            }
+
+            return persisted;
+        }
+
+        if (settings.WorkerRuntime is not { } runtime)
+        {
+            return selected;
+        }
+
+        bool Matches(IProjectStack stack) => string.Equals(stack.Descriptor.WorkerRuntime, runtime.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (selected is not null)
+        {
+            return Matches(selected) ? selected
+                : throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.StackIdentifier}' uses worker runtime '{selected.Descriptor.WorkerRuntime}', which conflicts with {ProjectStackSettings.WorkerRuntimeSource} '{runtime}'.");
+        }
+
+        return installed.Where(Matches).ToList() switch
+        {
+            [var match] => match,
+            [] => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' does not match an installed stack's worker runtime. Run 'func workload search --stack' to find stack workloads."),
+            var matches => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' matches multiple stacks: {string.Join(", ", matches.Select(s => s.Descriptor.StackIdentifier))}. Specify the matching CLI stack ID with 'func init --stack <id>'."),
+        };
+    }
+
+    public static LanguageDescriptor ResolveLanguage(IProjectStack stack, string value, string source)
+        => stack.SupportedLanguages.Where(language => language.IsMatch(value)).ToList() switch
+        {
+            [var match] => match,
+            [] => throw new ProjectStackResolutionException($"Language '{value}' from {source} is not supported by the '{stack.Descriptor.StackIdentifier}' stack. Supported IDs: {string.Join(", ", stack.SupportedLanguages.Select(l => l.LanguageIdentifier))}."),
+            var matches => throw new ProjectStackResolutionException($"Language '{value}' from {source} is ambiguous in the '{stack.Descriptor.StackIdentifier}' stack: {string.Join(", ", matches.Select(l => l.LanguageIdentifier))}."),
+        };
+
+    private static IReadOnlyList<IProjectStack> Validate(List<IProjectStack> installed, IReadOnlyList<WorkloadInfo> packages)
+    {
+        foreach (IGrouping<string, WorkloadInfo> group in packages.GroupBy(p => p.Stack!.StackIdentifier, StringComparer.OrdinalIgnoreCase))
+        {
+            string[] owners = [.. group.Select(p => p.PackageId).Distinct(StringComparer.OrdinalIgnoreCase)];
+            if (owners.Length > 1)
+            {
+                throw new ProjectStackResolutionException($"Multiple installed workloads claim the '{group.Key}' stack: {string.Join(", ", owners)}. Run 'func workload list' and uninstall the conflicting provider.");
             }
         }
 
-        return null;
-    }
-
-    /// <summary>
-    /// Gets every stack supporting a language name or alias, retaining registration order.
-    /// </summary>
-    public IReadOnlyList<IProjectStack> GetStacksForLanguage(string language)
-    {
-        string? canonical = GetCanonicalLanguage(language);
-        return canonical is null
-            ? []
-            : Stacks.Where(s => s.SupportedLanguages.Contains(canonical, StringComparer.OrdinalIgnoreCase)).ToList().AsReadOnly();
-    }
-
-    private static IReadOnlyList<IProjectStack> ValidateStacks(IEnumerable<IProjectStack> stacks)
-    {
-        ArgumentNullException.ThrowIfNull(stacks);
-        List<IProjectStack> installed = [.. stacks];
-        HashSet<string> stackIds = [with(StringComparer.OrdinalIgnoreCase)];
-        Dictionary<string, string> stackNames = [with(StringComparer.OrdinalIgnoreCase)];
-        Dictionary<string, string> languageNames = [with(StringComparer.OrdinalIgnoreCase)];
-
+        HashSet<string> ids = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (IProjectStack stack in installed)
         {
-            ArgumentNullException.ThrowIfNull(stack, nameof(stacks));
-            ValidateName(stack.Stack);
-            ValidateName(stack.DisplayName);
-            ArgumentNullException.ThrowIfNull(stack.WorkerRuntimeAliases, nameof(stacks));
-            ArgumentNullException.ThrowIfNull(stack.SupportedLanguages, nameof(stacks));
-            ArgumentNullException.ThrowIfNull(stack.SupportedLanguageAliases, nameof(stacks));
-            if (!stackIds.Add(stack.Stack))
+            ArgumentNullException.ThrowIfNull(stack, "stacks");
+            StackDescriptor descriptor = stack.Descriptor;
+            ValidateName(descriptor.StackIdentifier);
+            ValidateName(descriptor.WorkerRuntime);
+            ValidateName(descriptor.DisplayName);
+            if (!ids.Add(descriptor.StackIdentifier))
             {
-                throw new InvalidOperationException($"Multiple installed workloads claim the '{stack.Stack}' stack.");
+                throw new ProjectStackResolutionException($"Multiple installed workloads claim the '{descriptor.StackIdentifier}' stack. Run 'func workload list' and uninstall the conflicting provider.");
             }
 
-            RegisterName(stackNames, stack.Stack, stack.Stack, "stack");
-            foreach (string alias in stack.WorkerRuntimeAliases)
+            if (stack.SupportedLanguages is not { Count: > 0 } languages)
             {
-                RegisterName(stackNames, alias, stack.Stack, "stack");
+                throw new ProjectStackResolutionException($"Stack '{descriptor.StackIdentifier}' must declare at least one supported language.");
             }
 
-            if (stack.SupportedLanguages.Count == 0)
+            HashSet<string> languageIds = [with(StringComparer.OrdinalIgnoreCase)];
+            foreach (LanguageDescriptor language in languages)
             {
-                throw new ArgumentException($"Stack '{stack.Stack}' must support at least one language.", nameof(stacks));
-            }
-
-            HashSet<string> languages = [with(StringComparer.OrdinalIgnoreCase)];
-            foreach (string language in stack.SupportedLanguages)
-            {
-                ValidateName(language);
-                if (!languages.Add(language))
+                ValidateName(language.LanguageIdentifier);
+                ValidateName(language.DisplayName);
+                foreach (string alias in language.Aliases)
                 {
-                    throw new ArgumentException($"Stack '{stack.Stack}' declares language '{language}' more than once.", nameof(stacks));
+                    ValidateName(alias);
                 }
 
-                RegisterName(languageNames, language, language, "language");
-            }
-
-            foreach (KeyValuePair<string, IReadOnlyList<string>> entry in stack.SupportedLanguageAliases)
-            {
-                ValidateName(entry.Key);
-                if (!languages.Contains(entry.Key))
+                if (!languageIds.Add(language.LanguageIdentifier))
                 {
-                    throw new ArgumentException(
-                        $"Stack '{stack.Stack}' declares aliases for unsupported language '{entry.Key}'.", nameof(stacks));
-                }
-
-                ArgumentNullException.ThrowIfNull(entry.Value, nameof(stacks));
-                foreach (string alias in entry.Value)
-                {
-                    RegisterName(languageNames, alias, entry.Key, "language");
+                    throw new ProjectStackResolutionException($"Stack '{descriptor.StackIdentifier}' declares language '{language.LanguageIdentifier}' more than once.");
                 }
             }
         }
@@ -121,23 +130,13 @@ internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> st
         return installed.AsReadOnly();
     }
 
-    private static void RegisterName(Dictionary<string, string> names, string name, string canonical, string kind)
-    {
-        ValidateName(name);
-        if (names.TryGetValue(name, out string? owner) && !string.Equals(owner, canonical, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException($"The {kind} name or alias '{name}' belongs to both '{owner}' and '{canonical}'.");
-        }
-
-        names.TryAdd(name, canonical);
-    }
-
     private static void ValidateName(string name)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name, "stacks");
-        if (!string.Equals(name, name.Trim(), StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(name) || !string.Equals(name, name.Trim(), StringComparison.Ordinal))
         {
-            throw new ArgumentException($"Stack metadata name '{name}' must not contain leading or trailing whitespace.", "stacks");
+            throw new ProjectStackResolutionException($"Invalid name '{name}' in installed stack metadata. Names cannot be blank or padded with whitespace.");
         }
     }
 }
+
+internal sealed class ProjectStackResolutionException(string message) : InvalidOperationException(message);

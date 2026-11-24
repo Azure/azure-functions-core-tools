@@ -9,4 +9,5 @@ namespace Azure.Functions.Cli.Projects;
 /// Inputs to project resolution.
 /// </summary>
 /// <param name="WorkingDirectory">The directory the command is operating on.</param>
-internal sealed record ProjectResolutionContext(WorkingDirectory WorkingDirectory);
+/// <param name="SelectedStack">The already validated stack when detecting an existing project for adoption or repair.</param>
+internal sealed record ProjectResolutionContext(WorkingDirectory WorkingDirectory, IProjectStack? SelectedStack = null);

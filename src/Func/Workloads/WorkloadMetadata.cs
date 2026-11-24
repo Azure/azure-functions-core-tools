@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json.Serialization;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads;
 
@@ -23,6 +24,11 @@ internal sealed class WorkloadMetadata
     /// Package shape. Defaults to <see cref="WorkloadKind.Workload"/>.
     /// </summary>
     public WorkloadKind Kind { get; init; } = WorkloadKind.Workload;
+
+    /// <summary>
+    /// Stack supplied by this package. Executable workloads need not provide a stack.
+    /// </summary>
+    public StackDescriptor? Stack { get; init; }
 
     /// <summary>
     /// Entry-point assembly and type. Required for

@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 
 namespace Azure.Functions.Cli.Commands.Quickstart;
@@ -21,7 +22,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
-        Description = "The programming language"
+        Description = "A language ID or alias from the selected stack. Only languages with catalog templates are available."
     };
 
     public Option<string?> TemplateOption { get; } = new("--template", "-t")
@@ -85,7 +86,6 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
 
         var providersList = providers.ToList();
 
-        LanguageOption.Description = BuildLanguageOptionDescription(providersList);
         StackOption.Description = QuickstartMessages.BuildStackOptionDescription(providersList);
 
         AddPathArgument();
@@ -139,18 +139,18 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             cancellationToken);
 
         // 4. Resolve language
-        (string? manifestLanguage, int? langError) = await _resolver.ResolveOrPromptLanguageAsync(
+        LanguageDescriptor? language = await _resolver.ResolveOrPromptLanguageAsync(
             requestedLanguage, provider, manifest, cancellationToken);
-        if (langError is int langCode)
+        if (language is null)
         {
-            return langCode;
+            return 1;
         }
 
         // 5. Select template
         QuickstartEntry? entry;
         if (!string.IsNullOrWhiteSpace(templateId))
         {
-            entry = FindTemplateById(templateId, manifestLanguage!, provider, manifest);
+            entry = FindTemplateById(templateId, language, manifest);
             if (entry is null)
             {
                 return 1;
@@ -158,7 +158,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         }
         else
         {
-            (entry, int? errorCode) = await SelectTemplateAsync(manifest, manifestLanguage!, resource, iac, search, cancellationToken);
+            (entry, int? errorCode) = await SelectTemplateAsync(manifest, language, resource, iac, search, cancellationToken);
             if (errorCode is int code)
             {
                 return code;
@@ -191,10 +191,10 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             .Muted("Scaffolded ")
             .Code(entry.DisplayName)
             .Muted(" for ")
-            .Code(provider.DisplayName)
+            .Code(provider.ProjectStack.Descriptor.DisplayName)
             .Muted("."));
 
-        IReadOnlyList<string> steps = provider.GetNextSteps(manifestLanguage!);
+        IReadOnlyList<string> steps = provider.GetNextSteps(language);
         if (steps.Count > 0)
         {
             _interaction.WriteBlankLine();
@@ -209,7 +209,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         return 0;
     }
 
-    private QuickstartEntry? FindTemplateById(string templateId, string manifestLanguage, IQuickstartProvider provider, QuickstartManifest manifest)
+    private QuickstartEntry? FindTemplateById(string templateId, LanguageDescriptor language, QuickstartManifest manifest)
     {
         QuickstartEntry? entry = manifest.Entries.FirstOrDefault(e =>
             string.Equals(e.Id, templateId, StringComparison.OrdinalIgnoreCase));
@@ -221,12 +221,11 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             return null;
         }
 
-        if (!string.Equals(entry.Language, manifestLanguage, StringComparison.OrdinalIgnoreCase))
+        if (!language.IsMatch(entry.Language))
         {
             _interaction.WriteError(
                 $"Template '{templateId}' is for {entry.Language}, " +
-                $"but you selected {provider.GetDisplayLanguage(manifestLanguage)}. " +
-                $"Pass --language {entry.Language.ToLowerInvariant()} to use this template.");
+                $"but you selected {language.DisplayName}. " + QuickstartMessages.TemplateNotFoundHint);
             return null;
         }
 
@@ -235,13 +234,13 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
 
     private async Task<(QuickstartEntry? Entry, int? ErrorCode)> SelectTemplateAsync(
         QuickstartManifest manifest,
-        string manifestLanguage,
+        LanguageDescriptor language,
         string? resource,
         string? iac,
         string? search,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<QuickstartEntry> filtered = manifest.Filter(manifestLanguage, resource, iac, search);
+        IReadOnlyList<QuickstartEntry> filtered = manifest.Filter(language, resource, iac, search);
 
         if (filtered.Count == 0)
         {
@@ -294,19 +293,5 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             $"--force will delete all files in '{workingDirectory.FullName}' (except .git) before scaffolding.");
 
         return await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken);
-    }
-
-    private static string BuildLanguageOptionDescription(IReadOnlyList<IQuickstartProvider> providers)
-    {
-        var languages = providers
-            .SelectMany(p => p.ManifestLanguages)
-            .Select(l => l.Trim().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(l => l, StringComparer.Ordinal)
-            .ToList();
-
-        return languages.Count == 0
-            ? "The programming language. Set up a stack (`func setup --features <id>`) to see supported values."
-            : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
     }
 }

@@ -44,14 +44,14 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsGo()
     {
-        new GoProjectInitializer(new GoProjectStack()).Stack.Should().Be("go");
+        new GoProjectInitializer(GoWorkloadTests.Stack).ProjectStack.Descriptor.StackIdentifier.Should().Be("go");
     }
 
     [Fact]
     public void GetInitOptions_ContainsSkipGoModTidy()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new GoProjectInitializer(new GoProjectStack()).GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new GoProjectInitializer(GoWorkloadTests.Stack).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         names.Should().Contain("--skip-go-mod-tidy");
@@ -188,7 +188,7 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public async Task InitializeAsync_SkipsGoModTidy_WhenFlagSet()
     {
-        var initializer = new GoProjectInitializer(new GoProjectStack());
+        var initializer = new GoProjectInitializer(GoWorkloadTests.Stack);
         int calls = 0;
         initializer.RunGoModTidy = (_, _) => { calls++; return Task.FromResult((0, string.Empty)); };
 
@@ -210,7 +210,7 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public async Task InitializeAsync_RunsGoModTidy_ByDefault()
     {
-        var initializer = new GoProjectInitializer(new GoProjectStack());
+        var initializer = new GoProjectInitializer(GoWorkloadTests.Stack);
         int calls = 0;
         initializer.RunGoModTidy = (_, _) => { calls++; return Task.FromResult((0, string.Empty)); };
 
@@ -228,7 +228,7 @@ public class GoProjectInitializerTests : IDisposable
 
     private Task RunAsync(string? projectName, bool force, string[]? args = null)
     {
-        var initializer = new GoProjectInitializer(new GoProjectStack());
+        var initializer = new GoProjectInitializer(GoWorkloadTests.Stack);
         // Skip the real `go mod tidy` invocation in tests by stubbing the seam.
         initializer.RunGoModTidy = (_, _) => Task.FromResult((0, string.Empty));
         var context = new InitContext(

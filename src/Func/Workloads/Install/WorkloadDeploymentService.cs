@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Host;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Packaging;
@@ -368,9 +369,10 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             PackageId = package.Identity.PackageId,
             PackageVersion = package.Identity.Version,
             Aliases = package.Identity.Aliases,
-            DisplayName = GetDisplayName(package.Metadata, package.Identity.Title, package.Identity.PackageId),
-            Description = GetDescription(package.Metadata, package.Identity.Description),
+            DisplayName = package.Metadata.Stack?.DisplayName ?? GetDisplayName(package.Metadata, package.Identity.Title, package.Identity.PackageId),
+            Description = package.Metadata.Stack is { } stack ? stack.Description ?? string.Empty : GetDescription(package.Metadata, package.Identity.Description),
             EntryPoint = package.Metadata.EntryPoint,
+            Stack = package.Metadata.Stack,
             Kind = package.Metadata.Kind,
             Source = source,
             RuntimeIdentifier = package.Metadata.RuntimeIdentifier,
@@ -390,6 +392,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             DisplayName = entry.DisplayName,
             Description = entry.Description,
             EntryPoint = entry.EntryPoint,
+            Stack = entry.Stack,
             Kind = entry.Kind,
             Source = entry.Source,
             RuntimeIdentifier = entry.RuntimeIdentifier,
@@ -412,6 +415,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             DisplayName = incoming.DisplayName,
             Description = incoming.Description,
             EntryPoint = incoming.EntryPoint,
+            Stack = incoming.Stack,
             Kind = incoming.Kind,
             Source = incoming.Source,
             RuntimeIdentifier = incoming.RuntimeIdentifier,
@@ -434,6 +438,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             WorkloadMetadata actual = _metadataReader.Read(installPath);
             return actual.Kind == expectedMetadata.Kind
+                && SameStackDeclaration(actual.Stack, expectedMetadata.Stack)
+                && SameStackDeclaration(actual.Stack, entry.Stack)
                 && string.Equals(actual.TemplateRoot, expectedMetadata.TemplateRoot, StringComparison.Ordinal)
                 && string.Equals(actual.RuntimeIdentifier, expectedMetadata.RuntimeIdentifier, StringComparison.Ordinal);
         }
@@ -495,6 +501,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     private static void EnsureMetadataMatchesInspection(WorkloadMetadata expected, WorkloadMetadata actual, string packageId)
     {
         if (expected.Kind != actual.Kind
+            || !SameStackDeclaration(expected.Stack, actual.Stack)
             || !string.Equals(expected.TemplateRoot, actual.TemplateRoot, StringComparison.Ordinal)
             || !string.Equals(expected.RuntimeIdentifier, actual.RuntimeIdentifier, StringComparison.Ordinal))
         {
@@ -502,6 +509,11 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 $"Package '{packageId}' workload.json changed while the package was being installed.");
         }
     }
+
+    // StackDescriptor equality compares stable identifiers, not a package version's declaration.
+    private static bool SameStackDeclaration(StackDescriptor? left, StackDescriptor? right)
+        => left?.StackIdentifier == right?.StackIdentifier && left?.WorkerRuntime == right?.WorkerRuntime
+            && left?.DisplayName == right?.DisplayName && left?.Description == right?.Description;
 
     private static PackageArchiveReader OpenPackage(string nupkgPath)
     {

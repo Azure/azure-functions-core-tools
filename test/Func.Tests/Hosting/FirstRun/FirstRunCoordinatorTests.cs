@@ -9,6 +9,8 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Spectre.Console.Rendering;
 
@@ -54,6 +56,7 @@ public sealed class FirstRunCoordinatorTests
     }
 
     [Theory]
+    [InlineData("help")]
     [InlineData("setup")]
     [InlineData("update")]
     [InlineData("version")]
@@ -340,7 +343,7 @@ public sealed class FirstRunCoordinatorTests
         _interaction.Lines.Should().NotContain(l => l.Contains("`func setup`"));
     }
 
-    private FirstRunCoordinator CreateCoordinator() => new(_interaction, _stateStore, _setupRunner);
+    private FirstRunCoordinator CreateCoordinator() => new(_interaction, _stateStore, _setupRunner, Options.Create(new WorkloadCatalogOptions()));
 
     private static ParseResult Parse(string args)
     {
@@ -432,6 +435,9 @@ public sealed class FirstRunCoordinatorTests
                 ? ConfirmAsync(prompt, defaultValue, cancellationToken)
                 : Task.FromResult(whenInputUnavailable);
         }
+
+        public Task<T> PromptForSelectionAsync<T>(string title, IEnumerable<T> choices, Func<T, string> display, CancellationToken cancellationToken = default) where T : notnull
+            => throw new NotSupportedException();
 
         public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
             => Task.FromResult(string.Empty);

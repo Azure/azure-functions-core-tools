@@ -9,6 +9,8 @@ internal sealed class LocalSettingsSnapshot
 
     public bool IsEncrypted { get; init; }
 
+    public string? WorkerRuntimeReadError { get; init; }
+
     public IReadOnlyDictionary<string, string> Values { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -17,7 +19,6 @@ internal sealed class LocalSettingsSnapshot
     public string? WorkerRuntime =>
         !IsEncrypted
             && Values.TryGetValue(CliConfigurationNames.WorkerRuntimeSettingName, out string? value)
-            && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : null;
 }

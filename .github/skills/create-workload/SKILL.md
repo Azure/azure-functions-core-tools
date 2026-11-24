@@ -32,11 +32,11 @@ Create the following files:
 
     <PropertyGroup>
       <TargetFramework>net11.0</TargetFramework>
-      <Title><Name> Stack</Title>
+      <Title><Name></Title>
       <Description>Azure Functions CLI tooling for <Name> projects.</Description>
       <PackAsWorkload>true</PackAsWorkload>
       <WorkloadKind>workload</WorkloadKind>
-      <WorkloadAlias><name></WorkloadAlias>
+      <StackIdentifier><name></StackIdentifier>
     </PropertyGroup>
 
     <ItemGroup>
@@ -49,10 +49,10 @@ Create the following files:
 
   </Project>
   ```
-  - `PackAsWorkload=true` triggers the SDK build targets in `eng/build/Workloads/` that handle packaging, `workload.json` generation, dependency filtering, and pack layout. Do **not** manually set `PackageType`, `PackageTags`, `IncludeBuildOutput`, or `SuppressDependenciesWhenPacking` — the SDK targets set all of these from `WorkloadKind` and `WorkloadAlias`.
+  - `PackAsWorkload=true` triggers the SDK build targets in `eng/build/Workloads/` that handle packaging, `workload.json` generation, dependency filtering, and pack layout. Do **not** manually set `PackageType`, `PackageTags`, `IncludeBuildOutput`, or `SuppressDependenciesWhenPacking`: the SDK derives these from workload project metadata.
   - `WorkloadKind` must be one of: `workload`, `content`, `meta`, `rid-pointer`. Stack workloads use `workload`.
-  - `WorkloadAlias` is the short name users pass to `func workload install <alias>`.
-  - `Title` is the feed-UI display name; `Description` is the one-line summary.
+  - `StackIdentifier` supplies the stable CLI ID, the install alias and the explicit stack marker. Set `WorkerRuntime` only when the host uses a different value. Neither field is inferred from the package ID.
+  - `Title` and `Description` supply presentation in the feed and the installed descriptor. Do not duplicate them in code.
   - The Abstractions reference does **not** need `PrivateAssets`/`ExcludeAssets` — the SDK targets (`Workload.Pack.targets`) automatically exclude unified CLI assemblies from the package via the `ResolveWorkloadCopyLocal` task.
   - If the workload embeds template files, add `<EmbeddedResource Include="Templates/**" />`.
   - Csproj/assembly name is `Azure.Functions.Cli.Workloads.<Name>` (derived from the project filename by `eng/build/Engineering.props`).
@@ -92,20 +92,19 @@ Create the following files:
   /// </summary>
   public sealed class <Name>Workload : Workload
   {
-      public override string DisplayName => "<Name> Stack";
-
-      public override string Description => "Azure Functions CLI tooling for <Name> projects.";
-
       public override void Configure(FunctionsCliBuilder builder)
       {
           ArgumentNullException.ThrowIfNull(builder);
+          <Name>ProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("Missing stack declaration."));
+          builder.Services.AddSingleton(stack);
+          builder.Services.AddSingleton<IProjectStack>(stack);
           builder.Services.AddSingleton<IProjectInitializer, <Name>ProjectInitializer>();
       }
   }
   ```
   - Must be `public sealed` with a parameterless constructor (the loader activates it by reflection).
   - The `[assembly: CliWorkload<T>()]` attribute is **required** — the `ResolveWorkloadEntry` MSBuild task scans the compiled assembly for this attribute to auto-generate `workload.json`. Do **not** create a manual `workload.json` file.
-  - Use expression-bodied `=>` overrides; do not redeclare package id or version on the class.
+  - Pass the same per-workload stack to each capability. Do not redeclare package id, version, or stack identity on the class.
   - Register additional services in `Configure` as needed: `IQuickstartProvider` for post-init guidance, `IFunctionsProjectFactory` via `builder.AddProjectFactory(...)` for project detection, custom commands via `builder.RegisterCommand<T>()`.
 - [ ] At least one provider, typically `<Name>ProjectInitializer.cs` implementing `IProjectInitializer`:
   ```csharp
@@ -118,22 +117,15 @@ Create the following files:
 
   namespace Azure.Functions.Cli.Workloads.<Name>;
 
-  /// <summary>
-  /// Scaffolds a <Name> Functions project.
-  /// </summary>
-  internal sealed class <Name>ProjectInitializer : IProjectInitializer
+  internal sealed class <Name>ProjectStack(StackDescriptor descriptor) : IProjectStack
   {
-      public string Stack => "<name>";
+      public StackDescriptor Descriptor { get; } = descriptor;
+      public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("<language-id>", "<Language>")];
+  }
 
-      public string DisplayName => "<Name>";
-
-      public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-      public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
-          new Dictionary<string, IReadOnlyList<string>>()
-          {
-              { "<Language>", [] }
-          };
+  internal sealed class <Name>ProjectInitializer(<Name>ProjectStack stack) : IProjectInitializer
+  {
+      public IProjectStack ProjectStack { get; } = stack;
 
       public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
       {
@@ -180,8 +172,8 @@ Mirror the source path under `test/Workloads/`: grouped workloads use
   - Omit the `<kind>/` segment in the `ProjectReference` for ungrouped workloads.
   - The `Abstractions` and `Microsoft.Extensions.DependencyInjection` references are needed for DI-based contract tests that verify `Configure(FunctionsCliBuilder)` registrations.
   - Common test dependencies (xUnit, NSubstitute, AwesomeAssertions) are pulled in by `test/Directory.Build.props` — do not redeclare them.
-- [ ] `<Name>WorkloadTests.cs`, contract tests for the workload (initializer is registered via `Configure`, `DisplayName` / `Description` are set).
-- [ ] `<Name>ProjectInitializerTests.cs`, unit tests for the initializer (`Stack`, `SupportedLanguages`, `InitializeAsync` throws `NotImplementedException` for stubs).
+- [ ] `<Name>WorkloadTests.cs`, contract tests that supply `builder.StackDescriptor` and assert that each registered capability references its owner.
+- [ ] `<Name>ProjectInitializerTests.cs`, unit tests for supported languages and project initialization.
 
 ### 3. Solution file, `Azure.Functions.Cli.slnx`
 

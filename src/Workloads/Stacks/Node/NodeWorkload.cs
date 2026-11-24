@@ -16,17 +16,14 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// </summary>
 public sealed class NodeWorkload : Workload
 {
-    public override string DisplayName => "Node.js Stack";
-
-    public override string Description => "Azure Functions CLI tooling for Node.js projects.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<NodeProjectStack>();
-        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
+        NodeProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
+        builder.Services.AddSingleton(stack);
+        builder.Services.AddSingleton<IProjectStack>(stack);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
-        builder.AddProjectFactory(new NodeProjectFactory());
+        builder.AddProjectFactory(new NodeProjectFactory(stack));
     }
 }

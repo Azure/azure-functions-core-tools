@@ -28,12 +28,11 @@ internal sealed class GoFunctionsProject : FunctionsProject
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
 
-    public GoFunctionsProject(WorkingDirectory workingDirectory)
+    public GoFunctionsProject(WorkingDirectory workingDirectory, GoProjectStack stack)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        // The Go worker's worker.config.json declares language "native"; the host indexes WorkerConfig
-        // by that language. The workload id stays "go" (matches the package and install command).
-        _workerReference = FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native");
+        ProjectStack = stack ?? throw new ArgumentNullException(nameof(stack));
+        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.StackIdentifier, stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seam so tests can stub out the `go build` invocation
@@ -50,9 +49,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override string StackName => "go";
-
-    public override string StackDisplayName => "Go";
+    public override IProjectStack ProjectStack { get; }
 
     public override bool SupportsExtensionBundles => true;
 

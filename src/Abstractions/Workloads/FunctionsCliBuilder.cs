@@ -21,6 +21,11 @@ public abstract class FunctionsCliBuilder
     public abstract IServiceCollection Services { get; }
 
     /// <summary>
+    /// Gets the stack declared in this workload's installed manifest, or <see langword="null"/> for a non-stack workload.
+    /// </summary>
+    public abstract StackDescriptor? StackDescriptor { get; }
+
+    /// <summary>
     /// Registers a top-level <see cref="FuncCommand"/> instance. The same
     /// instance is reused for every invocation.
     /// </summary>

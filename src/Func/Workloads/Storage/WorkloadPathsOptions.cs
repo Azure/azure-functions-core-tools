@@ -58,5 +58,5 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
 
     /// <inheritdoc />
     public string GetInstallDirectory(string packageId, string version)
-        => Path.Combine(WorkloadsRoot, packageId, version);
+        => Path.Combine(WorkloadsRoot, packageId.ToLowerInvariant(), version);
 }

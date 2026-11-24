@@ -18,21 +18,11 @@ namespace Azure.Functions.Cli.Workloads;
 /// <remarks>
 /// The workload's identity (package id, version, aliases) is supplied by the
 /// NuGet package's nuspec at install time and persisted in the global
-/// registry, so the type itself only needs to describe its CLI presentation
-/// and wire up its services.
+/// registry. Its presentation and optional stack descriptor come from the
+/// package manifest, not from executing the workload.
 /// </remarks>
 public abstract class Workload
 {
-    /// <summary>
-    /// Human-readable name shown in <c>func workload list</c>.
-    /// </summary>
-    public abstract string DisplayName { get; }
-
-    /// <summary>
-    /// One-line description of what the workload provides.
-    /// </summary>
-    public abstract string Description { get; }
-
     /// <summary>
     /// Registers the workload's services with the host. Called once during
     /// CLI bootstrap, before the root command tree is built.

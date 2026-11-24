@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 using static Azure.Functions.Cli.Projects.ProjectCreationResults;
 
 namespace Azure.Functions.Cli.Workloads.Go;
@@ -10,9 +9,9 @@ namespace Azure.Functions.Cli.Workloads.Go;
 /// <summary>
 /// Creates Go Functions projects from Go-specific fingerprints.
 /// </summary>
-internal sealed class GoProjectFactory : IFunctionsProjectFactory
+internal sealed class GoProjectFactory(GoProjectStack stack) : IFunctionsProjectFactory
 {
-    private static readonly FunctionsWorkerId _workerId = new("go");
+    private readonly GoProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
@@ -31,7 +30,7 @@ internal sealed class GoProjectFactory : IFunctionsProjectFactory
             return Task.FromResult(NotCreated("no Go project fingerprint found"));
         }
 
-        FunctionsProject project = new GoFunctionsProject(context.WorkingDirectory);
+        FunctionsProject project = new GoFunctionsProject(context.WorkingDirectory, _stack);
         return Task.FromResult(Created(project, reason));
     }
 

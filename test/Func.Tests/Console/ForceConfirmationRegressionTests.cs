@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
@@ -47,9 +48,9 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         bool stdoutInput, bool stdoutAnsi, bool stderrInput, bool stderrAnsi, Response response)
     {
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns("python");
-        initializer.DisplayName.Returns("Python");
-        initializer.SupportedLanguages.Returns(["python"]);
+        initializer.ProjectStack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
+
+        initializer.ProjectStack.SupportedLanguages.Returns([new LanguageDescriptor("python", "Python")]);
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
@@ -57,9 +58,9 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
 
         await AssertForceConfirmationAsync(
-            service => new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), localSettings,
+            service => new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), [initializer]),
+                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.ProjectStack]), [initializer]),
             stdoutInput, stdoutAnsi, stderrInput, stderrAnsi, response, CancellationToken.None);
 
         await initializer.Received(!stdoutInput || response == Response.Yes ? 1 : 0).InitializeAsync(
@@ -76,8 +77,9 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         var manifest = new QuickstartManifest([entry]);
         var resolver = Substitute.For<IQuickstartProviderResolver>();
         resolver.SelectProviderAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(provider);
+        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single();
         resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>())
-            .Returns(("Python", (int?)null));
+            .Returns(language);
         var manifestService = Substitute.For<IQuickstartManifestService>();
         manifestService.GetManifestAsync(Arg.Any<CancellationToken>()).Returns(manifest);
         var scaffolder = Substitute.For<IQuickstartScaffolder>();

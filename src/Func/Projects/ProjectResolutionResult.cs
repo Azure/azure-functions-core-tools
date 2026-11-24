@@ -14,5 +14,5 @@ internal closed record ProjectResolutionResult
 
     public sealed record Resolved(FunctionsProject Project, string Message) : ProjectResolutionResult;
 
-    public sealed record NotResolved(string Message, ProjectCreationFailure? Failure = null) : ProjectResolutionResult;
+    public sealed record NotResolved(string Message, ProjectCreationFailure? Failure = null, bool IsUnrecognized = false) : ProjectResolutionResult;
 }

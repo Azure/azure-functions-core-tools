@@ -29,6 +29,8 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Ru
 
     public override IServiceCollection Services { get; } = services ?? throw new ArgumentNullException(nameof(services));
 
+    public override StackDescriptor? StackDescriptor => _workload?.Stack;
+
     public override void RegisterCommand(FuncCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);

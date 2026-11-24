@@ -7,6 +7,8 @@
     <PackageTags>$(PackageTags);func-workload</PackageTags>
     <PackageTags Condition="'$(WorkloadKind)' != ''">$(PackageTags);kind:$(WorkloadKind)</PackageTags>
     <PackageTags Condition="'$(WorkloadAlias)' != ''">$(PackageTags);alias:$(WorkloadAlias)</PackageTags>
+    <PackageTags Condition="'$(StackIdentifier)' != ''">$(PackageTags);stack:$(StackIdentifier);worker-runtime:$(WorkerRuntime)</PackageTags>
+    <PackageTags Condition="'$(StackIdentifier)' != '' AND '$(StackIdentifier)' != '$(WorkloadAlias)'">$(PackageTags);alias:$(StackIdentifier)</PackageTags>
 
     <!-- General pack settings -->
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

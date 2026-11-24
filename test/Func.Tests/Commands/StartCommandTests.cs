@@ -62,20 +62,14 @@ public class StartCommandTests : IDisposable
             startOptionContributors: [new FakeStartHostOptionContributor()]);
 
         cmd.Options.Select(o => o.Name).Should().Contain("--fake-stack-option");
-        cmd.GetOptionHelpHeading(cmd.Options.Single(o => o.Name == "--fake-stack-option"))
+        cmd.GetOptionHelpStack(cmd.Options.Single(o => o.Name == "--fake-stack-option"))!.DisplayName
             .Should().Be("fake");
     }
 
-    [Theory]
-    [InlineData("fake", "Friendly stack")]
-    [InlineData("FAKE", "Friendly stack")]
-    [InlineData("other", "fake")]
-    public void StartCommand_ResolvesHelpHeadingFromMatchingProjectStack(string stackId, string expectedHeading)
+    [Fact]
+    public void StartCommand_UsesContributorsOwnStackLabel()
     {
-        var stack = Substitute.For<IProjectStack>();
-        stack.Stack.Returns(stackId);
-        stack.DisplayName.Returns("Friendly stack");
-        var contributor = new FakeStartHostOptionContributor();
+        var contributor = new FakeStartHostOptionContributor("Friendly stack");
 
         var cmd = new StartCommand(
             _interaction, _palette, _cliVersionProvider,
@@ -83,10 +77,9 @@ public class StartCommandTests : IDisposable
             Substitute.For<IOptionsMonitor<HostStartupOptions>>(),
             _shortcutLabels,
             _platform,
-            startOptionContributors: [contributor],
-            projectStacks: [stack]);
+            startOptionContributors: [contributor]);
 
-        cmd.GetOptionHelpHeading(contributor.Option).Should().Be(expectedHeading);
+        cmd.GetOptionHelpStack(contributor.Option)!.DisplayName.Should().Be("Friendly stack");
     }
 
     [Fact]
@@ -122,9 +115,9 @@ public class StartCommandTests : IDisposable
         result.Should().BeSameAs(builtIn);
     }
 
-    private sealed class FakeStartHostOptionContributor : IStartHostOptionContributor
+    private sealed class FakeStartHostOptionContributor(string displayName = "fake") : IStartHostOptionContributor
     {
-        public string Stack => "fake";
+        public IProjectStack ProjectStack { get; } = new TestProjectStack("fake", displayName);
 
         public Option<bool> Option { get; } = new("--fake-stack-option");
 
@@ -627,9 +620,7 @@ public class StartCommandTests : IDisposable
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override string StackName => "dotnet-isolated";
-
-        public override string StackDisplayName => ".NET";
+        public override IProjectStack ProjectStack { get; } = new TestProjectStack("dotnet-isolated", ".NET");
 
         public override bool SupportsExtensionBundles => false;
 

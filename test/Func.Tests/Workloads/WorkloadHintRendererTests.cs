@@ -16,62 +16,22 @@ public class WorkloadHintRendererTests
     }
 
     [Fact]
-    public void Render_NoMatchingStack_KnownStack_ShowsSpecificSetupCommand()
+    public void Render_NoMatchingStack_SuggestsDiscoveryWithoutInventingARecipe()
     {
         // Arrange
         var hint = new WorkloadHint(
             WorkloadHintKind.NoMatchingStack,
             "initialize a project",
-            "node",
+            "comet",
             ["dotnet"]);
 
         // Act
         _renderer.Render(hint);
 
         // Assert
-        _interaction.AllOutput.Should().Contain("No installed stack matches 'node'.");
-        _interaction.AllOutput.Should().Contain("func setup --features node");
-        _interaction.AllOutput.Should().Contain("func workload search");
-    }
-
-    [Fact]
-    public void Render_NoMatchingStack_UnknownStack_ShowsFullSetupMenu()
-    {
-        // Arrange — no installed stacks to filter, so all known stacks appear
-        var hint = new WorkloadHint(
-            WorkloadHintKind.NoMatchingStack,
-            "initialize a project",
-            "ruby",
-            []);
-
-        // Act
-        _renderer.Render(hint);
-
-        // Assert
-        _interaction.AllOutput.Should().Contain("No installed stack matches 'ruby'.");
-        _interaction.AllOutput.Should().Contain("func setup --features dotnet");
-        _interaction.AllOutput.Should().Contain("func setup --features node");
-        _interaction.AllOutput.Should().Contain("func setup --features python");
-        _interaction.AllOutput.Should().Contain("func workload search");
-    }
-
-    [Fact]
-    public void Render_NoMatchingStack_UnknownStack_FiltersInstalledFromMenu()
-    {
-        // Arrange — dotnet is installed, so it shouldn't appear in the setup menu
-        var hint = new WorkloadHint(
-            WorkloadHintKind.NoMatchingStack,
-            "initialize a project",
-            "ruby",
-            ["dotnet"]);
-
-        // Act
-        _renderer.Render(hint);
-
-        // Assert
-        _interaction.AllOutput.Should().NotContain("func setup --features dotnet");
-        _interaction.AllOutput.Should().Contain("func setup --features node");
-        _interaction.AllOutput.Should().Contain("func setup --features python");
+        _interaction.AllOutput.Should().Contain("No installed stack matches --stack 'comet'.");
+        _interaction.AllOutput.Should().NotContain("func setup --features");
+        _interaction.AllOutput.Should().Contain("func workload search --stack");
     }
 
     [Fact]
@@ -107,9 +67,9 @@ public class WorkloadHintRendererTests
         _renderer.Render(hint);
 
         // Assert
-        _interaction.AllOutput.Should().Contain("No stacks installed.");
-        _interaction.AllOutput.Should().Contain("func setup --features dotnet");
-        _interaction.AllOutput.Should().Contain("func workload search");
+        _interaction.AllOutput.Should().Contain("No installed stack is available to initialize a project.");
+        _interaction.AllOutput.Should().Contain("func workload search --stack");
+        _interaction.AllOutput.Should().Contain("func workload install <package-id> --exact");
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using NSubstitute;
 
@@ -19,9 +20,7 @@ internal static class QuickstartTestHelpers
         }
 
         IQuickstartProvider provider = Substitute.For<IQuickstartProvider>();
-        provider.Stack.Returns(stack);
-        provider.DisplayName.Returns(displayName);
-        provider.ManifestLanguages.Returns(manifestLanguages.ToList().AsReadOnly());
+        provider.ProjectStack.Returns(new TestProjectStack(stack, displayName, languages: [.. manifestLanguages.Select(l => new LanguageDescriptor(l.ToLowerInvariant(), l))]));
         return provider;
     }
 

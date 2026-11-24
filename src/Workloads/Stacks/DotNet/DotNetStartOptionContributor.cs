@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Core Tools v4: worker debug wait, JSON line output, and JSON output file capture. Each maps
 /// to the environment variables/startup hook the .NET worker reads.
 /// </summary>
-internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
+internal sealed class DotNetStartOptionContributor(DotNetProjectStack stack) : IStartHostOptionContributor
 {
     internal const string DebuggerWaitEnvironmentVariable = "FUNCTIONS_ENABLE_DEBUGGER_WAIT";
     internal const string JsonOutputEnvironmentVariable = "FUNCTIONS_ENABLE_JSON_OUTPUT";
@@ -33,7 +33,7 @@ internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
     internal const string DebuggerWaitNotice =
         "The .NET isolated worker will pause on startup until a debugger attaches.";
 
-    public string Stack => "dotnet";
+    public IProjectStack ProjectStack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<bool> DotNetIsolatedDebugOption { get; } = new("--dotnet-isolated-debug")
     {

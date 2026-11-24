@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using NSubstitute;
 
@@ -43,7 +44,7 @@ public class QuickstartListCommandTests
     }
 
     [Fact]
-    public void QuickstartListCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
+    public void QuickstartListCommand_StackOptionDescription_ListsInstalledStacks_SortedByIdentifier()
     {
         QuickstartListCommand cmd = CreateCommand(
             QuickstartTestHelpers.CreateProvider(stack: "Python"),
@@ -51,7 +52,7 @@ public class QuickstartListCommandTests
             QuickstartTestHelpers.CreateProvider(stack: "node"));
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        description.Should().Contain("Supported values: dotnet, node, python.");
+        description.Should().Contain("Supported values: dotnet, node, Python.");
     }
 
     [Fact]
@@ -150,7 +151,7 @@ public class QuickstartListCommandTests
         _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
             .Returns(manifest);
         _resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>())
-            .Returns((null, (int?)1));
+            .Returns((LanguageDescriptor?)null);
 
         int exit = await InvokeAsync(CreateCommand(), "--language", "unknown");
 
@@ -170,8 +171,9 @@ public class QuickstartListCommandTests
     {
         _resolver.SelectProviderAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(provider);
+        LanguageDescriptor language = provider.ProjectStack.SupportedLanguages.Single(l => l.IsMatch(manifestLanguage));
         _resolver.ResolveOrPromptLanguageAsync(Arg.Any<string?>(), provider, manifest, Arg.Any<CancellationToken>())
-            .Returns((manifestLanguage, (int?)null));
+            .Returns(language);
     }
 
     private static Task<int> InvokeAsync(QuickstartListCommand cmd, params string[] args)

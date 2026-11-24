@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -63,14 +64,14 @@ public sealed class SetupCommandTests : IDisposable
     }
 
     [Fact]
-    public void SetupCommand_FeaturesHelp_UsesDotnetFeatureName()
+    public void SetupCommand_FeaturesHelp_DescribesStackIdsAndNonStackFeatures()
     {
         var cmd = new SetupCommand(Substitute.For<ISetupRunner>(), Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
         string description = cmd.FeaturesOption.Description ?? string.Empty;
 
-        description.Should().Contain("dotnet");
-        description.Should().Contain("java");
-        description.Should().Contain("powershell");
+        description.Should().Contain("stack ID");
+        description.Should().Contain("'runtime'");
+        description.Should().Contain("'host'");
         description.Should().NotContain("dotnet-isolated");
     }
 
@@ -82,6 +83,20 @@ public sealed class SetupCommandTests : IDisposable
         root.Subcommands.Should().Contain(command => command.Name == "setup");
     }
 
+    [Theory]
+    [InlineData("setup --help")]
+    [InlineData("workload search --help")]
+    public async Task HelpAndParserConstruction_DoNotRequestDiscovery(string arguments)
+    {
+        IWorkloadCatalog catalog = Substitute.For<IWorkloadCatalog>();
+        var services = TestParser.BuildServiceProviderWith(_interaction, s => s.AddSingleton(catalog));
+        var root = Parser.CreateCommand(services);
+
+        int exitCode = await root.Parse(arguments).InvokeAsync(new InvocationConfiguration(), TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        catalog.ReceivedCalls().Should().BeEmpty();
+    }
     [Fact]
     public async Task SetupCommand_InvokesRunnerWithParsedOptions()
     {

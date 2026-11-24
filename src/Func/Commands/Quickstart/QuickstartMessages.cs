@@ -19,18 +19,12 @@ internal static class QuickstartMessages
     internal const string TemplateNotFoundHint = "Run `func quickstart list` to see available templates.";
     internal const string HelpFooterHint = "Looking for more stacks? Run `func workload search --stack` to list installable stack workloads.";
 
-    // Builds the help text for `--stack`. Stacks come from installed quickstart
-    // providers' Stack ids, lowercased and sorted for stable presentation.
-    // Matching in the resolver is case-insensitive, so we surface the canonical
-    // lowercase form.
     internal static string BuildStackOptionDescription(IReadOnlyList<IQuickstartProvider> providers)
     {
         var stacks = providers
-            .Select(p => p.Stack)
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(s => s, StringComparer.Ordinal)
+            .Select(p => p.ProjectStack.Descriptor.StackIdentifier)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return stacks.Count == 0

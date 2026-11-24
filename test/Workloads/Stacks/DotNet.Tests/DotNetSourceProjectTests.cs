@@ -409,11 +409,11 @@ public class DotNetSourceProjectTests : IDisposable
         string projectFile = Path.Combine(_projectDir.FullName, projectFileName);
         DotNetSourceProject project = CreateProject(projectFile);
 
-        project.Language.Should().Be(expectedLanguage);
+        project.Language!.DisplayName.Should().Be(expectedLanguage);
     }
 
     private DotNetSourceProject CreateProject(string projectFile)
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), projectFile, _dotnetCli);
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), projectFile, _dotnetCli, DotNetWorkloadTests.Stack);
 
     private FunctionsProjectHostRunContext CreateHostRunContext(bool skipBuild = false)
         => new(_projectDir, "dotnet", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);

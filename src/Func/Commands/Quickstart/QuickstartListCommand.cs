@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 
 namespace Azure.Functions.Cli.Commands.Quickstart;
@@ -96,15 +97,15 @@ internal sealed class QuickstartListCommand : FuncCliCommand
             cancellationToken);
 
         // 3. Resolve language
-        (string? manifestLanguage, int? langError) = await _resolver.ResolveOrPromptLanguageAsync(
+        LanguageDescriptor? language = await _resolver.ResolveOrPromptLanguageAsync(
             requestedLanguage, provider, manifest, cancellationToken);
-        if (langError is int code)
+        if (language is null)
         {
-            return code;
+            return 1;
         }
 
         // 4. Filter and display
-        IReadOnlyList<QuickstartEntry> entries = manifest.Filter(manifestLanguage, resource, iac, search);
+        IReadOnlyList<QuickstartEntry> entries = manifest.Filter(language, resource, iac, search);
 
         if (entries.Count == 0)
         {

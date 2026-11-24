@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Setup;
@@ -15,7 +16,7 @@ internal sealed record SetupFeaturePlan(
     IReadOnlyList<string> WorkerRuntimes,
     bool IncludeExtensionBundle);
 
-internal sealed record SetupRuntimeFeature(string Name, string ProfileRuntime, bool InstallWorker);
+internal sealed record SetupRuntimeFeature(string Name, string ProfileRuntime, bool InstallWorker, StackPackage? Package = null);
 
 internal sealed record SetupProfileScope(ResolvedProfile? Profile)
 {
@@ -175,11 +176,5 @@ internal sealed record SetupDependencyResult(
 }
 
 internal sealed record ProfileSetupOutcome(int FailureCount);
-
-internal enum SetupBundlePolicy
-{
-    NotSupported,
-    DefaultStable,
-}
 
 internal sealed class SetupConfigurationException(string message) : Exception(message);

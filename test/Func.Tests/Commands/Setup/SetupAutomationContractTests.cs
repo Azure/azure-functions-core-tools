@@ -10,9 +10,10 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Storage;
-using Microsoft.Extensions.Configuration;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using Spectre.Console;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
@@ -80,7 +81,7 @@ public sealed class SetupAutomationContractTests
     public async Task ResolveFeaturesAsync_ConfiguredProjectRuntime_TakesPrecedenceOverRuntimeDefault(
         bool assumeYes, bool json, bool nonInteractive)
     {
-        Harness harness = CreateHarness(projectRuntime: " dotnet-isolated ");
+        Harness harness = CreateHarness(projectRuntime: " DOTNET ");
 
         SetupFeaturePlan? plan = await harness.Features.ResolveFeaturesAsync(
             Options(assumeYes: assumeYes, json: json, nonInteractive: nonInteractive), CancellationToken.None);
@@ -88,7 +89,7 @@ public sealed class SetupAutomationContractTests
         plan.Should().NotBeNull();
         plan!.Features.Should().Equal("dotnet");
         plan.RuntimeFeatures.Should().ContainSingle().Which.Should()
-            .BeEquivalentTo(new SetupRuntimeFeature("dotnet", "dotnet-isolated", InstallWorker: false));
+            .BeEquivalentTo(new { Name = "dotnet", ProfileRuntime = "dotnet-isolated", InstallWorker = false });
         plan.WorkerRuntimes.Should().BeEmpty();
         plan.IncludeExtensionBundle.Should().BeFalse();
         harness.Interaction.PromptCount.Should().Be(0);
@@ -105,21 +106,21 @@ public sealed class SetupAutomationContractTests
         Harness harness = CreateHarness(projectRuntime: "python");
 
         SetupFeaturePlan? plan = await harness.Features.ResolveFeaturesAsync(
-            Options(["host", "dotnet-isolated", "dotnet"], assumeYes: assumeYes, json: json, nonInteractive: nonInteractive),
+            Options(["host", "DOTNET", "dotnet"], assumeYes: assumeYes, json: json, nonInteractive: nonInteractive),
             CancellationToken.None);
 
         plan.Should().NotBeNull();
         plan!.Features.Should().Equal("host", "dotnet");
         plan.RuntimeFeatures.Should().ContainSingle().Which.Should()
-            .BeEquivalentTo(new SetupRuntimeFeature("dotnet", "dotnet-isolated", InstallWorker: false));
+            .BeEquivalentTo(new { Name = "dotnet", ProfileRuntime = "dotnet-isolated", InstallWorker = false });
         plan.WorkerRuntimes.Should().BeEmpty();
         plan.IncludeExtensionBundle.Should().BeFalse();
         harness.Interaction.PromptCount.Should().Be(0);
-        harness.Configuration.DidNotReceive().GetProjectConfiguration(Arg.Any<DirectoryInfo>());
+        harness.Configuration.DidNotReceive().Read(Arg.Any<DirectoryInfo>());
     }
 
     [Fact]
-    public async Task ResolveFeaturesAsync_NormalInteractiveRun_OffersBuiltInStacksAndUsesSelection()
+    public async Task ResolveFeaturesAsync_NormalInteractiveRun_OffersDiscoveredStackIdsAndUsesSelection()
     {
         Harness harness = CreateHarness();
 
@@ -132,6 +133,38 @@ public sealed class SetupAutomationContractTests
         plan!.Features.Should().Equal("node");
         plan.WorkerRuntimes.Should().Equal("node");
         plan.IncludeExtensionBundle.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RunAsync_PickerDiscoveryFails_DoesNotConcludeEverythingIsInstalled()
+    {
+        var catalog = Substitute.For<IWorkloadCatalog>();
+        catalog.SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>()).ThrowsAsync(new WorkloadCatalogException("feed offline"));
+        Harness harness = CreateHarness(allStacksInstalled: true, catalog: catalog);
+
+        SetupRunResult result = await harness.Runner.RunAsync(Options(), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(1);
+        harness.Interaction.AllOutput.Should().Contain("discovery is unavailable").And.Contain("feed offline").And.NotContain("Nothing to install");
+        harness.Interaction.PromptCount.Should().Be(0);
+        harness.Installer.ReceivedCalls().Should().BeEmpty();
+        await harness.FirstRunStore.DidNotReceive().MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResolveFeaturesAsync_PickerUsesIdsEvenWhenLabelsMatch()
+    {
+        var catalog = SetupTestInventory.Catalog(
+            SetupTestInventory.Row("Contoso.DevKit", "node", "worker-a", "Tools"),
+            SetupTestInventory.Row("Fabrikam.Kit", "go", "worker-b", "Tools"));
+        Harness harness = CreateHarness(catalog: catalog);
+
+        var plan = await harness.Features.ResolveFeaturesAsync(Options(), TestContext.Current.CancellationToken);
+
+        var choices = harness.Interaction.MultiSelectionChoices.Single();
+        choices.Select(choice => choice.Value).Should().Equal("go", "node");
+        choices.Select(choice => choice.Label).Should().Equal("Tools (go)", "Tools (node)");
+        plan!.RuntimeFeatures.Should().ContainSingle().Which.Package!.PackageId.Should().Be("Contoso.DevKit");
     }
 
     [Theory]
@@ -288,27 +321,24 @@ public sealed class SetupAutomationContractTests
         bool interactive = true,
         string? projectRuntime = null,
         bool allStacksInstalled = false,
-        Func<SetupDependency, SetupDependencyResult>? dependencyResult = null)
+        Func<SetupDependency, SetupDependencyResult>? dependencyResult = null,
+        IWorkloadCatalog? catalog = null)
     {
         SelectionInteraction interaction = new(interactive);
         var store = Substitute.For<IWorkloadStore>();
-        string[] stacks = ["dotnet", "go", "java", "node", "powershell", "python"];
+        var known = SetupTestInventory.Packages;
         IReadOnlyList<WorkloadEntry> installed = allStacksInstalled
-            ? [.. stacks.Select(stack => new WorkloadEntry
+            ? [.. known.Select(package => new WorkloadEntry
             {
-                PackageId = SetupDependency.Stack(stack).PackageId,
+                PackageId = package.PackageId,
+                Stack = package.Stack,
                 PackageVersion = "1.0.0",
                 Kind = WorkloadKind.Workload,
             })]
             : [];
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(installed);
-        var configuration = Substitute.For<ICliConfigurationProvider>();
-        configuration.GetProjectConfiguration(Arg.Any<DirectoryInfo>()).Returns(new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = projectRuntime,
-            }).Build());
-        SetupFeatureResolver features = new(interaction, store, configuration);
+        var configuration = SetupTestInventory.Configuration(projectRuntime);
+        SetupFeatureResolver features = new(interaction, SetupTestInventory.StackPackages(store, catalog ?? SetupTestInventory.Catalog(known)), configuration);
         var profiles = Substitute.For<ISetupProfileScopeResolver>();
         profiles.ResolveProfileScopesAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<SetupRenderer>(), Arg.Any<CancellationToken>())
             .Returns([SetupProfileScope.Unconstrained]);
@@ -371,7 +401,7 @@ public sealed class SetupAutomationContractTests
         IFirstRunStateStore FirstRunStore,
         SelectionInteraction Interaction,
         IWorkloadStore Store,
-        ICliConfigurationProvider Configuration);
+        IProjectStackConfiguration Configuration);
 
     private sealed class SelectionInteraction(bool interactive) : TestInteractionService
     {
