@@ -83,9 +83,6 @@ public sealed class TemplaterFactoryTests : IDisposable
         act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
     }
 
-    /// <summary>
-    /// Verifies that the factory rejects a null component provider.
-    /// </summary>
     [Fact]
     public void Constructor_NullComponentProvider_Throws()
     {
@@ -94,9 +91,6 @@ public sealed class TemplaterFactoryTests : IDisposable
         act.Should().Throw<ArgumentNullException>().WithParameterName("componentProvider");
     }
 
-    /// <summary>
-    /// Verifies that the factory registers components supplied by its provider.
-    /// </summary>
     [Fact]
     public void Create_RegistersComponentsFromInjectedProvider()
     {
@@ -115,7 +109,7 @@ public sealed class TemplaterFactoryTests : IDisposable
         provider.Received(1).Get();
     }
 
-    private static FuncTemplateComponents Components() => new([], [], Substitute.For<IInteractionService>());
+    private static FuncTemplateComponentsProvider Components() => new([], [], Substitute.For<IInteractionService>());
 
     private async Task InstallFixturesUnderHomeAsync()
     {

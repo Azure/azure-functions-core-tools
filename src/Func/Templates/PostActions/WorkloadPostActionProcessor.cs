@@ -54,9 +54,9 @@ internal sealed class WorkloadPostActionProcessor(
             action.ManualInstructions,
             action.ContinueOnError,
             context.OutputBasePath,
-            context.CreationResult.PrimaryOutputs.Select(output => output.Path).ToArray(),
+            context.CreationResult.PrimaryOutputs.Select(output => output.Path.Replace(Path.DirectorySeparatorChar, '/')).ToArray(),
             context.CreationEffects.FileChanges.Select(change => new PostActionFileChange(
-                change.TargetRelativePath,
+                change.TargetRelativePath.Replace(Path.DirectorySeparatorChar, '/'),
                 change.ChangeKind switch
                 {
                     ChangeKind.Create => PostActionFileChangeKind.Create,

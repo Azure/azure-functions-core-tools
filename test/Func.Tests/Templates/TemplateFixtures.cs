@@ -124,7 +124,7 @@ internal static class TemplateFixtures
     {
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
         using EngineEnvironmentSettings settings = new(
-            new FuncTemplateEngineHost(context, new FuncTemplateComponents([], [], Substitute.For<IInteractionService>()).Get()),
+            new FuncTemplateEngineHost(context, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get()),
             settingsLocation: settingsLocation);
         using TemplatePackageManager packageManager = new(settings);
 

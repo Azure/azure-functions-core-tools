@@ -18,16 +18,12 @@ using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.PostActions;
 
-/// <summary>
-/// Tests workload post-action selection, execution, and isolation.
-/// </summary>
 public sealed class WorkloadPostActionProcessorTests : IDisposable
 {
     private static readonly Guid _actionId = Guid.NewGuid();
     private readonly string _root = Path.Combine(Path.GetTempPath(), "func-workload-action-tests-" + Guid.NewGuid().ToString("N"));
     private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
 
-    /// <inheritdoc />
     public void Dispose()
     {
         try
@@ -47,13 +43,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// Verifies that matching processors are selected independently of registration order.
-    /// </summary>
-    /// <param name="stack">The selected template stack tag.</param>
-    /// <param name="language">The selected template language tag.</param>
-    /// <param name="reverseWorkloads">Whether to reverse workload registration order.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData("node", "TypeScript", false)]
     [InlineData("NODE-ALIAS", "TS", false)]
@@ -94,12 +83,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         (isPython ? node : python).ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name == "ProcessAsync");
     }
 
-    /// <summary>
-    /// Verifies that missing or unmatched tags produce manual instructions.
-    /// </summary>
-    /// <param name="stack">The selected template stack tag.</param>
-    /// <param name="language">The selected template language tag.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(null, "TypeScript")]
     [InlineData("node", null)]
@@ -132,10 +115,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await processor.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies that a processor can contribute without registering or resolving a stack.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task ProcessPostActionsAsync_StackServicesNotResolved_ProcessorCanContributeWithoutOwningStack()
     {
@@ -154,10 +133,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await processor.Received(1).ProcessAsync(Arg.Any<PostActionContext>(), TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies that ambiguous workloads fail without executing a processor.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task ProcessPostActionsAsync_AmbiguousWorkloads_FailsWithoutExecutingEither()
     {
@@ -184,11 +159,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await second.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies that duplicate eligible registrations fail without execution.
-    /// </summary>
-    /// <param name="sameInstance">Whether both registrations use the same processor instance.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -212,11 +182,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await second.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies that core processors take precedence without evaluating workload predicates.
-    /// </summary>
-    /// <param name="coreFirst">Whether the core processor is registered first.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -255,14 +220,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await workload.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies dispatcher behavior for workload results, failure continuation, and dry runs.
-    /// </summary>
-    /// <param name="succeeds">Whether the workload processor succeeds.</param>
-    /// <param name="continueOnError">Whether failure permits continuation.</param>
-    /// <param name="dryRun">Whether execution is a dry run.</param>
-    /// <param name="expectedSuccess">Whether the overall result should succeed.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(true, false, false, true)]
     [InlineData(false, false, false, false)]
@@ -296,10 +253,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// Verifies that predicate exceptions propagate before any processor executes.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task ProcessPostActionsAsync_PredicateThrows_PropagatesWithoutExecutingAnyProcessor()
     {
@@ -321,11 +274,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await second.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies that selection failures retain failure status while allowing later actions to run.
-    /// </summary>
-    /// <param name="ambiguous">Whether selection fails due to multiple matches.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -361,11 +309,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         await next.Received(1).ProcessAsync(Arg.Any<EnginePostActionContext>(), TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Verifies that workload exceptions and cancellation propagate.
-    /// </summary>
-    /// <param name="cancellation">Whether the workload throws a cancellation exception.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -388,10 +331,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         (await act.Should().ThrowAsync<Exception>()).Which.Should().BeSameAs(exception);
     }
 
-    /// <summary>
-    /// Verifies that the workload receives an independent, read-only action snapshot.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task ProcessPostActionsAsync_ProjectsIndependentReadOnlyContext()
     {
@@ -404,12 +343,12 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         var arguments = new Dictionary<string, string> { ["command"] = "restore" };
         result.CreationResult!.PostActions[0].Args.Returns(arguments);
         ICreationPath output = Substitute.For<ICreationPath>();
-        output.Path.Returns("project.csproj");
+        output.Path.Returns("src/Create.txt");
         result.CreationResult.PrimaryOutputs.Returns([output]);
         var changes = Enum.GetValues<ChangeKind>().Select(kind =>
         {
             var change = Substitute.For<IFileChange>();
-            change.TargetRelativePath.Returns($"{kind}.txt");
+            change.TargetRelativePath.Returns(Path.Combine("src", $"{kind}.txt"));
             change.ChangeKind.Returns(kind);
             return change;
         }).ToArray();
@@ -430,13 +369,13 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         captured.Description.Should().Be("Restore dependencies");
         captured.ManualInstructions.Should().Be("Complete this manually.");
         captured.ContinueOnError.Should().BeTrue();
-        captured.PrimaryOutputs.Should().Equal("project.csproj");
+        captured.PrimaryOutputs.Should().Equal("src/Create.txt");
         PostActionFileChange[] expectedChanges =
         [
-            new("Create.txt", PostActionFileChangeKind.Create),
-            new("Delete.txt", PostActionFileChangeKind.Delete),
-            new("Overwrite.txt", PostActionFileChangeKind.Overwrite),
-            new("Change.txt", PostActionFileChangeKind.Change),
+            new("src/Create.txt", PostActionFileChangeKind.Create),
+            new("src/Delete.txt", PostActionFileChangeKind.Delete),
+            new("src/Overwrite.txt", PostActionFileChangeKind.Overwrite),
+            new("src/Change.txt", PostActionFileChangeKind.Change),
         ];
         captured.FileChanges.Should().BeEquivalentTo(expectedChanges);
         FluentActions.Invoking(() => ((IDictionary<string, string>)captured.Arguments).Add("mutate", "value"))
@@ -447,11 +386,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
             .Should().Throw<NotSupportedException>();
     }
 
-    /// <summary>
-    /// Verifies that an isolated workload can register and execute a public processor.
-    /// </summary>
-    /// <param name="configureFails">Whether configuration fails after registration.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -510,9 +444,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// Verifies argument validation for post-action snapshots and file changes.
-    /// </summary>
     [Fact]
     public void Context_InvalidArguments_Throws()
     {
@@ -534,11 +465,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
             .Should().Throw<ArgumentOutOfRangeException>();
     }
 
-    /// <summary>
-    /// Verifies that selection contexts reject null tags.
-    /// </summary>
-    /// <param name="stack">The stack tag to validate.</param>
-    /// <param name="language">The language tag to validate.</param>
     [Theory]
     [InlineData(null, "C#")]
     [InlineData("dotnet", null)]
@@ -549,11 +475,6 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         act.Should().Throw<ArgumentNullException>();
     }
 
-    /// <summary>
-    /// Verifies that empty or blank tags are represented as missing.
-    /// </summary>
-    /// <param name="stack">The selected template stack tag.</param>
-    /// <param name="language">The selected template language tag.</param>
     [Theory]
     [InlineData("", "C#")]
     [InlineData("dotnet", "")]

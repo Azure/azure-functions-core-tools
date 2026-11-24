@@ -136,10 +136,6 @@ public sealed class PostActionDispatcherTests : IDisposable
         _interaction.Received().WriteLine("Manual instructions: Do it by hand.");
     }
 
-    /// <summary>
-    /// Verifies that a failed processor displays its description even without manual instructions.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task ProcessAsync_ProcessorFailsWithoutInstructions_ShowsDescription()
     {
@@ -285,9 +281,6 @@ public sealed class PostActionDispatcherTests : IDisposable
         act.Should().Throw<ArgumentNullException>().WithParameterName("creationResult");
     }
 
-    /// <summary>
-    /// Verifies that the post-action extension rejects a null template.
-    /// </summary>
     [Fact]
     public void ProcessPostActionsAsync_NullTemplate_Throws()
     {

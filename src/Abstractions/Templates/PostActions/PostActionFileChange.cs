@@ -29,7 +29,7 @@ public sealed record PostActionFileChange
     }
 
     /// <summary>
-    /// Gets the target path relative to the template's output directory.
+    /// Gets the target path relative to the template's output directory. The CLI uses forward slash separators.
     /// </summary>
     public string TargetRelativePath { get; }
 

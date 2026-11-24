@@ -88,7 +88,7 @@ public sealed class PostActionContext
     public string OutputBasePath { get; }
 
     /// <summary>
-    /// Gets the primary output paths relative to <see cref="OutputBasePath"/>.
+    /// Gets the primary output paths relative to <see cref="OutputBasePath"/>. The CLI uses forward slash separators.
     /// </summary>
     public IReadOnlyList<string> PrimaryOutputs { get; }
 

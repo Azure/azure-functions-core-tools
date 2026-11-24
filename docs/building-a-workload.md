@@ -425,7 +425,9 @@ exceptions propagate; they are not converted into successful actions.
 The context contains the action ID, read-only arguments, description, manual
 instructions, `ContinueOnError`, output directory, relative primary output paths,
 and file-change metadata. Collections are independent, immutable snapshots.
-File changes describe effects evaluated by the engine, not a filesystem audit.
+Both primary outputs and file-change target paths use `/` directory separators
+on all platforms. File changes describe effects evaluated by the engine, not a
+filesystem audit.
 Workloads need only the `Abstractions` reference: no `Microsoft.TemplateEngine`
 types, engine settings, or engine service providers cross the boundary.
 

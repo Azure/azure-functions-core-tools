@@ -49,7 +49,7 @@ internal static class TemplateServiceCollectionExtensions
         {
             ArgumentNullException.ThrowIfNull(services);
             services.TryAddSingleton<ITemplaterFactory, TemplaterFactory>();
-            services.TryAddSingleton<IFuncTemplateComponentProvider, FuncTemplateComponents>();
+            services.TryAddSingleton<IFuncTemplateComponentProvider, FuncTemplateComponentsProvider>();
             services.TryAddSingleton<IWorkloadTemplateSource, WorkloadTemplateSource>();
             services.TryAddSingleton<PostActionDispatcher>();
             services.AddTemplateComponent<PostActionDispatcher, PostActionDispatcher>();

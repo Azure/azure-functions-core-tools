@@ -11,7 +11,7 @@ using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
-public sealed class FuncTemplateComponentsTests
+public sealed class FuncTemplateComponentsProviderTests
 {
     [Fact]
     public void AddTemplating_RegistersTemplatingServices()
@@ -26,7 +26,7 @@ public sealed class FuncTemplateComponentsTests
             && descriptor.Lifetime == ServiceLifetime.Singleton);
         services.Should().ContainSingle(descriptor =>
             descriptor.ServiceType == typeof(IFuncTemplateComponentProvider)
-            && descriptor.ImplementationType == typeof(FuncTemplateComponents)
+            && descriptor.ImplementationType == typeof(FuncTemplateComponentsProvider)
             && descriptor.Lifetime == ServiceLifetime.Singleton);
         services.Should().ContainSingle(descriptor =>
             descriptor.ServiceType == typeof(IWorkloadTemplateSource)
@@ -45,7 +45,7 @@ public sealed class FuncTemplateComponentsTests
     public void Get_NoCustomComponents_IncludesEdgeComponents()
     {
         IReadOnlyList<ICoreTemplateComponent> components =
-            new FuncTemplateComponents([], [], Substitute.For<IInteractionService>()).Get();
+            new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get();
 
         foreach ((Type type, IIdentifiedComponent instance) in Microsoft.TemplateEngine.Edge.Components.AllComponents)
         {
@@ -57,7 +57,7 @@ public sealed class FuncTemplateComponentsTests
     public void Get_NoCustomComponents_IncludesRunnableProjectComponents()
     {
         IReadOnlyList<ICoreTemplateComponent> components =
-            new FuncTemplateComponents([], [], Substitute.For<IInteractionService>()).Get();
+            new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get();
 
         foreach ((Type type, IIdentifiedComponent instance) in Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components.AllComponents)
         {
@@ -65,9 +65,6 @@ public sealed class FuncTemplateComponentsTests
         }
     }
 
-    /// <summary>
-    /// Verifies that shared action IDs produce one bridge and unsupported contracts are ignored.
-    /// </summary>
     [Fact]
     public void Get_WorkloadsSharingActionId_ReturnsOneBridgeAndIgnoresUnsupportedContracts()
     {
@@ -78,7 +75,7 @@ public sealed class FuncTemplateComponentsTests
         second.Id.Returns(actionId);
         var unsupported = Substitute.For<ITemplateComponent>();
         unsupported.Id.Returns(Guid.NewGuid());
-        FuncTemplateComponents provider = new(
+        FuncTemplateComponentsProvider provider = new(
             [],
             [
                 new(TestWorkloads.CreateInfo("First.Workload"), first, false),
@@ -97,9 +94,6 @@ public sealed class FuncTemplateComponentsTests
         second.DidNotReceiveWithAnyArgs().CanProcess(default!);
     }
 
-    /// <summary>
-    /// Verifies that a matching core processor takes precedence over a workload bridge.
-    /// </summary>
     [Fact]
     public void Get_CoreComponent_ReturnsOriginalInstanceInsteadOfWorkloadBridge()
     {
@@ -111,7 +105,7 @@ public sealed class FuncTemplateComponentsTests
         registration.Instance.Returns(core);
         var workload = Substitute.For<IPostActionProcessor>();
         workload.Id.Returns(actionId);
-        FuncTemplateComponents provider = new(
+        FuncTemplateComponentsProvider provider = new(
             [registration],
             [new(TestWorkloads.CreateInfo(), workload, false)],
             Substitute.For<IInteractionService>());
@@ -122,9 +116,6 @@ public sealed class FuncTemplateComponentsTests
             .Should().ContainSingle().Which.Instance.Should().BeSameAs(core);
     }
 
-    /// <summary>
-    /// Verifies that workload IDs cannot conflict with a core component of another kind.
-    /// </summary>
     [Fact]
     public void Get_WorkloadIdMatchingDifferentCoreComponent_IsIgnored()
     {
@@ -136,7 +127,7 @@ public sealed class FuncTemplateComponentsTests
         registration.Instance.Returns(core);
         var workload = Substitute.For<IPostActionProcessor>();
         workload.Id.Returns(id);
-        FuncTemplateComponents provider = new(
+        FuncTemplateComponentsProvider provider = new(
             [registration],
             [new(TestWorkloads.CreateInfo(), workload, false)],
             Substitute.For<IInteractionService>());
@@ -147,19 +138,16 @@ public sealed class FuncTemplateComponentsTests
             .Should().BeEmpty();
     }
 
-    /// <summary>
-    /// Verifies that the component provider rejects null dependencies.
-    /// </summary>
     [Fact]
     public void Constructor_NullDependencies_Throws()
     {
         var interaction = Substitute.For<IInteractionService>();
 
-        FluentActions.Invoking(() => new FuncTemplateComponents(null!, [], interaction))
+        FluentActions.Invoking(() => new FuncTemplateComponentsProvider(null!, [], interaction))
             .Should().Throw<ArgumentNullException>().WithParameterName("components");
-        FluentActions.Invoking(() => new FuncTemplateComponents([], null!, interaction))
+        FluentActions.Invoking(() => new FuncTemplateComponentsProvider([], null!, interaction))
             .Should().Throw<ArgumentNullException>().WithParameterName("workloadComponents");
-        FluentActions.Invoking(() => new FuncTemplateComponents([], [], null!))
+        FluentActions.Invoking(() => new FuncTemplateComponentsProvider([], [], null!))
             .Should().Throw<ArgumentNullException>().WithParameterName("interaction");
     }
 

@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <param name="components">The core CLI component registrations.</param>
 /// <param name="workloadComponents">The components registered by workloads.</param>
 /// <param name="interaction">The service used for workload processor diagnostics.</param>
-internal sealed class FuncTemplateComponents(
+internal sealed class FuncTemplateComponentsProvider(
     IEnumerable<ICoreTemplateComponent> components,
     IEnumerable<WorkloadTemplateComponentRegistration> workloadComponents,
     IInteractionService interaction) : IFuncTemplateComponentProvider

@@ -331,13 +331,13 @@ public sealed class TemplaterTests : IDisposable
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
     private Templater CreateTemplater()
-        => new(Context(), _hive, new FuncTemplateComponents([], [], Substitute.For<IInteractionService>()).Get());
+        => new(Context(), _hive, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get());
 
     private Templater CreateWorkloadTemplater(IWorkloadProvider provider)
     {
         WorkloadTemplateSource source = new(provider, new PhysicalFileSystem());
         WorkloadTemplatePackageProviderFactory factory = new(source);
-        IReadOnlyList<ICoreTemplateComponent> components = new FuncTemplateComponents(
+        IReadOnlyList<ICoreTemplateComponent> components = new FuncTemplateComponentsProvider(
             [new TestTemplateComponent<ITemplatePackageProviderFactory>(factory)], [], Substitute.For<IInteractionService>()).Get();
         return new(Context(), _hive, components);
     }

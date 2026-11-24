@@ -213,10 +213,6 @@ public class DefaultFunctionsCliBuilderTests
         public string Value { get; } = value;
     }
 
-    /// <summary>
-    /// Verifies that an instance registration retains its workload and is reused.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task AddTemplateComponent_Instance_RetainsOwnerAndReusesSingleton()
     {
@@ -234,9 +230,6 @@ public class DefaultFunctionsCliBuilderTests
         provider.GetServices<WorkloadTemplateComponentRegistration>().Single().Should().BeSameAs(registration);
     }
 
-    /// <summary>
-    /// Verifies that a null component is rejected.
-    /// </summary>
     [Fact]
     public void AddTemplateComponent_Null_Throws()
     {
@@ -246,10 +239,6 @@ public class DefaultFunctionsCliBuilderTests
             .Should().ThrowExactly<ArgumentNullException>();
     }
 
-    /// <summary>
-    /// Verifies that unsupported component kinds can be registered by instance or type.
-    /// </summary>
-    /// <returns>A task representing the test.</returns>
     [Fact]
     public async Task AddTemplateComponent_UnsupportedKind_RetainsInstanceAndGenericRegistrations()
     {
@@ -268,9 +257,6 @@ public class DefaultFunctionsCliBuilderTests
         registrations[1].Component.Should().BeOfType<UnsupportedComponent>();
     }
 
-    /// <summary>
-    /// Verifies that abstract component types are rejected.
-    /// </summary>
     [Fact]
     public void AddTemplateComponent_AbstractType_Throws()
     {
@@ -280,9 +266,6 @@ public class DefaultFunctionsCliBuilderTests
             .Should().ThrowExactly<ArgumentException>();
     }
 
-    /// <summary>
-    /// Verifies that component registration requires a workload-scoped builder.
-    /// </summary>
     [Fact]
     public void AddTemplateComponent_WithoutWorkload_Throws()
     {
@@ -294,12 +277,6 @@ public class DefaultFunctionsCliBuilderTests
             .Should().ThrowExactly<InvalidOperationException>();
     }
 
-    /// <summary>
-    /// Verifies component activation, reuse, and disposal ownership.
-    /// </summary>
-    /// <param name="registerInDi">Whether the implementation is registered in dependency injection.</param>
-    /// <param name="instanceRegistration">Whether a caller-owned instance is registered.</param>
-    /// <returns>A task representing the test.</returns>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -348,54 +325,39 @@ public class DefaultFunctionsCliBuilderTests
 
     private sealed class UnsupportedComponent : ITemplateComponent
     {
-        /// <inheritdoc />
         public Guid Id => Guid.Empty;
     }
 
     private abstract class AbstractProcessor : IPostActionProcessor
     {
-        /// <inheritdoc />
         public abstract Guid Id { get; }
 
-        /// <inheritdoc />
         public abstract bool CanProcess(PostActionSelectionContext context);
 
-        /// <inheritdoc />
         public abstract Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken);
     }
 
     private sealed class DisposalCounter
     {
-        /// <summary>
-        /// Gets or sets the number of asynchronous disposals.
-        /// </summary>
         public int AsyncDisposals { get; set; }
 
-        /// <summary>
-        /// Gets or sets the number of synchronous disposals.
-        /// </summary>
         public int SyncDisposals { get; set; }
     }
 
     private sealed class DisposableProcessor(DisposalCounter counter) : IPostActionProcessor, IAsyncDisposable, IDisposable
     {
-        /// <inheritdoc />
         public Guid Id { get; } = Guid.NewGuid();
 
-        /// <inheritdoc />
         public bool CanProcess(PostActionSelectionContext context) => true;
 
-        /// <inheritdoc />
         public Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken) => Task.FromResult(true);
 
-        /// <inheritdoc />
         public ValueTask DisposeAsync()
         {
             counter.AsyncDisposals++;
             return ValueTask.CompletedTask;
         }
 
-        /// <inheritdoc />
         public void Dispose() => counter.SyncDisposals++;
     }
 
