@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// V3 NuGet feed client built on <c>NuGet.Protocol</c>. Drives search via
 /// the source's <c>SearchQueryService</c> entry (with the <c>packageType=</c>
 /// filter) and version/download via <see cref="FindPackageByIdResource"/>,
-/// using a caller-selected package type, defaulting to <c>FuncCliWorkload</c>.
+/// restricting search to the <c>FuncCliWorkload</c> package type.
 /// </summary>
 internal class NuGetProtocolSourceClient(SourceRepository repository)
 {
@@ -32,32 +32,21 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     public PackageSource Source => _repository.PackageSource;
 
-    public Task<IReadOnlyList<CatalogSearchResult>> SearchWorkloadAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
-        => SearchAsync(query, WorkloadPackageTypes.Workload, cancellationToken);
-
-    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        CatalogSearchQuery query, string packageType, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CatalogSearchResult>> SearchWorkloadAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ArgumentException.ThrowIfNullOrWhiteSpace(packageType);
 
         int take = query.Take ?? CatalogSearchQuery.DefaultTake;
-        Uri? searchUri = await TryBuildV3SearchUriAsync(query, take, packageType, cancellationToken);
+        Uri? searchUri = await TryBuildV3SearchUriAsync(query, take, cancellationToken);
 
         if (searchUri is null)
         {
-            string operation = packageType == WorkloadPackageTypes.Workload ? "Workload" : "Template package";
             throw new InvalidOperationException(
-                $"Source '{Source.Source}' does not advertise a SearchQueryService entry. {operation} search requires a V3 NuGet feed.");
+                $"Source '{Source.Source}' does not advertise a SearchQueryService entry. Workload search requires a V3 NuGet feed.");
         }
 
         JObject? raw = await FetchSearchResponseAsync(searchUri, cancellationToken);
-        if (packageType != WorkloadPackageTypes.Workload && (raw is null || raw["data"] is not JArray))
-        {
-            throw new InvalidDataException($"Source '{Source.Source}' did not return a valid V3 package search response.");
-        }
-
-        return raw is null ? [] : ParseV3Hits(raw, Source, packageType);
+        return raw is null ? [] : ParseV3Hits(raw, Source);
     }
 
     public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, CancellationToken cancellationToken)
@@ -131,11 +120,10 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     /// <summary>
     /// Resolves the source's <c>SearchQueryService</c> entry from its V3
     /// service index and builds a request URL with the
-    /// requested <c>packageType=</c> filter. Returns null when the
+    /// <c>packageType=FuncCliWorkload</c> filter. Returns null when the
     /// source has no V3 service index (e.g. local file feeds).
     /// </summary>
-    private async Task<Uri?> TryBuildV3SearchUriAsync(
-        CatalogSearchQuery query, int take, string packageType, CancellationToken cancellationToken)
+    private async Task<Uri?> TryBuildV3SearchUriAsync(CatalogSearchQuery query, int take, CancellationToken cancellationToken)
     {
         ServiceIndexResourceV3? serviceIndex = await _repository.GetResourceAsync<ServiceIndexResourceV3>(cancellationToken);
         if (serviceIndex is null)
@@ -163,7 +151,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             "take=" + take.ToString(CultureInfo.InvariantCulture),
             "prerelease=" + (query.IncludePrerelease ?? false).ToString(CultureInfo.InvariantCulture).ToLowerInvariant(),
             "semVerLevel=2.0.0",
-            $"{PackageTypeQueryParam}=" + Uri.EscapeDataString(packageType),
+            $"{PackageTypeQueryParam}=" + Uri.EscapeDataString(WorkloadPackageTypes.Workload),
         };
 
         return new Uri(baseUrl + (baseUrl.Contains('?') ? "&" : "?") + string.Join("&", qs));
@@ -178,65 +166,30 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     /// azure-functions-core-tools#5198). Hits that omit <c>packageTypes</c>
     /// are kept, since some V3 feeds don't surface the field.
     /// </summary>
-    /// <exception cref="InvalidDataException">A non-workload response contains malformed search hits or metadata.</exception>
-    internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(
-        JObject response, PackageSource source, string packageType = WorkloadPackageTypes.Workload)
+    internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
     {
         if (response["data"] is not JArray data)
         {
-            if (packageType != WorkloadPackageTypes.Workload)
-            {
-                throw new InvalidDataException("The feed did not return a valid V3 package search response.");
-            }
-
             return [];
         }
 
-        bool strict = packageType != WorkloadPackageTypes.Workload;
         var results = new List<CatalogSearchResult>(data.Count);
         foreach (JToken hit in data)
         {
-            if (strict)
-            {
-                if (hit is not JObject)
-                {
-                    throw new InvalidDataException("The feed returned a package search hit that is not an object.");
-                }
-
-                ValidatePackageTypeMetadata(hit["packageTypes"]);
-                if (!HitMatchesPackageType(hit["packageTypes"], packageType))
-                {
-                    continue;
-                }
-
-                if (hit["id"]?.Type != JTokenType.String || hit["version"]?.Type != JTokenType.String
-                    || hit["title"] is { Type: not (JTokenType.String or JTokenType.Null) }
-                    || hit["description"] is { Type: not (JTokenType.String or JTokenType.Null) })
-                {
-                    throw new InvalidDataException("The feed returned malformed package search metadata.");
-                }
-            }
-
             string? id = (string?)hit["id"];
             string? versionString = (string?)hit["version"];
             if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(versionString) ||
-                !NuGetVersion.TryParse(versionString, out NuGetVersion? version)
-                || (strict && !NuGet.Packaging.PackageIdValidator.IsValidPackageId(id)))
-            {
-                if (strict)
-                {
-                    throw new InvalidDataException("The feed returned a missing or invalid package ID or version.");
-                }
-
-                continue;
-            }
-
-            if (!HitMatchesPackageType(hit["packageTypes"], packageType))
+                !NuGetVersion.TryParse(versionString, out NuGetVersion? version))
             {
                 continue;
             }
 
-            string? tagsString = strict ? null : GetTagsString(hit["tags"]);
+            if (!HitMatchesWorkloadPackageType(hit["packageTypes"]))
+            {
+                continue;
+            }
+
+            string? tagsString = GetTagsString(hit["tags"]);
             results.Add(new CatalogSearchResult(
                 PackageId: id.ToLowerInvariant(),
                 LatestVersion: version,
@@ -251,28 +204,6 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         }
 
         return results;
-    }
-
-    private static void ValidatePackageTypeMetadata(JToken? packageTypes)
-    {
-        if (packageTypes is null || packageTypes.Type == JTokenType.Null)
-        {
-            return;
-        }
-
-        if (packageTypes is not JArray array)
-        {
-            throw new InvalidDataException("The feed returned package type metadata that is not an array.");
-        }
-
-        foreach (JToken entry in array)
-        {
-            JToken? name = entry is JObject objectEntry ? objectEntry["name"] : entry;
-            if (name?.Type != JTokenType.String || string.IsNullOrWhiteSpace((string?)name))
-            {
-                throw new InvalidDataException("The feed returned an invalid declared package type.");
-            }
-        }
     }
 
     private static string? GetTagsString(JToken? tags)
@@ -312,7 +243,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     // FuncCliWorkload entry so arbitrary nuget.org packages don't leak
     // through when the server-side `packageType=` filter is ignored (e.g.
     // for empty queries).
-    private static bool HitMatchesPackageType(JToken? packageTypes, string packageType)
+    private static bool HitMatchesWorkloadPackageType(JToken? packageTypes)
     {
         if (packageTypes is not JArray array || array.Count == 0)
         {
@@ -323,7 +254,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         {
             string? name = entry is JObject objectEntry ? (string?)objectEntry["name"] : (entry as JValue)?.Value as string;
             if (!string.IsNullOrEmpty(name)
-                && string.Equals(name, packageType, StringComparison.OrdinalIgnoreCase))
+                && string.Equals(name, WorkloadPackageTypes.Workload, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

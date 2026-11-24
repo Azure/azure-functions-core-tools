@@ -1,10 +1,11 @@
 # Template Package Management
 
-**Status:** Proposed; not yet available. This documentation-only layer changes
-no CLI behavior. The NuGet catalog, package lifecycle, and CLI integration
-layers must ship before the commands below are available. The behavior and
+**Status:** Proposed commands; not yet available. The catalog layer adds no CLI
+commands. The NuGet acquisition, package lifecycle, and CLI integration
+layers must ship before install and uninstall are available. Search additionally
+requires the CDN-backed template index and its client. The behavior and
 acceptance criteria below describe that proposed implementation, not completed
-features or executed validation.
+commands or release qualification.
 
 `func templates` would manage template NuGet packages independently of function
 generation. `func new` remains the command for adding a function, and `func init`
@@ -15,7 +16,7 @@ workloads automatically.
 ## Command surface
 
 ```text
-func templates search [query] [--source <feed>] [--prerelease] [--format <plain|json>]
+func templates search [query]
 func templates install <package-id> [--version <version>] [--source <feed>] [--prerelease]
 func templates uninstall <package-id>
 ```
@@ -24,20 +25,23 @@ The initial surface excludes update, folder and local archive installation,
 batch operations, package aliases, and advanced search. Package IDs identify
 NuGet packages, not individual template identities or short names.
 
+Search options and output contracts will be defined with the CDN manifest;
+the search line above reserves the command, not a finalized interface.
+
 ## Feed configuration
 
-Template commands resolve one feed the same way workload commands do. The first
-configured value wins:
+Template installation resolves one feed the same way workload commands do.
+The first configured value wins:
 
 1. The command's `--source` option.
 2. `FUNC_CLI_TEMPLATES_SOURCE`.
 3. The nuget.org V3 service index, `https://api.nuget.org/v3/index.json`.
 
-Search and install use that single feed. They do not read `NuGet.Config`, apply
-package source mappings, or aggregate several feeds. A broader func CLI
-configuration story, including whether to honor user or machine NuGet
+Version resolution and download use that single feed. They do not read
+`NuGet.Config`, apply package source mappings, or aggregate several feeds.
+A broader func CLI configuration story, including whether to honor user or machine NuGet
 configuration, is out of scope for this proposal and would apply to workloads and
-templates together.
+templates together. Credentials stored only in `NuGet.Config` are not loaded.
 
 An explicit source must be an absolute HTTP(S) V3 feed URL, matching workload
 source validation. Unsupported sources fail with guidance rather than falling
@@ -48,35 +52,31 @@ workload catalog's configuration values; the template and workload feed
 variables are independent. Do not add an application configuration file or a
 layered configuration pipeline.
 
+Search uses the published CDN index, not this NuGet feed. Neither `--source`
+nor `FUNC_CLI_TEMPLATES_SOURCE` selects a search endpoint.
+
 Uninstall uses installed package identity and recorded state; it does not
 contact or resolve a feed.
 
 ## Search
 
-Keep the initial search similar to the basic workload search experience:
+`func templates search` will fetch a JSON manifest published to our CDN. A
+separate producer scans NuGet template packages and indexes the individual
+templates inside them. Users search by template; matching entries identify the
+owning NuGet package so users know what to install.
 
-- Accept an optional free-text query; omission searches the package catalog.
-- Return up to 20 packages from one request. When the page is full, explain that
-  more packages may exist and suggest refining the query.
-- Render package cards by default, with title, package ID, latest matching
-  version, and description. Use the package ID when the title is absent.
-- With `--format json`, emit an array containing `packageId`, `latestVersion`,
-  `title`, and `description`, without presentation hints in the JSON output.
-- Return an empty result successfully when no packages match.
+The CLI does not query a NuGet `SearchQueryService` or scan packages during
+search, and does not fall back to NuGet search if the CDN is unavailable.
+Installation by known package ID does not depend on the CDN index, and always
+validates the acquired package rather than trusting search metadata.
 
-Search targets the `FuncTemplate` NuGet package type using the V3
-`packageType=FuncTemplate` parameter. Defensively filter incompatible declared
-package types in the response. Feeds that omit package-type metadata may return
-unverified candidates; installation always validates the downloaded package.
-Do not broaden the search to ordinary dependency packages or workloads.
-
-The search prerelease default follows whether the running CLI is a prerelease
-build, as workload search does. `--prerelease` includes prerelease packages.
-
-Do not expand hits into release-channel rows, retrieve every package's version
-history, add stack filtering, or search individual templates inside packages.
-A feed without a V3 search service produces an actionable failure, not an empty
-successful search. Network and malformed-response failures remain failures.
+This layer only registers a substitutable `TemplateSearch` stub, separate from
+`TemplateCatalog`. It honors cancellation and otherwise fails explicitly with
+`NotSupportedException`; it does not contact a CDN or return empty successful
+results. Its placeholder method deliberately has no result contract yet.
+The CDN URL, manifest schema, template result model, filtering, pagination,
+output formatting, and caching/failure policy belong to the search/index
+workstream. The stub must be implemented before enabling the search command.
 
 ## Install
 
@@ -186,8 +186,10 @@ Focused coverage must establish:
 
 - Command registration, help, input validation, and operation without a project.
 - Dedicated template feed precedence and unchanged workload configuration.
-- Search package-type filtering, prerelease behavior, JSON shape, empty results,
-  and feed failures.
+- Explicit unavailable-search and cancellation behavior for the CDN stub.
+  The search/index workstream must separately qualify CDN manifest retrieval,
+  template-level matching and package-ID mapping, its finalized output contract,
+  empty results, and failures without NuGet fallback.
 - Exact-version and latest-version resolution, invalid package rejection, and
   same-version no-op behavior.
 - Install visibility through the existing discovery path and removal after

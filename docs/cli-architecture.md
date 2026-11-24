@@ -86,13 +86,18 @@ would add a top-level group separate from function generation:
 
 ```text
 func templates
-├── search [query]        Search template NuGet packages
+├── search [query]        Search templates in the published CDN index
 ├── install <package-id>  Install a template NuGet package
 └── uninstall <package-id>  Uninstall a managed template package
 ```
 
-Like workload commands, search and install use one feed: `--source`, then
-`FUNC_CLI_TEMPLATES_SOURCE`, then nuget.org. They do not read `NuGet.Config`.
+Like workload commands, install uses one feed: `--source`, then
+`FUNC_CLI_TEMPLATES_SOURCE`, then nuget.org. It does not read `NuGet.Config`.
+Search instead reads a CDN-hosted JSON manifest produced by scanning NuGet
+packages and indexing individual templates, mapping matches to the package ID
+to install. It does not query NuGet search or use the install feed configuration.
+The CDN client is currently an explicit unavailable stub; its manifest and
+result contracts belong to the separate search/index workstream.
 Install prevalidates the downloaded archive, then delegates package storage and
 registration to the engine's managed provider. Preflight checks require matching
 package identity/version, the `FuncTemplate` package type with no workload type,
@@ -102,8 +107,9 @@ validation. On replacement, the CLI keeps a temporary backup to restore through
 that provider if installation or discovery fails. The engine would record a
 local NuGet package without `NuGetSource`; matching ID/version is a no-op
 regardless of feed. These commands would not require an initialized Functions
-project. They are not yet available; the NuGet catalog, package lifecycle, and
-CLI integration layers must ship first.
+project. They are not yet available; the NuGet acquisition, package lifecycle,
+and CLI integration layers must ship first, with the CDN search implementation
+also required before enabling search.
 
 ## In-place CLI updates
 

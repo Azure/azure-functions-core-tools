@@ -245,7 +245,7 @@ public sealed class NuGetProtocolSourceClientTests
     }
 
     [Fact]
-    public void ParseV3Hits_TemplateFilterDoesNotChangeDefaultWorkloadFiltering()
+    public void ParseV3Hits_ExcludesTemplatePackagesFromWorkloadSearch()
     {
         var response = JObject.Parse("""
             {"data":[
@@ -255,8 +255,6 @@ public sealed class NuGetProtocolSourceClientTests
             ]}
             """);
 
-        NuGetProtocolSourceClient.ParseV3Hits(response, _source, "FuncTemplate")
-            .Select(r => r.PackageId).Should().Equal("templates.test", "untyped.test");
         NuGetProtocolSourceClient.ParseV3Hits(response, _source)
             .Select(r => r.PackageId).Should().Equal("workloads.test", "untyped.test");
     }

@@ -18,6 +18,7 @@ internal static class TemplateCatalogRegistration
         services.AddOptions<TemplateCatalogOptions>();
         services.AddSingleton<IConfigureOptions<TemplateCatalogOptions>, TemplateCatalogOptionsSetup>();
         services.AddSingleton<TemplateCatalog>();
+        services.AddSingleton<TemplateSearch>();
         return services;
     }
 }

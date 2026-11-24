@@ -9,9 +9,7 @@ namespace Azure.Functions.Cli.Templates.Packages;
 internal sealed class TemplateCatalogOptions
 {
     /// <summary>
-    /// Gets or sets the feed used for search and install when no command source is provided.
+    /// Gets or sets the install feed when no command source is provided.
     /// </summary>
     public string? Source { get; set; }
-
-    public bool IncludePrerelease { get; set; }
 }

@@ -10,7 +10,7 @@ using PackageSource = NuGet.Configuration.PackageSource;
 namespace Azure.Functions.Cli.Templates.Packages;
 
 /// <summary>
-/// Searches template packages and resolves install versions through the shared NuGet transport.
+/// Resolves install versions and downloads template packages through the shared NuGet transport.
 /// </summary>
 internal class TemplateCatalog(
     IOptions<TemplateCatalogOptions> options, Func<PackageSource, NuGetProtocolSourceClient> clients)
@@ -19,21 +19,6 @@ internal class TemplateCatalog(
 
     private readonly TemplateCatalogOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     private readonly Func<PackageSource, NuGetProtocolSourceClient> _clients = clients ?? throw new ArgumentNullException(nameof(clients));
-
-    /// <summary>
-    /// Searches at most twenty template packages on one HTTP(S) V3 source.
-    /// </summary>
-    /// <exception cref="ArgumentException">The source is not an HTTP(S) feed URI.</exception>
-    /// <exception cref="TemplatePackageException">The feed could not be queried or returned malformed package metadata or JSON.</exception>
-    public virtual async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        string? query, string? source, bool? prerelease, CancellationToken cancellationToken)
-    {
-        NuGetProtocolSourceClient client = _clients(GetSource(source));
-        IReadOnlyList<CatalogSearchResult> results = await FromSourceAsync(() => client.SearchAsync(
-            new CatalogSearchQuery { Filter = query, Take = 20, IncludePrerelease = prerelease ?? _options.IncludePrerelease },
-            PackageType, cancellationToken), client.Source.Source, cancellationToken);
-        return [.. results.Take(20)];
-    }
 
     /// <summary>
     /// Resolves an exact version, preferring the latest stable release unless prereleases are requested.
