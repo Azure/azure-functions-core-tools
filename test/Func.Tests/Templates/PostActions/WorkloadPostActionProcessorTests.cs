@@ -372,6 +372,7 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         captured.ManualInstructions.Should().Be("Complete this manually.");
         captured.ContinueOnError.Should().BeTrue();
         captured.PrimaryOutputs.Should().Equal("Function.cs");
+        captured.FileMatcher.Should().BeNull();
         PostActionFileChange[] expectedChanges =
         [
             new("Function.cs", PostActionFileChangeKind.Create),
@@ -386,6 +387,97 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
             .Should().Throw<NotSupportedException>();
         FluentActions.Invoking(() => ((IList<PostActionFileChange>)captured.FileChanges).Clear())
             .Should().Throw<NotSupportedException>();
+    }
+
+    [Fact]
+    public async Task ProcessPostActionsAsync_SourceFileChanges_MatchGeneratedTargets()
+    {
+        ServiceCollection services = Services();
+        var processor = Processor();
+        Register(services, processor);
+        await using var provider = services.BuildServiceProvider();
+        using var templater = provider.GetRequiredService<ITemplaterFactory>().Create(Context());
+        var result = Result();
+        ICreationEffects effects = Substitute.For<ICreationEffects, ICreationEffects2>();
+        IFileChange2[] changes =
+        [
+            FileChange("./src/Template.csproj", "out/First.csproj", ChangeKind.Create),
+            FileChange("./src/nested/Template.csproj", "out/Second.csproj", ChangeKind.Delete),
+            FileChange("./other/Template.fsproj", "out/Third.fsproj", ChangeKind.Create),
+        ];
+        effects.FileChanges.Returns(changes);
+        ((ICreationEffects2)effects).FileChanges.Returns(changes);
+        result.CreationEffects.Returns(effects);
+        PostActionContext? captured = null;
+        processor.ProcessAsync(Arg.Do<PostActionContext>(context => captured = context), Arg.Any<CancellationToken>()).Returns(true);
+
+        var status = await templater.ProcessPostActionsAsync(
+            Template("node", "TypeScript"), result, false, TestContext.Current.CancellationToken);
+        changes[0].SourceRelativePath.Returns("./changed");
+        changes[0].TargetRelativePath.Returns("changed");
+
+        status.Should().Be(PostActionExecutionStatus.Success);
+        captured.Should().NotBeNull();
+        captured.FileMatcher.Should().NotBeNull();
+        captured.FileMatcher.MatchTargetPaths("Template.csproj").Should().Equal("out/First.csproj", "out/Second.csproj");
+        captured.FileMatcher.MatchTargetPaths("./src/*.csproj").Should().Equal("out/First.csproj");
+        captured.FileMatcher.MatchTargetPaths("./src/**/*.csproj").Should().Equal("out/First.csproj", "out/Second.csproj");
+        captured.FileMatcher.MatchTargetPaths("src/*.csproj").Should().BeEmpty();
+        captured.FileMatcher.MatchTargetPaths("!*.csproj").Should().Equal("out/Third.fsproj");
+        FluentActions.Invoking(() => captured.FileMatcher.MatchTargetPaths(null!)).Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task ProcessPostActionsAsync_NullFileChanges_ProducesEmptySnapshotAndMatches()
+    {
+        ServiceCollection services = Services();
+        var processor = Processor();
+        Register(services, processor);
+        await using var provider = services.BuildServiceProvider();
+        using var templater = provider.GetRequiredService<ITemplaterFactory>().Create(Context());
+        var result = Result();
+        ICreationEffects effects = Substitute.For<ICreationEffects, ICreationEffects2>();
+        effects.FileChanges.Returns((IReadOnlyList<IFileChange>)null!);
+        ((ICreationEffects2)effects).FileChanges.Returns((IReadOnlyList<IFileChange2>)null!);
+        result.CreationEffects.Returns(effects);
+        PostActionContext? captured = null;
+        processor.ProcessAsync(Arg.Do<PostActionContext>(context => captured = context), Arg.Any<CancellationToken>()).Returns(true);
+
+        var status = await templater.ProcessPostActionsAsync(
+            Template("node", "TypeScript"), result, false, TestContext.Current.CancellationToken);
+
+        status.Should().Be(PostActionExecutionStatus.Success);
+        captured.Should().NotBeNull();
+        captured.FileChanges.Should().BeEmpty();
+        captured.FileMatcher.Should().NotBeNull();
+        captured.FileMatcher.MatchTargetPaths("*.csproj").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ProcessPostActionsAsync_WorkloadReports_UsesNoOpReporter()
+    {
+        ServiceCollection services = Services();
+        var processor = Processor();
+        processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            PostActionContext context = call.Arg<PostActionContext>();
+            context.Reporter.Should().BeSameAs(NullFunctionsReporter.Instance);
+            context.Reporter.ReportStatus("Workload status");
+            context.Reporter.WriteLog("Workload error", FunctionsReportSeverity.Error);
+            return Task.FromResult(false);
+        });
+        Register(services, processor);
+        await using var provider = services.BuildServiceProvider();
+        using var templater = provider.GetRequiredService<ITemplaterFactory>().Create(Context());
+
+        var status = await templater.ProcessPostActionsAsync(
+            Template("node", "TypeScript"), Result(), false, TestContext.Current.CancellationToken);
+
+        status.Should().Be(PostActionExecutionStatus.Failure);
+        _interaction.DidNotReceive().WriteHint("Workload status");
+        _interaction.DidNotReceive().WriteError("Workload error");
+        _interaction.Received().WriteError("Post action failed.");
+        _interaction.Received().WriteLine("Manual instructions: Complete this manually.");
     }
 
     [Theory]
@@ -421,7 +513,17 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         var result = Result();
         var registration = provider.GetServices<WorkloadTemplateComponentRegistration>().Single();
         result.CreationResult!.PostActions[0].ActionId.Returns(registration.Component.Id);
-        result.CreationResult.PostActions[0].Args.Returns(new Dictionary<string, string> { ["fixture"] = "run" });
+        result.CreationResult.PostActions[0].Args.Returns(new Dictionary<string, string>
+        {
+            ["fixture"] = "run",
+            ["files"] = "*.csproj",
+            ["expectedTarget"] = "generated/App.csproj",
+        });
+        ICreationEffects effects = Substitute.For<ICreationEffects, ICreationEffects2>();
+        IFileChange2[] changes = [FileChange("./source/Template.csproj", "generated/App.csproj", ChangeKind.Create)];
+        effects.FileChanges.Returns(changes);
+        ((ICreationEffects2)effects).FileChanges.Returns(changes);
+        result.CreationEffects.Returns(effects);
 
         try
         {
@@ -429,6 +531,7 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
                 Template("fixture", "Fixture"), result, false, TestContext.Current.CancellationToken);
 
             status.Should().Be(PostActionExecutionStatus.Success);
+            registration.Component.Should().BeAssignableTo<RestorePostAction>();
             registration.Workload.LoadContext.Should().NotBeNull();
             System.Runtime.Loader.AssemblyLoadContext.GetLoadContext(registration.Component.GetType().Assembly)
                 .Should().BeSameAs(registration.Workload.LoadContext);
@@ -465,6 +568,39 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
             .Should().Throw<ArgumentException>();
         FluentActions.Invoking(() => new PostActionFileChange("file", (PostActionFileChangeKind)100))
             .Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Context_WithoutReporter_AcceptsReports()
+    {
+        PostActionContext context = new(_actionId, new Dictionary<string, string>(), null, null, false, _root, [], []);
+
+        Action act = () =>
+        {
+            context.Reporter.ReportStatus("Restoring");
+            context.Reporter.WriteLog("Restored");
+            context.Reporter.WriteLog("Failed", FunctionsReportSeverity.Error);
+        };
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Context_OriginalConstructorSignature_RemainsAvailable()
+    {
+        Type[] parameters =
+        [
+            typeof(Guid),
+            typeof(IReadOnlyDictionary<string, string>),
+            typeof(string),
+            typeof(string),
+            typeof(bool),
+            typeof(string),
+            typeof(IReadOnlyList<string>),
+            typeof(IReadOnlyList<PostActionFileChange>),
+        ];
+
+        typeof(PostActionContext).GetConstructor(parameters).Should().NotBeNull();
     }
 
     [Theory]
@@ -540,6 +676,15 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
 
         template.TagsCollection.Returns(tags);
         return template;
+    }
+
+    private static IFileChange2 FileChange(string source, string target, ChangeKind kind)
+    {
+        IFileChange2 change = Substitute.For<IFileChange2>();
+        change.SourceRelativePath.Returns(source);
+        change.TargetRelativePath.Returns(target);
+        change.ChangeKind.Returns(kind);
+        return change;
     }
 
     private ITemplateCreationResult Result(bool continueOnError = false)

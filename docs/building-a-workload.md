@@ -424,12 +424,34 @@ exceptions propagate; they are not converted into successful actions.
 
 The context contains the action ID, read-only arguments, description, manual
 instructions, `ContinueOnError`, output directory, relative primary output paths,
-and file-change metadata. Collections are independent, immutable snapshots.
+file-change metadata, a source-file matcher, and a `Reporter`. Collections are
+independent, immutable snapshots.
 Both primary outputs and file-change target paths use `/` directory separators
 on all platforms. File changes describe effects evaluated by the engine, not a
 filesystem audit.
 Workloads need only the `Abstractions` reference: no `Microsoft.TemplateEngine`
 types, engine settings, or engine service providers cross the boundary.
+
+When available, `context.FileMatcher.MatchTargetPaths(pattern)` applies template
+glob semantics to source-relative paths and returns the corresponding generated
+target paths. `FileMatcher` is null when source-path metadata is unavailable.
+
+`context.GetConfiguredFiles("files")` resolves the named argument's source
+patterns to absolute generated paths. It supports semicolon-delimited strings
+or JSON arrays and accepts an optional target-path predicate.
+
+For the standard restore action, derive from `RestorePostAction`. It supplies
+the action ID, selects `files` or falls back to primary outputs, and attempts
+each target. Implement `CanProcess` for the supported template tags and
+`RestoreAsync` for one target; return false for expected restore failures.
+
+Use `context.Reporter.ReportStatus(message)` for status and
+`context.Reporter.WriteLog(line, FunctionsReportSeverity.Info)` for subprocess
+output. `Warning` and `Error` severities are also available. This uses the same
+`IFunctionsReporter` contract and `FunctionsReportSeverity` enum as project
+host-run reporting. The CLI currently supplies a no-op reporter to post-action
+processors, so their status and output are discarded. When a processor returns
+`false`, the dispatcher still displays the template's manual instructions.
 
 The generic registration activates the processor through DI and retains it as a
 singleton. An already-registered implementation is reused and remains owned by
