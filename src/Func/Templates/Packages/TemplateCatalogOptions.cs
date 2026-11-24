@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Templates.Packages;
 internal sealed class TemplateCatalogOptions
 {
     /// <summary>
-    /// Gets or sets the optional additional install feed, also used as the direct search feed.
+    /// Gets or sets the feed used for search and install when no command source is provided.
     /// </summary>
     public string? Source { get; set; }
 

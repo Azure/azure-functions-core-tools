@@ -33,6 +33,7 @@ public sealed class TemplateCatalogTests
         options.Source.Should().Be("https://templates.test/v3/index.json");
         options.IncludePrerelease.Should().BeFalse();
         environment.Received(1).Get("FUNC_CLI_TEMPLATES_SOURCE");
+        environment.DidNotReceive().Get("FUNC_CLI_WORKLOADS_SOURCE");
         environment.DidNotReceive().Get("FUNC_CLI_WORKLOADS_PRERELEASE");
     }
 
@@ -44,7 +45,7 @@ public sealed class TemplateCatalogTests
     public void Source_UsesIndependentPrecedence(string? explicitSource, string? environmentSource, string expected)
     {
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { Source = environmentSource }),
-            source => new NuGetProtocolSourceClient(TestRepository.Build(source)), Sources());
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source)));
 
         catalog.GetSource(explicitSource).Source.Should().Be(expected);
     }
@@ -53,13 +54,15 @@ public sealed class TemplateCatalogTests
     [InlineData("file:///packages")]
     [InlineData("C:\\packages")]
     [InlineData("ftp://feed.test/index.json")]
+    [InlineData("")]
+    [InlineData("  ")]
     public void Source_RejectsNonHttpFeeds(string source)
     {
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => throw new InvalidOperationException(), Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => throw new InvalidOperationException());
 
         Action act = () => catalog.GetSource(source);
 
-        act.Should().Throw<ArgumentException>();
+        act.Should().Throw<ArgumentException>().WithMessage("*absolute http(s) URL*V3 service index*");
     }
 
     [Theory]
@@ -71,7 +74,7 @@ public sealed class TemplateCatalogTests
         versions.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
             Arg.Any<CancellationToken>()).Returns([NuGetVersion.Parse("1.0.0"), NuGetVersion.Parse("2.0.0-preview.1")]);
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { IncludePrerelease = true }),
-            source => new NuGetProtocolSourceClient(TestRepository.Build(source, versions)), Sources());
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source, versions)));
 
         var result = await catalog.ResolveVersionAsync("test.templates", null, "https://feed.test/index.json", prerelease, CancellationToken.None);
 
@@ -79,43 +82,44 @@ public sealed class TemplateCatalogTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task OpenPackage_UsesNextEligibleFeedWhenTheFirstCannotSupplyTheExactVersion(bool unavailable)
+    [InlineData(null, null, "https://api.nuget.org/v3/index.json")]
+    [InlineData(null, "https://env.test/index.json", "https://env.test/index.json")]
+    [InlineData("http://explicit.test/index.json", "https://env.test/index.json", "http://explicit.test/index.json")]
+    public async Task CatalogOperations_UseOnlyTheResolvedFeed(string? explicitSource, string? environmentSource, string expected)
     {
-        var sources = Sources();
-        sources.GetSources(Arg.Any<string>(), Arg.Any<PackageSource?>()).Returns(
-            [new PackageSource("https://first.test/index.json"), new PackageSource("https://second.test/index.json")]);
         byte[] payload = [1, 2, 3];
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), source =>
+        var version = NuGetVersion.Parse("2.0.0");
+        List<string> requestedSources = [];
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { Source = environmentSource }), source =>
         {
+            requestedSources.Add(source.Source);
             var resource = Substitute.For<FindPackageByIdResource>();
+            resource.GetAllVersionsAsync("test.templates", Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
+                Arg.Any<CancellationToken>()).Returns([version]);
             resource.CopyNupkgToStreamAsync(
-                "test.templates", NuGetVersion.Parse("2.0.0"), Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
+                "test.templates", version, Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
                 Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(async call =>
                 {
-                    if (source.Source.Contains("first", StringComparison.Ordinal))
-                    {
-                        if (unavailable)
-                        {
-                            throw new FatalProtocolException("feed unavailable");
-                        }
-
-                        return false;
-                    }
-
                     await call.ArgAt<Stream>(2).WriteAsync(payload, call.ArgAt<CancellationToken>(5));
                     return true;
                 });
-            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource));
-        }, sources);
+            var index = new ServiceIndexResourceV3(JObject.Parse("""
+                {"version":"3.0.0","resources":[{"@id":"https://search.test/query","@type":"SearchQueryService"}]}
+                """), DateTime.UtcNow);
+            return new SearchClient(TestRepository.Build(source, resource, index), JObject.Parse("""{"data":[]}"""));
+        });
 
-        await using Stream archive = await catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("2.0.0"), null, CancellationToken.None);
+        var results = await catalog.SearchAsync(null, explicitSource, false, TestContext.Current.CancellationToken);
+        var resolved = await catalog.ResolveVersionAsync("test.templates", null, explicitSource, false, TestContext.Current.CancellationToken);
+        await using Stream archive = await catalog.OpenPackageAsync("test.templates", resolved, explicitSource, TestContext.Current.CancellationToken);
 
         using var bytes = new MemoryStream();
         await archive.CopyToAsync(bytes, TestContext.Current.CancellationToken);
         bytes.ToArray().Should().Equal(payload);
         archive.CanSeek.Should().BeTrue();
+        resolved.Should().Be(version);
+        results.Should().BeEmpty();
+        requestedSources.Should().Equal(expected, expected, expected);
     }
 
     [Fact]
@@ -125,7 +129,7 @@ public sealed class TemplateCatalogTests
         resource.CopyNupkgToStreamAsync(Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
             Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(false);
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
-            source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)), Sources());
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)));
 
         Func<Task> act = () => catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), null, CancellationToken.None);
 
@@ -140,7 +144,7 @@ public sealed class TemplateCatalogTests
     [InlineData("1.0.0", true)]
     public async Task ResolveVersion_RejectsRangesAndConflictingOptions(string version, bool prerelease)
     {
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => throw new InvalidOperationException(), Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => throw new InvalidOperationException());
 
         Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", version, "https://feed.test/index.json", prerelease, CancellationToken.None);
 
@@ -165,7 +169,7 @@ public sealed class TemplateCatalogTests
         };
         response["data"]![0]!["packageTypes"] = new JArray("FuncCliWorkload");
         var client = new SearchClient(TestRepository.Build(source, index), response);
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client, Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client);
 
         var results = await catalog.SearchAsync("hello world", null, false, CancellationToken.None);
 
@@ -183,7 +187,7 @@ public sealed class TemplateCatalogTests
             {"version":"3.0.0","resources":[{"@id":"https://search.test/query","@type":"SearchQueryService"}]}
             """), DateTime.UtcNow);
         var client = new SearchClient(TestRepository.Build(source, index), nullResponse ? null : JObject.Parse("{}"));
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client, Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client);
 
         Func<Task> act = () => catalog.SearchAsync(null, null, false, CancellationToken.None);
 
@@ -210,7 +214,7 @@ public sealed class TemplateCatalogTests
     public async Task Search_MalformedRowsThrowDocumentedDomainFailure(string row)
     {
         var client = new TextSearchClient(SearchRepository(), $$"""{"data":[{{row}}]}""");
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client, Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client);
 
         Func<Task> act = () => catalog.SearchAsync(null, null, false, CancellationToken.None);
 
@@ -225,7 +229,7 @@ public sealed class TemplateCatalogTests
     public async Task Search_MalformedJsonPreservesParsingExceptionInDomainFailure(string json)
     {
         var client = new TextSearchClient(SearchRepository(), json);
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client, Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client);
 
         Func<Task> act = () => catalog.SearchAsync(null, null, false, CancellationToken.None);
 
@@ -243,27 +247,11 @@ public sealed class TemplateCatalogTests
               {"id":"test.templates","version":"1.0.0"}
             ]}
             """);
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client, Sources());
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => client);
 
         var results = await catalog.SearchAsync(null, null, false, CancellationToken.None);
 
         results.Should().ContainSingle().Which.PackageId.Should().Be("test.templates");
-    }
-
-    private static TemplateNuGetSourceProvider Sources()
-    {
-        var sources = Substitute.For<TemplateNuGetSourceProvider>(new DirectoryInfo(Directory.GetCurrentDirectory()));
-        sources.GetSources(Arg.Any<string>(), Arg.Any<PackageSource?>()).Returns(c =>
-            [c.ArgAt<PackageSource?>(1) ?? new PackageSource("https://feed.test/index.json")]);
-        return sources;
-    }
-
-    [Fact]
-    public void AdditionalSource_IsAbsentWithoutAnExplicitOrEnvironmentFeed()
-    {
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => throw new InvalidOperationException(), Sources());
-
-        catalog.GetAdditionalSource(null).Should().BeNull();
     }
 
     [Fact]
@@ -273,108 +261,70 @@ public sealed class TemplateCatalogTests
         resource.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
             Arg.Any<CancellationToken>()).Returns([NuGetVersion.Parse("1.0.0-preview.1")]);
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
-            source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)), Sources());
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)));
 
         Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", null, null, false, CancellationToken.None);
 
-        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*No matching version*");
-    }
-
-    [Fact]
-    public void SourceProvider_NullWorkingDirectoryIsRejected()
-    {
-        Action act = () => _ = new TemplateNuGetSourceProvider(null!);
-
-        act.Should().Throw<ArgumentNullException>().WithParameterName("workingDirectory");
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*No matching version*--prerelease*");
     }
 
     [Theory]
-    [InlineData(true)]
     [InlineData(false)]
-    public async Task ResolveVersion_ToleratesUnavailableFeedsOnlyWhenAnotherFeedCanBeRead(bool readableFeed)
+    [InlineData(true)]
+    public async Task Install_FeedFailureIsReportedWithoutFallback(bool download)
     {
-        var sources = Sources();
-        sources.GetSources(Arg.Any<string>(), Arg.Any<PackageSource?>()).Returns(
-            [new PackageSource("https://unavailable.test/index.json"), new PackageSource("https://available.test/index.json")]);
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), source =>
+        int requests = 0;
+        var resource = Substitute.For<FindPackageByIdResource>();
+        resource.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
+            Arg.Any<CancellationToken>()).Returns(Task.FromException<IEnumerable<NuGetVersion>>(new FatalProtocolException("feed unavailable")));
+        resource.CopyNupkgToStreamAsync(Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<bool>(new FatalProtocolException("feed unavailable")));
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { Source = "https://env.test/index.json" }), source =>
         {
-            var resource = Substitute.For<FindPackageByIdResource>();
-            resource.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
-                Arg.Any<CancellationToken>()).Returns(readableFeed && source.Source.Contains("//available.", StringComparison.Ordinal)
-                    ? Task.FromResult<IEnumerable<NuGetVersion>>([NuGetVersion.Parse("1.0.0")])
-                    : Task.FromException<IEnumerable<NuGetVersion>>(new FatalProtocolException("feed unavailable")));
+            requests++;
+            source.Source.Should().Be("https://explicit.test/index.json");
             return new NuGetProtocolSourceClient(TestRepository.Build(source, resource));
-        }, sources);
+        });
 
-        if (readableFeed)
-        {
-            (await catalog.ResolveVersionAsync("test.templates", null, null, false, CancellationToken.None))
-                .ToNormalizedString().Should().Be("1.0.0");
-        }
-        else
-        {
-            Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", null, null, false, CancellationToken.None);
-            await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*Cannot read template feed*");
-        }
+        Func<Task> act = () => download
+            ? catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), "https://explicit.test/index.json", TestContext.Current.CancellationToken)
+            : catalog.ResolveVersionAsync("test.templates", null, "https://explicit.test/index.json", false, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*Cannot read template feed*explicit.test*");
+        requests.Should().Be(1);
     }
 
     [Theory]
-    [InlineData(false, "2.0.0")]
-    [InlineData(true, "3.0.0-preview.1")]
-    public async Task ResolveVersion_UsesAmbientAndAdditionalFeedsWithoutPreviewFallback(bool prerelease, string expected)
+    [InlineData("1.0.0")]
+    [InlineData("2.0.0-preview.1")]
+    public async Task ResolveVersion_ExactVersionDoesNotQueryTheFeed(string version)
     {
-        var sources = Sources();
-        sources.GetSources(Arg.Any<string>(), Arg.Any<PackageSource?>()).Returns(
-            [new PackageSource("https://ambient.test/index.json"), new PackageSource("https://extra.test/index.json")]);
-        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), source =>
-        {
-            var resource = Substitute.For<FindPackageByIdResource>();
-            resource.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
-                Arg.Any<CancellationToken>()).Returns(source.Source.Contains("ambient", StringComparison.Ordinal)
-                    ? [NuGetVersion.Parse("1.0.0")] : [NuGetVersion.Parse("2.0.0"), NuGetVersion.Parse("3.0.0-preview.1")]);
-            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource));
-        }, sources);
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), _ => throw new InvalidOperationException());
 
-        NuGetVersion version = await catalog.ResolveVersionAsync("test.templates", null, "https://extra.test/index.json", prerelease, CancellationToken.None);
+        var result = await catalog.ResolveVersionAsync("test.templates", version, null, false, TestContext.Current.CancellationToken);
 
-        version.ToNormalizedString().Should().Be(expected);
+        result.Should().Be(NuGetVersion.Parse(version));
     }
 
-    [Fact]
-    public void InstallSources_RespectMappingsDisabledSourcesAndHttpFilteringButAppendAdditionalFeed()
+    [Theory]
+    [InlineData(null, "file:///packages")]
+    [InlineData("file:///packages", "https://env.test/index.json")]
+    [InlineData("", "https://env.test/index.json")]
+    public async Task CatalogOperations_InvalidSourceFailsBeforeAcquisition(string? explicitSource, string environmentSource)
     {
-        string root = Path.Combine(Directory.GetCurrentDirectory(), "template-sources-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            File.WriteAllText(Path.Combine(root, "NuGet.Config"), """
-                <configuration>
-                  <packageSources><clear />
-                    <add key="mapped" value="https://mapped.test/index.json" />
-                    <add key="unmapped" value="https://unmapped.test/index.json" />
-                    <add key="http" value="http://insecure.test/index.json" />
-                    <add key="disabled" value="https://disabled.test/index.json" />
-                  </packageSources>
-                  <disabledPackageSources><clear /><add key="disabled" value="true" /></disabledPackageSources>
-                  <packageSourceMapping><clear />
-                    <packageSource key="mapped"><package pattern="test.*" /></packageSource>
-                    <packageSource key="http"><package pattern="test.*" /></packageSource>
-                    <packageSource key="disabled"><package pattern="test.*" /></packageSource>
-                  </packageSourceMapping>
-                </configuration>
-                """);
-            var provider = new TemplateNuGetSourceProvider(new DirectoryInfo(root));
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { Source = environmentSource }),
+            _ => throw new InvalidOperationException());
 
-            var result = provider.GetSources("test.templates", new PackageSource("https://extra.test/index.json"));
+        Func<Task> search = () => catalog.SearchAsync(null, explicitSource, false, TestContext.Current.CancellationToken);
+        Func<Task> resolve = () => catalog.ResolveVersionAsync("test.templates", null, explicitSource, false, TestContext.Current.CancellationToken);
+        Func<Task> exact = () => catalog.ResolveVersionAsync("test.templates", "1.0.0", explicitSource, false, TestContext.Current.CancellationToken);
+        Func<Task> download = () => catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), explicitSource,
+            TestContext.Current.CancellationToken);
 
-            result.Select(s => s.Source).Should().Equal("https://extra.test/index.json", "https://mapped.test/index.json");
-            provider.GetSources("other.templates", new PackageSource("https://extra.test/index.json"))
-                .Select(s => s.Source).Should().Equal("https://extra.test/index.json");
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        await search.Should().ThrowAsync<ArgumentException>();
+        await resolve.Should().ThrowAsync<ArgumentException>();
+        await exact.Should().ThrowAsync<ArgumentException>();
+        await download.Should().ThrowAsync<ArgumentException>();
     }
 
     private static SourceRepository SearchRepository()

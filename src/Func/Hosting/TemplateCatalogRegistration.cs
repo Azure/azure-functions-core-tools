@@ -17,7 +17,6 @@ internal static class TemplateCatalogRegistration
         ArgumentNullException.ThrowIfNull(services);
         services.AddOptions<TemplateCatalogOptions>();
         services.AddSingleton<IConfigureOptions<TemplateCatalogOptions>, TemplateCatalogOptionsSetup>();
-        services.AddSingleton(_ => new TemplateNuGetSourceProvider(new DirectoryInfo(Environment.CurrentDirectory)));
         services.AddSingleton<TemplateCatalog>();
         return services;
     }

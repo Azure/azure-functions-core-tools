@@ -13,13 +13,12 @@ namespace Azure.Functions.Cli.Templates.Packages;
 /// Searches template packages and resolves install versions through the shared NuGet transport.
 /// </summary>
 internal class TemplateCatalog(
-    IOptions<TemplateCatalogOptions> options, Func<PackageSource, NuGetProtocolSourceClient> clients, TemplateNuGetSourceProvider sources)
+    IOptions<TemplateCatalogOptions> options, Func<PackageSource, NuGetProtocolSourceClient> clients)
 {
     internal const string PackageType = "FuncTemplate";
 
     private readonly TemplateCatalogOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     private readonly Func<PackageSource, NuGetProtocolSourceClient> _clients = clients ?? throw new ArgumentNullException(nameof(clients));
-    private readonly TemplateNuGetSourceProvider _sources = sources ?? throw new ArgumentNullException(nameof(sources));
 
     /// <summary>
     /// Searches at most twenty template packages on one HTTP(S) V3 source.
@@ -39,11 +38,14 @@ internal class TemplateCatalog(
     /// <summary>
     /// Resolves an exact version, preferring the latest stable release unless prereleases are requested.
     /// </summary>
+    /// <exception cref="ArgumentException">The source is not an HTTP(S) feed URI.</exception>
     /// <exception cref="TemplatePackageException">The package ID, version, or requested combination is invalid or unavailable.</exception>
     public virtual async Task<NuGetVersion> ResolveVersionAsync(
         string packageId, string? version, string? source, bool prerelease, CancellationToken cancellationToken)
     {
         ValidatePackageId(packageId);
+        cancellationToken.ThrowIfCancellationRequested();
+        PackageSource feed = GetSource(source);
         if (version is not null)
         {
             if (prerelease)
@@ -59,90 +61,49 @@ internal class TemplateCatalog(
             return exact;
         }
 
-        List<NuGetVersion> versions = [];
-        TemplatePackageException? failure = null;
-        bool readSource = false;
-        foreach (PackageSource feed in _sources.GetSources(packageId, GetAdditionalSource(source)))
-        {
-            try
-            {
-                versions.AddRange(await FromSourceAsync(
-                    () => _clients(feed).ListVersionsAsync(packageId, cancellationToken), feed.Source, cancellationToken));
-                readSource = true;
-            }
-            catch (TemplatePackageException ex)
-            {
-                // Like the engine, allow an available source to satisfy a lookup when another feed is unavailable.
-                failure ??= ex;
-            }
-        }
-
-        if (!readSource && failure is not null)
-        {
-            throw failure;
-        }
+        IReadOnlyList<NuGetVersion> versions = await FromSourceAsync(
+            () => _clients(feed).ListVersionsAsync(packageId, cancellationToken), feed.Source, cancellationToken);
 
         return versions.Where(v => prerelease || !v.IsPrerelease).Max()
-            ?? throw new TemplatePackageException($"No matching version of '{packageId}' was found. Check NuGet.Config and --source or use --prerelease.");
+            ?? throw new TemplatePackageException($"No matching version of '{packageId}' was found on '{feed.Source}'. Check --source or use --prerelease.");
     }
 
     /// <summary>
-    /// Opens the selected package from an eligible install feed; the caller owns the stream.
+    /// Opens the selected package from the resolved feed; the caller owns the temporary seekable stream.
     /// </summary>
-    /// <exception cref="TemplatePackageException">No eligible feed could supply the package.</exception>
+    /// <exception cref="ArgumentException">The source is not an HTTP(S) feed URI.</exception>
+    /// <exception cref="TemplatePackageException">The resolved feed could not supply the package.</exception>
     public virtual async Task<Stream> OpenPackageAsync(
         string packageId, NuGetVersion version, string? source, CancellationToken cancellationToken)
     {
         ValidatePackageId(packageId);
         ArgumentNullException.ThrowIfNull(version);
-        TemplatePackageException? failure = null;
-        foreach (PackageSource feed in _sources.GetSources(packageId, GetAdditionalSource(source)))
+        PackageSource feed = GetSource(source);
+        try
         {
-            try
-            {
-                return await FromSourceAsync(
-                    () => _clients(feed).OpenPackageAsync(packageId, version, cancellationToken), feed.Source, cancellationToken);
-            }
-            catch (WorkloadPackageNotFoundException ex)
-            {
-                failure ??= new TemplatePackageException($"Template package '{packageId}' {version} was not found on '{feed.Source}'.", ex);
-            }
-            catch (TemplatePackageException ex)
-            {
-                // Another eligible feed may supply the same exact version.
-                failure ??= ex;
-            }
+            return await FromSourceAsync(
+                () => _clients(feed).OpenPackageAsync(packageId, version, cancellationToken), feed.Source, cancellationToken);
         }
-
-        throw failure ?? new TemplatePackageException(
-            $"No eligible NuGet source can supply '{packageId}' {version}. Check NuGet.Config, source mappings, and --source.");
+        catch (WorkloadPackageNotFoundException ex)
+        {
+            throw new TemplatePackageException(
+                $"Template package '{packageId}' {version} was not found on '{feed.Source}'. Check --source and --version.", ex);
+        }
     }
 
     /// <summary>
-    /// Resolves the additional feed, using nuget.org only as the default search feed.
+    /// Resolves the command source, then the template environment source, then nuget.org.
     /// </summary>
     /// <exception cref="ArgumentException">The source is not an HTTP(S) feed URI.</exception>
     public virtual PackageSource GetSource(string? source)
     {
-        return GetAdditionalSource(source) ?? new PackageSource(PackageSourceProvider.DefaultSourceUrl);
-    }
-
-    /// <summary>
-    /// Resolves an explicit or environment-provided additional feed without injecting a default.
-    /// </summary>
-    /// <exception cref="ArgumentException">The additional feed is not an HTTP(S) URI.</exception>
-    public virtual PackageSource? GetAdditionalSource(string? source)
-    {
         string? selected = source ?? _options.Source;
         if (string.IsNullOrWhiteSpace(selected) && source is null)
         {
-            return null;
+            return new PackageSource(PackageSourceProvider.DefaultSourceUrl);
         }
 
-        string value = selected!.Trim();
-        PackageSource configured = PackageSourceProvider.Build(value, "Template");
-        string canonical = new Uri(configured.Source).AbsoluteUri;
-        return new PackageSource(canonical, canonical);
+        return PackageSourceProvider.Build(selected!.Trim(), "Template");
     }
 
     internal static void ValidatePackageId(string packageId)
