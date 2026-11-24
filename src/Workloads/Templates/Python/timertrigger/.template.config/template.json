@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Timer" ],
+  "identity": "Azure.Functions.Cli.Python.TimerTrigger.Python",
+  "name": "Azure Functions timer trigger (Python)",
+  "description": "A timer trigger using the Python v2 programming model.",
+  "shortName": "timertrigger",
+  "tags": {
+    "language": "Python",
+    "stack": "python",
+    "type": "item"
+  },
+  "symbols": {
+    "FunctionName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonName",
+      "replaces": "FunctionName",
+      "fileRename": "FunctionName"
+    }
+  },
+  "forms": {
+    "pythonName": {
+      "identifier": "replace",
+      "pattern": "[^a-zA-Z0-9_]",
+      "replacement": "_"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "functions/function_FunctionName.py" }
+  ]
+}
