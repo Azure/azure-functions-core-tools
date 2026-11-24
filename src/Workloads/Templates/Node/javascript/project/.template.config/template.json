@@ -75,7 +75,6 @@
     {
       "source": "./",
       "target": "./",
-      "exclude": [ ".template.config/**" ],
       "modifiers": [
         {
           "condition": "NoHttp",
