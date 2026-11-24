@@ -1326,6 +1326,9 @@ public sealed class SetupRunnerTests : IDisposable
             return Task.FromResult<IReadOnlyList<CatalogSearchResult>>([.. _aliases.Values]);
         }
 
+        public Task<IReadOnlyList<CatalogSearchResult>> SearchVersionsAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<ResolvedPackage?> ResolveLatestVersionAsync(
             string packageId,
             bool? includePrerelease,

@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Title>PowerShell Stack</Title>
+    <Title>PowerShell</Title>
     <Description>Azure Functions CLI tooling for PowerShell projects.</Description>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
-    <WorkloadAlias>powershell</WorkloadAlias>
+    <StackIdentifier>powershell</StackIdentifier>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
   </PropertyGroup>
 

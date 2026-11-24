@@ -106,10 +106,13 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
             Aliases: entry.Aliases,
             InstallDirectory: installPath,
             ContentRoot: contentRoot,
-            DisplayName: instance.DisplayName,
-            Description: instance.Description,
+            DisplayName: entry.Stack?.DisplayName ?? instance.DisplayName,
+            Description: entry.Stack is null ? instance.Description : entry.Stack.Description ?? string.Empty,
             LoadContext: loadContext,
-            TemplateRoot: templateRoot);
+            TemplateRoot: templateRoot)
+        {
+            Stack = entry.Stack,
+        };
     }
 
     /// <summary>

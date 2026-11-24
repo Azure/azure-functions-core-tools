@@ -2,7 +2,7 @@
 
 This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior, most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
 
-> **Spec**: this guide is the authoring view. The on-disk and on-feed layout, the `workload.json` schema, the `kind` discriminator (`workload` / `content` / `meta` / `rid-pointer`), and the install pipeline are specified in [`./proposed/workload-package-layout.md`](./proposed/workload-package-layout.md). Consult that doc for the contract; this guide stays focused on the happy-path authoring experience for `kind: workload`.
+> For the underlying on-disk and on-feed layout and the `kind` discriminator, see the [package layout proposal](../proposed/workload-package-layout.md). This guide describes the current workload SDK and stack contracts.
 
 ## Architecture
 
@@ -57,9 +57,9 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 
 1. Create a class library project under `src/Workloads/<kind>/<Name>/` that targets `net11.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
 2. Reference `Azure.Functions.Cli.Abstractions` (with `PrivateAssets=all` and `ExcludeAssets=runtime` so it isn't shipped inside your package)
-3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
-4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
-5. Add a `workload.json` next to your csproj describing the entry-point assembly and type
+3. If this package provides a project stack, declare its `StackIdentifier`, `Title`, and `Description` in the project
+4. Subclass `Workload`, register its stack and capabilities in `Configure`, and mark the assembly with `[assembly: CliWorkload<YourWorkload>()]`
+5. Let the workload SDK generate `workload.json`. A workload that only contributes commands does not need a stack
 6. Add a `README.md` next to the csproj — `Release.props` auto-includes it as `<PackageReadmeFile>` so it surfaces on NuGet feeds and in `func workload list`
 7. Build, package, and explicitly install your unsigned development package with `func workload install <path-to-nupkg> --allow-untrusted`. See [workload publisher trust](workload-publisher-trust.md).
 
@@ -85,11 +85,9 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
     <TargetFramework>net11.0</TargetFramework>
     <Title>Node.js</Title>
     <Description>Azure Functions CLI tooling for Node.js projects.</Description>
-    <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:workload alias:node alias:javascript alias:typescript func-workload</PackageTags>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+    <StackIdentifier>node</StackIdentifier>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>workload</WorkloadKind>
   </PropertyGroup>
 
   <ItemGroup>
@@ -97,29 +95,17 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj">
-      <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
-    </ProjectReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
-    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="tools/any/" Visible="false" />
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
 ```
 
-What each piece does:
+`<StackIdentifier>` supplies `StackDescriptor.Identifier`, the stable CLI ID of the stack. `WorkerRuntime` defaults to this ID. Override it when the host uses a different name: the Go workload declares `<StackIdentifier>go</StackIdentifier>` and `<WorkerRuntime>native</WorkerRuntime>`. `Title` is a human label, never an input alias.
 
-- `PackageType=FuncCliWorkload` is how the CLI's catalog discovers workload packages (see `docs/proposed/workload-package-layout.md` §5, §7).
-- `Title` is the display name surfaced by NuGet feed UIs; `Description` is the one-line summary. The `Workload` class's `DisplayName` / `Description` overrides serve the same purpose for `func workload list` (no duplication: feed metadata vs. running CLI).
-- `PackageTags` should include exactly one `kind:<workload|content|meta>` tag matching `workload.json`'s `kind`, plus one or more `alias:<name>` tags so `func workload install <alias>` resolves. `func-workload` is recommended for generic feed UI discoverability.
-- `IncludeBuildOutput=false` + the explicit `<None Include="$(OutputPath)$(AssemblyName).dll" ... PackagePath="tools/any/" />` puts the workload assembly under `tools/any/` instead of `lib/`, which is where the loader looks.
-- `<None Include="workload.json" ... PackagePath="/" />` ships the manifest at the package root.
-- `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on the `Abstractions` reference keep the workload self-contained: the CLI provides Abstractions (and the other host-shared contract assemblies, see §9.2 of the layout spec) at runtime. The same `PrivateAssets=all` rule applies to **every** `<PackageReference>` you add later, not just `Abstractions`.
-- `NU5128`/`NU5100` are suppressed because we deliberately ship without `lib/` and place files under `tools/any/`.
+The SDK projects this declaration into NuGet (`stack:<id>`, `alias:<id>`, `worker-runtime:<runtime>`, title and description) and into the package's `workload.json`. The CLI associates it with the **evaluated NuGet package ID**, not a naming convention. For example, a project may declare `<StackIdentifier>comet</StackIdentifier>` and `<PackageId>Contoso.DevKit</PackageId>`. It appears in `func workload search --stack` and installs with `func workload install Contoso.DevKit --exact`. Declaring a stack does not create a `func setup` dependency recipe.
+
+Search reads metadata for the exact version and source. Installation captures the actual package manifest in that version's registry entry. A preview can change its title while an installed stable version continues to show its own title.
 
 ### Runtime-specific workload packages
 
@@ -165,18 +151,7 @@ And a `release_notes.md`:
 - Initial scaffold of the Node.js workload (entry point + stub project initializer).
 ```
 
-Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to the package root**, with a legacy `tools/any/` fallback (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass. Assemblies conventionally live under `tools/<rid>/` or `tools/any/`. For RID-specific assemblies, include `tools/<rid>/` in `assemblyPath`; the loader does not automatically search that directory.
-
-```json
-{
-  "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
-  "kind": "workload",
-  "entryPoint": {
-    "assemblyPath": "Azure.Functions.Cli.Workloads.Node.dll",
-    "type": "Azure.Functions.Cli.Workloads.Node.NodeWorkload"
-  }
-}
-```
+The SDK generates the manifest and packages the workload's publish output. The generated `entryPoint` and the assembly's `CliWorkload` attribute identify the workload to activate. Do not hand-author SDK-generated tags.
 
 Runtime (`kind: workload`) manifests may also declare an optional single string
 `templateRoot`, such as `"content/templates"`, relative to the **physical package root**
@@ -225,6 +200,8 @@ Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<Package
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
+[assembly: CliWorkload<Azure.Functions.Cli.Workloads.Node.NodeWorkload>()]
+
 namespace Azure.Functions.Cli.Workloads.Node;
 
 /// <summary>
@@ -247,7 +224,7 @@ public sealed class NodeWorkload : Workloads.Workload
 }
 ```
 
-`DisplayName` and `Description` surface in `func workload list`. Package id and version aren't on the class: they come from the csproj/`Directory.Version.props` (single source of truth) and are persisted in the global registry at install time.
+For packages that declare a stack, `func workload list` uses the installed descriptor's display name and description. Other runtime workloads still use the entry point's `DisplayName` and `Description`. Package ID and version come from the package itself.
 
 ## Step 3: Implement IProjectInitializer
 
@@ -538,7 +515,7 @@ in the install directory.
 
 The `DeployForDebug` MSBuild target (in `eng/build/WorkloadDebug.targets`,
 imported by every project) handles the build + copy. It's safe to invoke on
-any project; it no-ops for anything that isn't `PackageType=FuncCliWorkload`.
+any project; it skips projects that do not set `PackAsWorkload=true`.
 
 ```bash
 dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
@@ -564,6 +541,11 @@ Publisher verification also applies to that install step. For unsigned local
 builds, explicitly preinstall the package with
 `func workload install <path-to-nupkg> --allow-untrusted --force` in the same
 `FUNC_CLI_WORKLOADS_HOME` first. The debug target does not bypass publisher trust.
+
+The copy-only path requires the generated `workload.json` to match the installed
+manifest. After changing a stack ID, worker runtime, title or description, repack
+and reinstall the workload so the registry reflects the new declaration. Auto-install
+mode can refresh changed manifests for packages that pass publisher verification.
 
 ### VS Code launch configs
 
@@ -673,7 +655,7 @@ Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`)
 - [ ] New project `src/Workloads/<kind>/<Name>/Workloads.<Name>.csproj`, packs as `PackageType=FuncCliWorkload`, references `Abstractions` with `PrivateAssets=all` / `ExcludeAssets=runtime`
 - [ ] `Directory.Version.props` and `release_notes.md` next to the csproj
 - [ ] `README.md` next to the csproj (auto-packed by `Release.props` as `<PackageReadmeFile>`)
-- [ ] `workload.json` next to the csproj, listing the entry-point `assemblyPath` and `type`
+- [ ] Generated `workload.json` in the package, and stack metadata declared in the project if it provides a stack
 - [ ] Subclass of `Workload` with a parameterless constructor, overriding `DisplayName`, `Description`, and `Configure`
 - [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
 - [ ] `IProjectInitializer.GetInitOptions(IInitOptionRegistry registry)` registers any extra options the initializer needs via `registry.GetOrAdd(...)` and returns the canonical instances (return `[]` for stubs; only throw from `InitializeAsync`)

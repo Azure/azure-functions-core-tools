@@ -92,10 +92,10 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         IEnumerable<ListRow> sorted = rows.OrderBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase);
 
         _interaction.WriteTable(
-            ["Alias", "Display Name", "Version"],
+            ["Aliases", "Display Name", "Version"],
             sorted.Select(r => new[]
             {
-                PrimaryAlias(r),
+                string.Join(", ", r.Aliases),
                 DisplayNameOrPackageId(r),
                 r.PackageVersion,
             }));
@@ -146,7 +146,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             first = false;
 
             ListRow header = group.First();
-            string alias = PrimaryAlias(header);
+            string alias = string.Join(", ", header.Aliases);
             string displayName = DisplayNameOrPackageId(header);
 
             _interaction.WriteLine(line =>
@@ -253,8 +253,8 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             logical?.PackageId ?? entry.PackageId,
             logical?.PackageVersion ?? entry.PackageVersion,
             logical?.Aliases ?? entry.Aliases,
-            logical?.DisplayName ?? loadedInfo?.DisplayName ?? GetDisplayName(entry),
-            logical?.Description ?? loadedInfo?.Description ?? entry.Description,
+            entry.Stack?.DisplayName ?? logical?.DisplayName ?? loadedInfo?.DisplayName ?? GetDisplayName(entry),
+            entry.Stack?.Description ?? logical?.Description ?? loadedInfo?.Description ?? entry.Description,
             entry.PackageId,
             entry.PackageVersion,
             entry.RuntimeIdentifier,
@@ -269,8 +269,8 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             workload.PackageId,
             workload.PackageVersion,
             workload.Aliases,
-            workload.DisplayName,
-            workload.Description,
+            workload.Stack?.DisplayName ?? workload.DisplayName,
+            workload.Stack?.Description ?? workload.Description,
             workload.PackageId,
             workload.PackageVersion,
             RuntimeIdentifier: null,
@@ -301,9 +301,6 @@ internal sealed class WorkloadListCommand : FuncCliCommand
 
         return string.Join(", ", owners);
     }
-
-    private static string PrimaryAlias(ListRow row)
-        => row.Aliases.Count == 0 ? string.Empty : row.Aliases[0];
 
     private static string DisplayNameOrPackageId(ListRow row)
         => string.IsNullOrWhiteSpace(row.DisplayName) ? row.PackageId : row.DisplayName;

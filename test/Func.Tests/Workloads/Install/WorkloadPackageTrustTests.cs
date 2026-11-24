@@ -48,7 +48,7 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
 
         var result = await installer.InstallFromPackageAsync(
             valid, allowUntrusted: true, cancellationToken: TestContext.Current.CancellationToken);
-        result.Entry.PackageId.Should().Be("test.workload");
+        result.Entry.PackageId.Should().Be("Test.Workload");
         Func<Task> act = () => installer.InstallFromPackageAsync(invalid, allowUntrusted: true);
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
         File.Exists(valid).Should().BeTrue();

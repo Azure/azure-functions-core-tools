@@ -70,7 +70,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         File.Exists(stalePath).Should().BeFalse();
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(entry =>
-                entry.PackageId == "test.workload"
+                entry.PackageId == "Test.Workload"
                 && entry.PackageVersion == "1.0.0"),
             Arg.Any<CancellationToken>());
     }
@@ -95,7 +95,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
             nupkg, force: true, cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
-        result.Entry.PackageId.Should().Be("test.workload");
+        result.Entry.PackageId.Should().Be("Test.Workload");
         File.Exists(stalePath).Should().BeFalse("stale files from the prior install must be removed");
         File.Exists(Path.Combine(installDir, "tools", "any", "Test.dll")).Should().BeTrue();
         await _store.Received(1).SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());

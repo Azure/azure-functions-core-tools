@@ -286,14 +286,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     private void RenderSingle(WorkloadUpdateResult result)
     {
-        // Prefer the published alias for user-facing messages so the output
-        // matches the token the user typed; fall back to the package id when
-        // no alias is published.
         LogicalPackage? logical = result.Entry.LogicalPackage;
-        IReadOnlyList<string> aliases = logical?.Aliases ?? result.Entry.Aliases;
-        string display = aliases.Count > 0
-            ? aliases[0]
-            : logical?.PackageId ?? result.Entry.PackageId;
+        string display = result.Entry.Stack?.DisplayName ?? logical?.PackageId ?? result.Entry.PackageId;
         string version = logical?.PackageVersion ?? result.Entry.PackageVersion;
 
         if (result.NoCandidateOnSource)

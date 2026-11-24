@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -39,7 +40,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
-        result.Entry.PackageId.Should().Be("test.workload");
+        result.Entry.PackageId.Should().Be("Test.Workload");
         result.Entry.PackageVersion.Should().Be("1.0.0");
         result.Entry.Aliases.Should().Equal(["test", "stub"]);
         result.Entry.EntryPoint!.AssemblyPath.Should().Be("Test.dll");
@@ -53,10 +54,10 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
 
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(entry =>
-                entry.PackageId == "test.workload"
+                entry.PackageId == "Test.Workload"
                 && entry.PackageVersion == "1.0.0"
                 && entry.EntryPoint!.AssemblyPath == "Test.dll"
-                && entry.DisplayName == "test.workload"
+                && entry.DisplayName == "Test.Workload"
                 && entry.Description == "For tests."
                 && entry.Source == Path.GetFullPath(nupkg)
                 && entry.InstallRefCount == 1
@@ -74,6 +75,45 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
             nupkg, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.Aliases.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_StoresEachVersionsActualManifestDescriptorNotTheNuspec()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var installer = NewInstaller(metadataReader: new WorkloadMetadataReader(), store: new WorkloadStore(Paths));
+        string Package(string version, string title, string runtime)
+        {
+            string manifest = $$"""
+                {
+                  "$schema": "{{WorkloadManifestSchema.PackageManifestV1Schema}}",
+                  "entryPoint": { "assemblyPath": "Test.dll", "type": "Fixture.Stub" },
+                  "stack": { "stackIdentifier": "comet", "workerRuntime": "{{runtime}}", "displayName": "{{title}}", "description": "{{title}} tooling" }
+                }
+                """;
+            return BuildNupkg(id: "Contoso.DevKit", version: version, title: "Not the installed label",
+                tags: "alias:old-name alias:comet stack:different worker-runtime:incorrect", extraFiles: [(WriteTempFile("workload.json", manifest), "workload.json")]);
+        }
+
+        await installer.InstallFromPackageAsync(Package("1.0.0", "Comet", "native"), cancellationToken: token);
+        await installer.InstallFromPackageAsync(Package("2.0.0-preview.1", "Comet Next", "comet"), cancellationToken: token);
+
+        using var registry = JsonDocument.Parse(await File.ReadAllTextAsync(Paths.WorkloadRegistryPath, token));
+        registry.RootElement.GetProperty("workloads").EnumerateArray()
+            .Select(entry => entry.GetProperty("stack").GetProperty("stackIdentifier").GetString()).Should().Equal("comet", "comet");
+
+        var entries = await new WorkloadStore(Paths).GetWorkloadsAsync(token);
+        entries.Should().HaveCount(2).And.OnlyContain(entry => entry.PackageId == "Contoso.DevKit");
+        var stable = entries.Single(entry => entry.PackageVersion == "1.0.0");
+        stable.Stack!.Identifier.Should().Be("comet");
+        stable.Stack.WorkerRuntime.Should().Be("native");
+        stable.Stack.DisplayName.Should().Be("Comet");
+        stable.Stack.Description.Should().Be("Comet tooling");
+        stable.Aliases.Should().Equal("old-name", "comet");
+        var preview = entries.Single(entry => entry.PackageVersion == "2.0.0-preview.1");
+        preview.Stack!.DisplayName.Should().Be("Comet Next");
+        preview.Stack.WorkerRuntime.Should().Be("comet");
+        _catalog.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
@@ -162,14 +202,14 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
 
         result.Entry.Kind.Should().Be(WorkloadKind.Content);
         result.Entry.EntryPoint.Should().BeNull();
-        result.Entry.DisplayName.Should().Be("test.workload");
+        result.Entry.DisplayName.Should().Be("Test.Workload");
         result.Entry.Description.Should().Be("For tests.");
 
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(entry =>
                 entry.Kind == WorkloadKind.Content
                 && entry.EntryPoint == null
-                && entry.DisplayName == "test.workload"
+                && entry.DisplayName == "Test.Workload"
                 && entry.Description == "For tests."),
             Arg.Any<CancellationToken>());
     }
@@ -191,8 +231,8 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         reports.Should().SatisfyRespectively(
             report => report.Phase.Should().Be(WorkloadInstallPhase.Extracting),
             report => report.Phase.Should().Be(WorkloadInstallPhase.Registering));
-        reports[0].Description.Should().Contain("test.workload");
-        reports[1].Description.Should().Contain("test.workload");
+        reports[0].Description.Should().Contain("Test.Workload");
+        reports[1].Description.Should().Contain("Test.Workload");
     }
 
     [Fact]

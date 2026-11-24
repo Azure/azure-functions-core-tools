@@ -45,7 +45,7 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
             cancellationToken: TestContext.Current.CancellationToken);
 
         result.AlreadyInstalled.Should().BeFalse();
-        result.Entry.PackageId.Should().Be("test.workload");
+        result.Entry.PackageId.Should().Be("Test.Workload");
         result.Entry.PackageVersion.Should().Be("1.0.0");
         Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeTrue();
         await _store.Received(1).SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
@@ -111,16 +111,12 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
     }
 
     [Fact]
-    public async Task InstallFromCatalog_AliasResolution_FallsBackToBroadSearchWhenTargetedReturnsZero()
+    public async Task InstallFromCatalog_AliasResolution_DoesNotRequireAKeywordMatchOnPackageId()
     {
         string nupkg = BuildNupkg(id: "real.workload.id");
         var resolved = NewResolved("real.workload.id", "1.0.0");
         var source = new PackageSource("https://example/v3/index.json", "test");
 
-        _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == "node-worker"),
-                Arg.Any<CancellationToken>())
-            .Returns([]);
         _catalog.SearchAsync(
                 Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
                 Arg.Any<CancellationToken>())
@@ -150,23 +146,20 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
     }
 
     [Fact]
-    public async Task InstallFromCatalog_AliasResolution_SkipsFallbackWhenTargetedHasHits()
+    public async Task InstallFromCatalog_AliasResolution_DownloadsTheAdvertisedVersion()
     {
         string nupkg = BuildNupkg(id: "node.pkg");
         var resolved = NewResolved("node.pkg", "1.0.0");
         var source = new PackageSource("https://example/v3/index.json", "test");
 
         _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == "node"),
+                Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
                 Arg.Any<CancellationToken>())
             .Returns(
             [
                 new CatalogSearchResult(
                     "node.pkg", NuGetVersion.Parse("1.0.0"), null, null, ["node"], source),
             ]);
-        _catalog.ResolveLatestVersionAsync(
-                "node.pkg", false, null, true, null, Arg.Any<CancellationToken>())
-            .Returns(resolved);
         _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
             .Returns(_ => File.OpenRead(nupkg));
 
@@ -176,9 +169,8 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
             includePrerelease: false, exact: false, force: false,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        await _catalog.DidNotReceive().SearchAsync(
-            Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
-            Arg.Any<CancellationToken>());
+        await _catalog.DidNotReceive().ResolveLatestVersionAsync(
+            Arg.Any<string>(), Arg.Any<bool?>(), Arg.Any<NuGetVersion?>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -186,7 +178,7 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
     {
         var source = new PackageSource("https://example/v3/index.json", "test");
         _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == "python-worker"),
+                Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
                 Arg.Any<CancellationToken>())
             .Returns(
             [
@@ -219,7 +211,7 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         const string ridB = "fake-rid-b";
         var source = new PackageSource("https://example/v3/index.json", "test");
         _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == "python-worker"),
+                Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
                 Arg.Any<CancellationToken>())
             .Returns(
             [
@@ -251,7 +243,7 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
     {
         var source = new PackageSource("https://example/v3/index.json", "test");
         _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == "shared-alias"),
+                Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
                 Arg.Any<CancellationToken>())
             .Returns(
             [

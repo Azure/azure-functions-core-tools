@@ -32,11 +32,11 @@ Create the following files:
 
     <PropertyGroup>
       <TargetFramework>net11.0</TargetFramework>
-      <Title><Name> Stack</Title>
+      <Title><Name></Title>
       <Description>Azure Functions CLI tooling for <Name> projects.</Description>
       <PackAsWorkload>true</PackAsWorkload>
       <WorkloadKind>workload</WorkloadKind>
-      <WorkloadAlias><name></WorkloadAlias>
+      <StackIdentifier><name></StackIdentifier>
     </PropertyGroup>
 
     <ItemGroup>
@@ -49,10 +49,10 @@ Create the following files:
 
   </Project>
   ```
-  - `PackAsWorkload=true` triggers the SDK build targets in `eng/build/Workloads/` that handle packaging, `workload.json` generation, dependency filtering, and pack layout. Do **not** manually set `PackageType`, `PackageTags`, `IncludeBuildOutput`, or `SuppressDependenciesWhenPacking` — the SDK targets set all of these from `WorkloadKind` and `WorkloadAlias`.
+  - `PackAsWorkload=true` triggers the SDK build targets in `eng/build/Workloads/` that handle packaging, `workload.json` generation, dependency filtering, and pack layout. Do **not** manually set `PackageType`, `PackageTags`, `IncludeBuildOutput`, or `SuppressDependenciesWhenPacking`: the SDK derives these from workload project metadata.
   - `WorkloadKind` must be one of: `workload`, `content`, `meta`, `rid-pointer`. Stack workloads use `workload`.
-  - `WorkloadAlias` is the short name users pass to `func workload install <alias>`.
-  - `Title` is the feed-UI display name; `Description` is the one-line summary.
+  - `StackIdentifier` supplies the stable CLI ID, the install alias and the explicit stack marker. Set `WorkerRuntime` only when the host uses a different value. Neither field is inferred from the package ID.
+  - `Title` and `Description` supply presentation in the feed and the installed descriptor.
   - The Abstractions reference does **not** need `PrivateAssets`/`ExcludeAssets` — the SDK targets (`Workload.Pack.targets`) automatically exclude unified CLI assemblies from the package via the `ResolveWorkloadCopyLocal` task.
   - If the workload embeds template files, add `<EmbeddedResource Include="Templates/**" />`.
   - Csproj/assembly name is `Azure.Functions.Cli.Workloads.<Name>` (derived from the project filename by `eng/build/Engineering.props`).

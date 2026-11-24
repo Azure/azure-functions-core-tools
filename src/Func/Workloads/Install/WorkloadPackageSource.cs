@@ -10,8 +10,6 @@ namespace Azure.Functions.Cli.Workloads.Install;
 internal sealed class WorkloadPackageSource(IWorkloadCatalog catalog, IWorkloadPackageInspector packageInspector,
     IOptions<WorkloadCatalogOptions> catalogOptions) : IWorkloadPackageSource
 {
-    private const int AliasSearchTake = 50;
-
     private readonly IWorkloadCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly IWorkloadPackageInspector _packageInspector =
         packageInspector ?? throw new ArgumentNullException(nameof(packageInspector));
@@ -24,13 +22,15 @@ internal sealed class WorkloadPackageSource(IWorkloadCatalog catalog, IWorkloadP
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
         bool effectiveIncludePrerelease = IncludePrerelease(includePrerelease);
-        string resolvedId = exact
-            ? packageId
-            : await ResolveAliasOrIdAsync(packageId, source, effectiveIncludePrerelease, cancellationToken);
+        if (!exact && await FindAliasAsync(packageId, version, source, effectiveIncludePrerelease, cancellationToken) is { } alias)
+        {
+            return alias;
+        }
+
         ResolvedPackage? resolved = version is null
             ? await _catalog.ResolveLatestVersionAsync(
-                resolvedId, effectiveIncludePrerelease, currentVersion: null, allowMajor: true, source, cancellationToken)
-            : await _catalog.ResolveVersionAsync(resolvedId, version, source, cancellationToken);
+                packageId, effectiveIncludePrerelease, currentVersion: null, allowMajor: true, source, cancellationToken)
+            : await _catalog.ResolveVersionAsync(packageId, version, source, cancellationToken);
         if (resolved is not null)
         {
             return resolved;
@@ -40,7 +40,7 @@ internal sealed class WorkloadPackageSource(IWorkloadCatalog catalog, IWorkloadP
             ? "No matching version was found on any configured source."
             : $"Version '{version.ToNormalizedString()}' was not found on any configured source.";
         string hint = effectiveIncludePrerelease ? string.Empty : " Pass --prerelease if it is a prerelease.";
-        throw new WorkloadPackageNotFoundException($"Could not resolve workload '{resolvedId}'. {detail}{hint}");
+        throw new WorkloadPackageNotFoundException($"Could not resolve workload '{packageId}'. {detail}{hint}");
     }
 
     public Task<ResolvedPackage?> ResolveLatestVersionAsync(string packageId, bool? includePrerelease, NuGetVersion currentVersion,
@@ -139,54 +139,33 @@ internal sealed class WorkloadPackageSource(IWorkloadCatalog catalog, IWorkloadP
         return Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) && uri.IsFile;
     }
 
-    private async Task<string> ResolveAliasOrIdAsync(string aliasOrId, string? source, bool includePrerelease,
-        CancellationToken cancellationToken)
+    private async Task<ResolvedPackage?> FindAliasAsync(string alias, NuGetVersion? version, string? source, bool includePrerelease, CancellationToken cancellationToken)
     {
-        CatalogSearchQuery query = new()
+        // Keyword search indexes the latest package, not every alias (especially historical aliases).
+        CatalogSearchQuery query = new() { Source = source, IncludePrerelease = includePrerelease || version?.IsPrerelease == true };
+        IReadOnlyList<CatalogSearchResult> rows = version is null
+            ? await _catalog.SearchAsync(query, cancellationToken)
+            : await _catalog.SearchVersionsAsync(query, cancellationToken);
+        List<CatalogSearchResult> matches = [.. rows.Where(row => (version is null || row.LatestVersion == version)
+            && row.Aliases.Contains(alias, StringComparer.OrdinalIgnoreCase))];
+
+        // Some feeds return per-RID content alongside its user-facing pointer. Keep
+        // the content-install policy separate from stack selection: a package's
+        // name is never evidence that two declared stack owners are the same.
+        if (matches.All(row => row.Stack is null) && matches.Any(row => string.Equals(row.Kind, "rid-pointer", StringComparison.OrdinalIgnoreCase)))
         {
-            Filter = aliasOrId,
-            IncludePrerelease = includePrerelease,
-            Take = AliasSearchTake,
-            Source = source,
+            matches.RemoveAll(row => row.Rid is not null && string.Equals(row.Kind, "content", StringComparison.OrdinalIgnoreCase));
+        }
+        return matches switch
+        {
+            [] => null,
+            [var match] => new ResolvedPackage(match.PackageId, match.LatestVersion, match.Source),
+            _ => throw new AmbiguousPackageMatchException(alias, [.. matches.Select(row => row.PackageId)]),
         };
-
-        IReadOnlyList<CatalogSearchResult> hits = await _catalog.SearchAsync(query, cancellationToken);
-        IReadOnlyList<CatalogSearchResult> aliasMatches = FilterByAlias(hits, aliasOrId);
-        if (aliasMatches.Count == 0 && hits.Count == 0)
-        {
-            IReadOnlyList<CatalogSearchResult> all = await _catalog.SearchAsync(query with { Filter = null }, cancellationToken);
-            aliasMatches = FilterByAlias(all, aliasOrId);
-        }
-
-        IReadOnlyList<string> pointerIds = DistinctPackageIds(aliasMatches.Where(m =>
-            string.Equals(m.Kind, "rid-pointer", StringComparison.OrdinalIgnoreCase)));
-        if (pointerIds.Count == 1)
-        {
-            return pointerIds[0];
-        }
-
-        if (pointerIds.Count > 1)
-        {
-            throw new AmbiguousPackageMatchException(aliasOrId, pointerIds);
-        }
-
-        IReadOnlyList<string> matchedIds = DistinctPackageIds(aliasMatches);
-        if (matchedIds.Count > 1)
-        {
-            throw new AmbiguousPackageMatchException(aliasOrId, matchedIds);
-        }
-
-        return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
     }
 
     private bool IncludePrerelease(bool? includePrerelease)
         => includePrerelease ?? _catalogOptions.IncludePrerelease;
-
-    private static IReadOnlyList<CatalogSearchResult> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias)
-        => [.. hits.Where(r => r.Aliases.Any(a => string.Equals(a, alias, StringComparison.OrdinalIgnoreCase)))];
-
-    private static IReadOnlyList<string> DistinctPackageIds(IEnumerable<CatalogSearchResult> hits)
-        => [.. hits.Select(r => r.PackageId).Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private static void TryDeleteFile(string path)
     {

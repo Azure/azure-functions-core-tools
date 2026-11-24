@@ -538,7 +538,7 @@ public class WorkloadInstallCommandTests
             {
                 PackageId = "Test.Workload",
                 PackageVersion = "1.2.3",
-                Aliases = ["alias1"],
+                Aliases = ["different-first-alias", "alias1"],
             },
         });
 
