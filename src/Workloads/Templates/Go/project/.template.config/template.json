@@ -60,7 +60,6 @@
     {
       "source": "./",
       "target": "./",
-      "exclude": [ ".template.config/**" ],
       "rename": {
         "funcignore.txt": ".funcignore"
       },
