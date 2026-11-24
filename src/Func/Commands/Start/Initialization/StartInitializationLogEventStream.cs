@@ -3,8 +3,8 @@
 
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Events;
-using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -126,11 +126,11 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
             attributes);
     }
 
-    private static LogLevel ToLogLevel(FunctionsProjectReportSeverity severity)
+    private static LogLevel ToLogLevel(FunctionsReportSeverity severity)
         => severity switch
         {
-            FunctionsProjectReportSeverity.Warning => LogLevel.Warning,
-            FunctionsProjectReportSeverity.Error => LogLevel.Error,
+            FunctionsReportSeverity.Warning => LogLevel.Warning,
+            FunctionsReportSeverity.Error => LogLevel.Error,
             _ => LogLevel.Information,
         };
 

@@ -68,8 +68,8 @@ internal sealed class JavaFunctionsProject : FunctionsProject
             int exitCode = await RunMavenPackage(
                 root,
                 mavenCommand,
-                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Info),
+                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Error),
                 cancellationToken).ConfigureAwait(false);
             if (exitCode != 0)
             {

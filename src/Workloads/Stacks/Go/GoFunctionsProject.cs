@@ -101,8 +101,8 @@ internal sealed class GoFunctionsProject : FunctionsProject
         context.Reporter.ReportStatus("Running go mod tidy");
         int tidyExit = await RunGoModTidy(
             root,
-            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+            line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Info),
+            line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Error),
             cancellationToken).ConfigureAwait(false);
         if (tidyExit != 0)
         {
@@ -115,8 +115,8 @@ internal sealed class GoFunctionsProject : FunctionsProject
         int exitCode = await RunGoBuild(
             root,
             outputPath,
-            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+            line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Info),
+            line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Error),
             cancellationToken).ConfigureAwait(false);
 
         if (exitCode != 0)
