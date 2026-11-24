@@ -56,38 +56,19 @@ public class BundleHintBuilderTests
         string hint = BundleHintBuilder.WorkloadMissing();
 
         hint.Should().Contain($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}");
-        hint.Should().NotContain("func setup");
+        hint.Should().Contain("func setup --features runtime");
     }
 
     [Fact]
-    public void WorkloadMissing_KnownRuntime_AppendsSetupFeatureHint()
-    {
-        string hint = BundleHintBuilder.WorkloadMissing(workerRuntime: "go");
-
-        hint.Should().Contain("func workload install");
-        hint.Should().Contain("func setup --features go");
-    }
-
-    [Fact]
-    public void WorkloadMissing_UnknownRuntime_DoesNotAppendSetupHint()
-    {
-        string hint = BundleHintBuilder.WorkloadMissing(workerRuntime: "ruby");
-
-        hint.Should().Contain("func workload install");
-        hint.Should().NotContain("func setup");
-    }
-
-    [Fact]
-    public void NoCompatibleInstall_KnownRuntime_AppendsSetupFeatureHint()
+    public void NoCompatibleInstall_SuggestsHostAndBundleSetup()
     {
         string hint = BundleHintBuilder.NoCompatibleInstall(
             "Microsoft.Azure.Functions.ExtensionBundle",
             "[4.22.0, 5.0.0)",
             ["4.10.0"],
-            suggestedVersion: "4.10.0",
-            workerRuntime: "node");
+            suggestedVersion: "4.10.0");
 
-        hint.Should().Contain("func setup --features node");
+        hint.Should().Contain("func setup --features runtime");
     }
 
     [Fact]

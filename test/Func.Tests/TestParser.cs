@@ -71,6 +71,9 @@ internal static class TestParser
         services.AddBuiltInCommands();
         services.AddProfiles();
         services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
+        services.AddSingleton<Cli.Projects.InstalledProjectStackCatalog>();
+        services.AddSingleton<IProjectStackConfiguration, ProjectStackConfiguration>();
+        services.AddSingleton<Cli.Common.IFileSystem, Cli.Common.PhysicalFileSystem>();
         services.AddSingleton(Substitute.For<Cli.Workloads.Storage.IWorkloadPaths>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IInstalledBundleWorkloads>());
@@ -96,6 +99,7 @@ internal static class TestParser
         emptyStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
             .Returns([]);
         services.AddSingleton(emptyStore);
+        services.AddSingleton(Substitute.For<IWorkloadRuntimeIdentifierProvider>());
         services.AddSingleton(Substitute.For<IWorkloadLoader>());
 
         // Loaded workloads are registered individually as singletons at host

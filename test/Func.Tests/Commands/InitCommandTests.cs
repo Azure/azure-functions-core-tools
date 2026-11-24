@@ -37,7 +37,7 @@ public class InitCommandTests
         _projectResolver = Substitute.For<IFunctionsProjectResolver>();
         _projectResolver
             .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
-            .Returns(ProjectResolutionResults.NotResolved("no project"));
+            .Returns(ProjectResolutionResults.Unrecognized("no project"));
         _bundleReader = Substitute.For<IHostJsonBundleSectionReader>();
         _bundleReader
             .ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
@@ -48,8 +48,11 @@ public class InitCommandTests
             .Returns([]);
     }
 
-    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers, IInteractionService? interaction = null) =>
-        new(interaction ?? _interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+    private InitCommand CreateCommand(IReadOnlyList<IProjectInitializer> initializers, IInteractionService? interaction = null,
+        IEnumerable<IProjectStack>? stacks = null, ILocalSettingsProvider? localSettings = null, IFunctionsProjectResolver? projectResolver = null) =>
+        new(interaction ?? _interaction, _hintRenderer, new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings ?? _localSettings),
+            projectResolver ?? _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles),
+            new InstalledProjectStackCatalog(stacks ?? initializers.Select(i => i.Stack)), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -109,10 +112,8 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_CreatesMissingDirectoryBeforeDispatch()
+    public async Task InitCommand_NoInstalledStacks_DoesNotCreateDirectory()
     {
-        // Even when --stack is missing, InitCommand creates the target
-        // directory before validating (directory creation is unconditional).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         Directory.Exists(newDir).Should().BeFalse();
 
@@ -123,9 +124,8 @@ public class InitCommandTests
 
             var exitCode = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-            // No --stack provided → exit 1, but directory was still created.
             exitCode.Should().Be(1);
-            Directory.Exists(newDir).Should().BeTrue();
+            Directory.Exists(newDir).Should().BeFalse();
         }
         finally
         {
@@ -397,7 +397,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_HostRuntime_ResolvesToCanonicalInitializer()
+    public async Task InitCommand_ExplicitHostRuntime_IsNotAStackSelector()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -405,9 +405,10 @@ public class InitCommandTests
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntime: "dotnet-isolated");
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet-isolated");
 
-            exitCode.Should().Be(0);
-            dotnet.WasInvoked.Should().BeTrue();
-            _hintRenderer.Hints.Should().BeEmpty();
+            exitCode.Should().Be(1);
+            dotnet.WasInvoked.Should().BeFalse();
+            _hintRenderer.Hints.Should().ContainSingle().Which.Kind.Should().Be(WorkloadHintKind.NoMatchingStack);
+            Directory.Exists(newDir).Should().BeFalse();
         }
         finally
         {
@@ -639,7 +640,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_StackOptionAcceptsHostRuntime()
+    public async Task InitCommand_Adopt_ExplicitRuntimeRejectedEvenWithMatchingLocalSignal()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -647,6 +648,7 @@ public class InitCommandTests
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
 
+            StubLocalSettingsRuntime("dotnet-isolated");
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntime: "dotnet-isolated");
             var command = CreateCommand([dotnet], new InteractiveTestInteractionService());
             var root = new RootCommand { command };
@@ -654,9 +656,9 @@ public class InitCommandTests
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
-            exitCode.Should().Be(0);
+            exitCode.Should().Be(1);
             dotnet.WasInvoked.Should().BeFalse();
-            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+            Directory.Exists(Path.Combine(newDir, ".func")).Should().BeFalse();
         }
         finally
         {
@@ -691,12 +693,8 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_UninstalledStack_RefusesAndSuggestsSetup()
+    public async Task InitCommand_Adopt_UnknownHostRuntime_ReportsSourceAndDoesNotWrite()
     {
-        // project_runtime points at a stack with no installed initializer:
-        // refuse rather than write a config we can't validate. The setup
-        // hint uses a `<stack>` placeholder (not the raw runtime value),
-        // because the runtime string may itself not be a valid feature id.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -712,8 +710,8 @@ public class InitCommandTests
             File.Exists(Path.Combine(newDir, ".func", "config.json")).Should().BeFalse();
             _interaction.Lines.Should().Contain(l =>
                 l.StartsWith("ERROR:")
-                && l.Contains("'ruby' stack is not installed")
-                && l.Contains("func setup --features <stack>"));
+                && l.Contains("'ruby'")
+                && l.Contains("FUNCTIONS_WORKER_RUNTIME in local.settings.json"));
         }
         finally
         {
@@ -834,9 +832,6 @@ public class InitCommandTests
     [Fact]
     public async Task InitCommand_Adopt_StackOption_UninstalledStack_Refuses()
     {
-        // --stack X where X isn't installed should be refused just like the
-        // uninstalled local.settings.json case. Same hint, same exit code,
-        // no config written.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -849,10 +844,9 @@ public class InitCommandTests
             exitCode.Should().Be(1);
             python.WasInvoked.Should().BeFalse();
             File.Exists(Path.Combine(newDir, ".func", "config.json")).Should().BeFalse();
-            _interaction.Lines.Should().Contain(l =>
-                l.StartsWith("ERROR:")
-                && l.Contains("'ruby' stack is not installed")
-                && l.Contains("func setup --features <stack>"));
+            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
+            hint.Kind.Should().Be(WorkloadHintKind.NoMatchingStack);
+            hint.RequestedStack.Should().Be("ruby");
         }
         finally
         {
@@ -1138,7 +1132,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_ExplicitLanguage_WinsOverResolver()
+    public async Task InitCommand_Adopt_ExplicitLanguageConflictsWithResolvedProject_DoesNotWrite()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -1154,8 +1148,9 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: "F#", stack: "dotnet");
 
-            exitCode.Should().Be(0);
-            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "fsharp");
+            exitCode.Should().Be(1);
+            _interaction.AllOutput.Should().Contain("--language 'F#'").And.Contain("detected project language 'csharp'");
+            Directory.Exists(Path.Combine(newDir, ".func")).Should().BeFalse();
         }
         finally
         {
@@ -1251,6 +1246,90 @@ public class InitCommandTests
         }
     }
 
+    [Fact]
+    public async Task Adopt_NativeFromDisk_PersistsGoAndLaterLocalChangesDoNotReadopt()
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "host.json"), "{}");
+        string settings = Path.Combine(directory.Path, "local.settings.json");
+        File.WriteAllText(settings, """{"Values":{"FUNCTIONS_WORKER_RUNTIME":"native"}}""");
+        var go = new FakeProjectInitializer("go", workerRuntime: "native");
+        var other = new FakeProjectInitializer("native", workerRuntime: "other-host");
+        var factory = Substitute.For<IFunctionsProjectFactory>();
+        var project = Substitute.For<FunctionsProject>();
+        project.Stack.Returns(go.Stack);
+        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>()).Returns(ProjectCreationResults.Created(project, "Go project"));
+        var owner = TestWorkloads.CreateInfo("Contoso.DevKit") with { Stack = go.Stack.Descriptor };
+        var catalog = new InstalledProjectStackCatalog([other.Stack, go.Stack], [owner]);
+        var local = new LocalSettingsProvider();
+        var resolver = new FunctionsProjectResolver([new(owner, factory)], catalog, new ProjectStackConfiguration(new PhysicalFileSystem(), local));
+        var root = new RootCommand { CreateCommand([other, go], localSettings: local, projectResolver: resolver) };
+
+        int adopted = await root.Parse(["init", directory.Path]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        adopted.Should().Be(0);
+        AssertConfigJsonHasShape(directory.Path, "go", null);
+        string configPath = Path.Combine(directory.Path, ".func", "config.json");
+        byte[] original = File.ReadAllBytes(configPath);
+        File.WriteAllText(settings, """{"Values":{"FUNCTIONS_WORKER_RUNTIME":"other-host"}}""");
+        ProjectResolutionResult subsequentResolution = await resolver.ResolveProjectAsync(new(WorkingDirectory.FromExplicit(directory.Path)), TestContext.Current.CancellationToken);
+        var subsequent = new RootCommand { CreateCommand([other, go], localSettings: new LocalSettingsProvider()) };
+        int conflict = await subsequent.Parse(["init", directory.Path, "--stack", "native"]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        subsequentResolution.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.Should().BeSameAs(project);
+        conflict.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("--stack 'native'").And.Contain("stack.runtime in .func/config.json 'go'");
+        File.ReadAllBytes(configPath).Should().Equal(original);
+        go.WasInvoked.Should().BeFalse();
+        other.WasInvoked.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("unknown", "go", "FUNCTIONS_WORKER_RUNTIME")]
+    [InlineData("go", "go", "FUNCTIONS_WORKER_RUNTIME")]
+    [InlineData("native", "typo", "--stack")]
+    [InlineData("native", "native", "--stack")]
+    [InlineData("native", null, "multiple stacks")]
+    [InlineData(" ", "go", "FUNCTIONS_WORKER_RUNTIME")]
+    public async Task Adopt_InvalidOrAmbiguousSignals_DoNotCreateConfig(string runtime, string? requested, string expectedMessage)
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "host.json"), "{}");
+        StubLocalSettingsRuntime(runtime);
+        var go = new FakeProjectInitializer("go", workerRuntime: "native");
+        var comet = new FakeProjectInitializer("comet", workerRuntime: "native");
+
+        int exitCode = await RunInitAsync(directory.Path, [go, comet], stack: requested);
+
+        exitCode.Should().Be(1);
+        if (expectedMessage == "--stack")
+        {
+            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
+            hint.Kind.Should().Be(WorkloadHintKind.NoMatchingStack);
+            hint.RequestedStack.Should().Be(requested);
+        }
+        else
+        {
+            _interaction.AllOutput.Should().Contain(expectedMessage);
+        }
+        Directory.Exists(Path.Combine(directory.Path, ".func")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Adopt_ExplicitIdDisambiguatesSharedRuntime_PersistsCanonicalLanguage()
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "host.json"), "{}");
+        StubLocalSettingsRuntime("native");
+        var go = new FakeProjectInitializer("go", workerRuntime: "native");
+        var comet = new FakeProjectInitializer("comet", [_javascript, _typescript], workerRuntime: "native");
+
+        int exitCode = await RunInitAsync(directory.Path, [go, comet], language: " TS ", stack: "COMET");
+
+        exitCode.Should().Be(0);
+        AssertConfigJsonHasShape(directory.Path, "comet", "typescript");
+    }
+
     [Theory]
     [InlineData("Fresh")]
     [InlineData("Adopt")]
@@ -1298,6 +1377,58 @@ public class InitCommandTests
         {
             AssertConfigJsonHasShape(directory.Path, "right", null);
         }
+    }
+
+    [Fact]
+    public async Task Init_DuplicateProviderEvenWithoutInitializer_RefusesBeforeWriting()
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        var go = new FakeProjectInitializer("go", workerRuntime: "native");
+        var other = new TestProjectStack("GO", "Renamed", "native", new LanguageDescriptor("go", "Go"));
+        var root = new RootCommand { CreateCommand([go], stacks: [go.Stack, other]) };
+
+        int result = await root.Parse(["init", directory.Path, "--stack", "go"]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("Multiple installed workloads");
+        Directory.GetFileSystemEntries(directory.Path).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("script")]
+    [InlineData("Display Only")]
+    [InlineData(" ")]
+    public async Task Init_ConflictingAliasesOrUnmatchedLanguage_ForceDoesNotModifyExistingConfig(string token)
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        string path = Path.Combine(directory.Path, ".func", "config.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        const string original = """{"stack":{"runtime":"go"},"keep":true}""";
+        File.WriteAllText(path, original);
+        var comet = new FakeProjectInitializer("comet", [new("left", "Display Only", "script"), new("right", "Right", "SCRIPT")]);
+
+        int result = await RunInitAsync(directory.Path, comet, language: token, stack: "comet", force: true);
+
+        result.Should().Be(1);
+        comet.WasInvoked.Should().BeFalse();
+        File.ReadAllText(path).Should().Be(original);
+    }
+
+    [Fact]
+    public async Task Init_StackWithoutInitializer_IsNotOfferedOrSelectable()
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        var go = new FakeProjectInitializer("go");
+        var other = new TestProjectStack("other", "Other", languages: [new("go", "Go")]);
+        InitCommand command = CreateCommand([go], stacks: [other, go.Stack]);
+        var root = new RootCommand { command };
+
+        int result = await root.Parse(["init", directory.Path, "--stack", "other"]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Should().Be(1);
+        command.StackOption.Description.Should().NotContain("other");
+        _interaction.AllOutput.Should().Contain("does not provide an initializer");
+        Directory.GetFileSystemEntries(directory.Path).Should().BeEmpty();
     }
 
     private sealed class StubFunctionsProject(string stackName, LanguageDescriptor? language) : FunctionsProject

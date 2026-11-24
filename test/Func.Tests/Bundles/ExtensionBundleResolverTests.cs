@@ -74,7 +74,7 @@ public class ExtensionBundleResolverTests
             Context(host: "[4.0.0, 5.0.0)", workerRuntime: "go"), TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>()
-            .Which.Hint.Should().Contain("func setup --features go");
+            .Which.Hint.Should().Contain("func setup --features runtime");
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class ExtensionBundleResolverTests
                 TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>()
-            .Which.Hint.Should().Contain("func setup --features node");
+            .Which.Hint.Should().Contain("func setup --features runtime");
     }
 
     [Fact]

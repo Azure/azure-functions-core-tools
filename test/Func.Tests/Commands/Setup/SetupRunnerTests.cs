@@ -4,7 +4,6 @@
 using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
-using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
@@ -12,10 +11,10 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using NuGet.Configuration;
 using NuGet.Versioning;
 
@@ -104,10 +103,7 @@ public sealed class SetupRunnerTests : IDisposable
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
             .WithLatest(_dotNetStackPackageId, "1.0.0");
-        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
-        {
-            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = configuredRuntime,
-        });
+        SetupRunner runner = configuredRuntime == "dotnet" ? CreateRunner(catalog, projectStack: configuredRuntime) : CreateRunner(catalog, workerRuntime: configuredRuntime);
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
@@ -166,10 +162,7 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
         SetupRunner runner = CreateRunner(
             catalog,
-            projectConfig: new Dictionary<string, string?>
-            {
-                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "native",
-            },
+            workerRuntime: "native",
             profileCatalog: new ProfileCatalog([
                 new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
                     new("go-profile", new ProfileDefinition
@@ -203,11 +196,7 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(goStack, "1.0.0")
             .WithLatest(WorkerPackage("go"), "1.0.0")
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
-        var projectConfig = new Dictionary<string, string?>
-        {
-            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = configuredRuntime,
-        };
-        SetupRunner runner = CreateRunner(catalog, projectConfig);
+        SetupRunner runner = configuredRuntime == "go" ? CreateRunner(catalog, projectStack: configuredRuntime) : CreateRunner(catalog, workerRuntime: configuredRuntime);
 
         SetupRunResult result = await runner.RunAsync(
             Options(features: explicitGoFeature ? ["go"] : [], outputMode: SetupOutputMode.Json),
@@ -262,10 +251,7 @@ public sealed class SetupRunnerTests : IDisposable
                 .WithLatest(goStack, "1.0.0")
                 .WithLatest(WorkerPackage("go"), "1.0.0")
                 .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
-            projectConfig: new Dictionary<string, string?>
-            {
-                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "native",
-            });
+            workerRuntime: "native");
 
         SetupRunResult result = await runner.RunAsync(
             Options(check: true, outputMode: json ? SetupOutputMode.Json : SetupOutputMode.Plain),
@@ -274,7 +260,7 @@ public sealed class SetupRunnerTests : IDisposable
         result.ExitCode.Should().Be(stackInstalled && workerInstalled ? 0 : 1);
         if (!stackInstalled)
         {
-            _interaction.Lines.Should().Contain(line => line.Contains("go stack 1.0.0 is not installed.", StringComparison.Ordinal));
+            _interaction.Lines.Should().Contain(line => line.Contains("Go stack 1.0.0 is not installed.", StringComparison.Ordinal));
         }
 
         if (!workerInstalled)
@@ -302,11 +288,9 @@ public sealed class SetupRunnerTests : IDisposable
         SetupRunner runner = CreateRunner(
             Catalog()
                 .WithLatest(_hostPackageId, "4.1.0")
+                .WithLatest("Azure.Functions.Cli.Workloads.Go", "1.0.0")
                 .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
-            projectConfig: new Dictionary<string, string?>
-            {
-                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "native",
-            },
+            workerRuntime: "native",
             profileCatalog: new ProfileCatalog([
                 new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
                     new("no-go", new ProfileDefinition
@@ -392,7 +376,7 @@ public sealed class SetupRunnerTests : IDisposable
 
     [Theory]
     [InlineData("dotnet")]
-    [InlineData("dotnet-isolated")]
+    [InlineData("DOTNET")]
     public async Task RunAsync_JsonOutput_DotnetRuntimeUsesDotnetFeatureName(string requestedFeature)
     {
         SetupRunner runner = CreateRunner(
@@ -424,11 +408,11 @@ public sealed class SetupRunnerTests : IDisposable
 
     [Theory]
     [InlineData("dotnet")]
-    [InlineData("dotnet-isolated")]
+    [InlineData("DotNet")]
     public async Task RunAsync_DotnetRuntimeUnsupportedProfile_ReportsDotnetFeatureName(string requestedFeature)
     {
         SetupRunner runner = CreateRunner(
-            Catalog().WithLatest(_hostPackageId, "4.1.0"),
+            Catalog().WithLatest(_hostPackageId, "4.1.0").WithLatest(_dotNetStackPackageId, "1.0.0"),
             profileCatalog: new ProfileCatalog([
                 new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
                     new("flex", new ProfileDefinition
@@ -450,7 +434,7 @@ public sealed class SetupRunnerTests : IDisposable
     public async Task RunAsync_JsonOutput_DotnetUnsupportedProfileReportsRuntimeDiagnostic()
     {
         SetupRunner runner = CreateRunner(
-            Catalog().WithLatest(_hostPackageId, "4.1.0"),
+            Catalog().WithLatest(_hostPackageId, "4.1.0").WithLatest(_dotNetStackPackageId, "1.0.0"),
             profileCatalog: new ProfileCatalog([
                 new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
                     new("flex", new ProfileDefinition
@@ -642,7 +626,7 @@ public sealed class SetupRunnerTests : IDisposable
                 Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.0.0", kind: WorkloadKind.Content),
             ]);
         SetupRunner runner = CreateRunner(
-            Catalog(),
+            Catalog().WithLatest("Azure.Functions.Cli.Workloads.Node", "1.0.0"),
             profileCatalog: new ProfileCatalog([
                 new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
                     new("flex", new ProfileDefinition
@@ -890,7 +874,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         result.ExitCode.Should().Be(0);
         _interaction.Lines.Should().Contain(line => line.Contains($"Skipped {runtime} worker", StringComparison.Ordinal));
-        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {runtime} stack", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {SetupTestInventory.Packages.Single(p => p.Stack!.Identifier == runtime).Title} stack", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -960,6 +944,100 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunAsync_RecipeLessStack_RejectsWholeRequestBeforeInstallingAnything(bool installed)
+    {
+        var claim = SetupTestInventory.Row("Contoso.DevKit", "comet", "native", "Comet");
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0").WithLatest(WorkerPackage("comet"), "1.0.0");
+        if (installed)
+        {
+            _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+                [new WorkloadEntry { PackageId = claim.PackageId, PackageVersion = "1.0.0", Stack = claim.Stack }]);
+        }
+        else
+        {
+            catalog.WithStack(claim);
+            _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([Entry(WorkerPackage("comet"), "1.0.0")]);
+        }
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["host", "CoMeT"]), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("No full setup recipe").And.Contain("func workload install Contoso.DevKit --exact");
+        _installer.ReceivedCalls().Should().BeEmpty();
+        if (installed)
+        {
+            catalog.SearchSources.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_InstalledStandaloneWorkerRemainsUsableWhenDiscoveryIsOffline()
+    {
+        var catalog = Substitute.For<IWorkloadCatalog>();
+        catalog.SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WorkloadCatalogException("feed offline"));
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([
+            Entry(WorkerPackage("custom"), "1.0.0"), Entry(_hostPackageId, "1.0.0"), Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.0.0"),
+        ]);
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["custom"], installPolicy: SetupInstallPolicy.IfNeeded), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("discovery is unavailable").And.Contain("custom worker is already installed");
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("native")]
+    [InlineData("dotnet-isolated")]
+    [InlineData(".NET")]
+    [InlineData("dotnet-inprocess")]
+    public async Task RunAsync_ExplicitStackValues_RejectHostSpellingsAndLabels(string requested)
+    {
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(_dotNetStackPackageId, "1.0.0").WithLatest("Azure.Functions.Cli.Workloads.Go", "1.0.0")
+            .WithLatest(WorkerPackage(requested), "1.0.0");
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: [requested]), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain($"'{requested}'").And.Contain("Use a stack ID");
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_CompetingStackPackages_ReportsBothOwnersBeforeInstall()
+    {
+        FakeCatalog catalog = Catalog().WithStack(SetupTestInventory.Row("Contoso.DevKit", "comet", "worker-a", "Comet"))
+            .WithStack(SetupTestInventory.Row("Fabrikam.Tools", "COMET", "worker-b", "Comet II"));
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["comet"]), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("ambiguous").And.Contain("Contoso.DevKit").And.Contain("Fabrikam.Tools");
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_RecipeStackWithUnrelatedPackageId_InstallsDeclaredOwner()
+    {
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0")
+            .WithStack(SetupTestInventory.Row("Contoso.DevKit", "node", "unrelated-worker", "Custom node", "2.0.0"))
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.0.0");
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["node"]), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(0);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.Equals("Contoso.DevKit", StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "2.0.0"), Arg.Any<string?>(),
+            Arg.Any<bool?>(), true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
+        _interaction.AllOutput.Should().Contain("Installed Custom node stack");
+    }
+
+    [Theory]
     [InlineData("java", "Java", false)]
     [InlineData("java", "Java", true)]
     [InlineData("powershell", "PowerShell", false)]
@@ -973,10 +1051,7 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(workerPackageId, "1.0.0")
             .WithLatest(stackPackageId, "1.0.0")
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
-        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
-        {
-            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime,
-        });
+        SetupRunner runner = CreateRunner(catalog, projectStack: runtime);
 
         SetupRunResult result = await runner.RunAsync(
             Options(features: explicitFeature ? [runtime] : [], installPolicy: SetupInstallPolicy.IfNeeded),
@@ -991,7 +1066,7 @@ public sealed class SetupRunnerTests : IDisposable
                 workerPackageId.ToLowerInvariant(),
                 stackPackageId.ToLowerInvariant(),
                 IInstalledBundleWorkloads.BundleWorkloadPackageId.ToLowerInvariant());
-        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {runtime} stack", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {packageSuffix} stack", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -1027,10 +1102,7 @@ public sealed class SetupRunnerTests : IDisposable
             catalog.WithLatest(stackPackageId, "1.0.0");
         }
 
-        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
-        {
-            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime,
-        });
+        SetupRunner runner = CreateRunner(catalog, projectStack: runtime);
 
         SetupRunResult result = await runner.RunAsync(
             Options(
@@ -1047,6 +1119,13 @@ public sealed class SetupRunnerTests : IDisposable
             using var document = JsonDocument.Parse(line);
             return document.RootElement.Clone();
         })];
+        if (stackState == "unpublished")
+        {
+            events.Should().ContainSingle().Which.GetProperty("type").GetString().Should().Be("setup.failed");
+            _installer.ReceivedCalls().Should().BeEmpty();
+            return;
+        }
+
         JsonElement stackResult = events.Should().ContainSingle(item =>
             item.GetProperty("type").GetString() == "dependency.result"
             && item.GetProperty("dependency_type").GetString() == "stack").Which;
@@ -1070,7 +1149,7 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(interactive, SetupTestInventory.StackPackages(_store, catalog), SetupTestInventory.Configuration()),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
@@ -1143,7 +1222,7 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(interactive, SetupTestInventory.StackPackages(_store, catalog), SetupTestInventory.Configuration()),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
@@ -1170,7 +1249,7 @@ public sealed class SetupRunnerTests : IDisposable
         // entirely so the user can't toggle them.
         interactive.Lines.Should().Contain(line => line.Contains("Already installed", StringComparison.Ordinal)
             && line.Contains("func workload uninstall", StringComparison.Ordinal));
-        interactive.Lines.Should().Contain(line => line.Contains("[✓] node", StringComparison.Ordinal));
+        interactive.Lines.Should().Contain(line => line.Contains("[✓] Node.js (node)", StringComparison.Ordinal));
         interactive.Lines.Should().NotContain(line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node", StringComparison.Ordinal));
         interactive.MultiSelectionChoices.SelectMany(g => g).Should().NotContain(c => c.Value == "node");
     }
@@ -1184,7 +1263,7 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
         SetupRunner runner = new(
             _interaction,
-            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(_interaction, SetupTestInventory.StackPackages(_store, catalog), SetupTestInventory.Configuration()),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
@@ -1201,11 +1280,12 @@ public sealed class SetupRunnerTests : IDisposable
 
     private SetupRunner CreateRunner(
         IWorkloadCatalog catalog,
-        IReadOnlyDictionary<string, string?>? projectConfig = null,
+        string? projectStack = null,
+        string? workerRuntime = null,
         IProfileCatalog? profileCatalog = null)
         => new(
             _interaction,
-            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>())),
+            new SetupFeatureResolver(_interaction, SetupTestInventory.StackPackages(_store, catalog), SetupTestInventory.Configuration(projectStack, workerRuntime)),
             new SetupProfileScopeResolver(
                 profileCatalog ?? _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
@@ -1247,6 +1327,7 @@ public sealed class SetupRunnerTests : IDisposable
             PackageId = packageId.ToLowerInvariant(),
             PackageVersion = version,
             Aliases = aliases ?? [],
+            Stack = SetupTestInventory.Packages.SingleOrDefault(p => p.PackageId.Equals(packageId, StringComparison.OrdinalIgnoreCase))?.Stack,
             Kind = kind,
         };
 
@@ -1271,6 +1352,7 @@ public sealed class SetupRunnerTests : IDisposable
         private readonly Dictionary<string, CatalogSearchResult> _aliases = [with(StringComparer.OrdinalIgnoreCase)];
         private readonly Dictionary<string, NuGetVersion> _latest = [with(StringComparer.OrdinalIgnoreCase)];
         private readonly Dictionary<string, List<NuGetVersion>> _versions = [with(StringComparer.OrdinalIgnoreCase)];
+        private readonly List<CatalogSearchResult> _stacks = [];
 
         public int ResolveLatestCallCount { get; private set; }
 
@@ -1304,6 +1386,12 @@ public sealed class SetupRunnerTests : IDisposable
             return this;
         }
 
+        public FakeCatalog WithStack(CatalogSearchResult package)
+        {
+            _stacks.Add(package);
+            return WithLatest(package.PackageId, package.LatestVersion.ToNormalizedString());
+        }
+
         public FakeCatalog WithVersions(string packageId, params string[] versions)
         {
             foreach (string version in versions)
@@ -1327,7 +1415,13 @@ public sealed class SetupRunnerTests : IDisposable
         }
 
         public Task<IReadOnlyList<CatalogSearchResult>> SearchVersionsAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            SearchSources.Add(query.Source);
+            return Task.FromResult<IReadOnlyList<CatalogSearchResult>>([.. SetupTestInventory.Packages
+                .Where(p => _latest.ContainsKey(p.PackageId))
+                .Select(p => p with { LatestVersion = _latest[p.PackageId] }), .. _stacks]);
+        }
 
         public Task<ResolvedPackage?> ResolveLatestVersionAsync(
             string packageId,
@@ -1425,21 +1519,6 @@ public sealed class SetupRunnerTests : IDisposable
 
         private ResolvedPackage? CreateResolved(string packageId, NuGetVersion? version)
             => version is null ? null : new ResolvedPackage(packageId.ToLowerInvariant(), version, _source);
-    }
-
-    private sealed class FakeCliConfigurationProvider(IReadOnlyDictionary<string, string?> projectValues) : ICliConfigurationProvider
-    {
-        private readonly IConfiguration _projectConfiguration = new ConfigurationBuilder()
-            .AddInMemoryCollection(projectValues)
-            .Build();
-
-        private readonly IConfiguration _userConfiguration = new ConfigurationBuilder().Build();
-
-        public IConfiguration GetUserConfiguration() => _userConfiguration;
-
-        public IConfiguration GetProjectConfiguration(DirectoryInfo projectDirectory) => _projectConfiguration;
-
-        public IConfiguration GetEffectiveConfiguration(DirectoryInfo projectDirectory) => _projectConfiguration;
     }
 
     private sealed class TestOptionsMonitor<TOptions>(TOptions value) : IOptionsMonitor<TOptions>

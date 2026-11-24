@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
@@ -49,9 +50,9 @@ public class ForceConfirmationCancellationTests
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
         var bundles = Substitute.For<IInstalledBundleWorkloads>();
         bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
-        var command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), localSettings,
+        var command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
             Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-            new InstalledBundleScanner(bundles), [initializer]);
+            new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([initializer.Stack]), [initializer]);
         commandConstructed = true;
 
         string directory = Path.Combine(Path.GetTempPath(), $"func-force-cancel-{Guid.NewGuid():N}");

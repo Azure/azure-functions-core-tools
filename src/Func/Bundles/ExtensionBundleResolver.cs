@@ -32,7 +32,7 @@ internal sealed class ExtensionBundleResolver(
         if (scan.TotalInstalledRows == 0)
         {
             return Record(context, context.HostJsonVersionRange,
-                new ExtensionBundleResolution.WorkloadMissing(BundleHintBuilder.WorkloadMissing(context.WorkerRuntime)),
+                new ExtensionBundleResolution.WorkloadMissing(BundleHintBuilder.WorkloadMissing()),
                 sw);
         }
 
@@ -88,7 +88,7 @@ internal sealed class ExtensionBundleResolver(
     {
         IReadOnlyList<string> installedVersions = [.. installed.Select(b => b.Version.ToNormalizedString())];
         string? suggested = installedVersions.FirstOrDefault();
-        string hint = BundleHintBuilder.NoCompatibleInstall(context.BundleId, constraintRange, installedVersions, suggested, context.WorkerRuntime);
+        string hint = BundleHintBuilder.NoCompatibleInstall(context.BundleId, constraintRange, installedVersions, suggested);
 
         return new ExtensionBundleResolution.NoCompatibleInstall(constraintRange, installedVersions, hint);
     }

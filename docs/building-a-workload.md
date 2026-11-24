@@ -297,7 +297,7 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
 
 ### Contexts
 
-`InitContext` supplies `WorkingDirectory`, `ProjectName`, the resolved `LanguageDescriptor?`, and `Force`. Do not parse the original user input again. Persisted project settings use `StackDescriptor.Identifier` and, for stacks that distinguish languages, `LanguageDescriptor.LanguageIdentifier`.
+`InitContext` supplies `WorkingDirectory`, `ProjectName`, the resolved `LanguageDescriptor?`, and `Force`. Do not parse the original user input again. Persisted project settings use `StackDescriptor.Identifier` and, for stacks that distinguish languages, `LanguageDescriptor.LanguageIdentifier`. When adopting an existing project, the CLI resolves `FUNCTIONS_WORKER_RUNTIME` against `WorkerRuntime` before writing any CLI config.
 
 Workload-specific option values flow through the `ParseResult`, so the CLI never has to know about your options.
 

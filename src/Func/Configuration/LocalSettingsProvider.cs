@@ -39,35 +39,56 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
             using var document = JsonDocument.Parse(stream, _documentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return LocalSettingsSnapshot.Empty;
+                return new() { WorkerRuntimeReadError = "local.settings.json must contain a JSON object." };
             }
 
             bool isEncrypted = ReadNullableBoolean(document.RootElement, "IsEncrypted") == true;
+            string? runtimeError = null;
+            IReadOnlyDictionary<string, string> values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : ReadValues(document.RootElement, out runtimeError);
 
             return new LocalSettingsSnapshot
             {
                 IsEncrypted = isEncrypted,
-                Values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : ReadValues(document.RootElement),
+                Values = values,
+                WorkerRuntimeReadError = runtimeError,
                 Host = ReadHost(document.RootElement),
             };
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            return LocalSettingsSnapshot.Empty;
+            return new() { WorkerRuntimeReadError = $"Could not read {ProjectStackSettings.WorkerRuntimeSource}: {ex.Message}" };
         }
     }
 
-    private static IReadOnlyDictionary<string, string> ReadValues(JsonElement root)
+    private static IReadOnlyDictionary<string, string> ReadValues(JsonElement root, out string? runtimeError)
     {
-        if (!root.TryGetProperty(CliConfigurationNames.LocalSettingsValuesSectionName, out JsonElement values)
-            || values.ValueKind != JsonValueKind.Object)
+        runtimeError = null;
+        if (!root.TryGetProperty(CliConfigurationNames.LocalSettingsValuesSectionName, out JsonElement values))
         {
+            return LocalSettingsSnapshot.Empty.Values;
+        }
+
+        if (values.ValueKind != JsonValueKind.Object)
+        {
+            runtimeError = $"Cannot read {ProjectStackSettings.WorkerRuntimeSource}: 'Values' must be an object.";
             return LocalSettingsSnapshot.Empty.Values;
         }
 
         Dictionary<string, string> result = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (JsonProperty property in values.EnumerateObject())
         {
+            if (string.Equals(property.Name, CliConfigurationNames.WorkerRuntimeSettingName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (property.Value.ValueKind != JsonValueKind.String)
+                {
+                    runtimeError = $"{ProjectStackSettings.WorkerRuntimeSource} must be a string, not {property.Value.ValueKind}.";
+                }
+                else if (result.ContainsKey(property.Name))
+                {
+                    runtimeError = $"{ProjectStackSettings.WorkerRuntimeSource} is declared more than once.";
+                }
+            }
+
             if (property.Value.ValueKind == JsonValueKind.String)
             {
                 result[property.Name] = property.Value.GetString() ?? string.Empty;
