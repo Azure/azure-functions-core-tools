@@ -1,5 +1,7 @@
 # Azure.Functions.Cli.Workloads.Workers.Go
 
-## 1.0.0-preview.1
+## 1.0.0-preview.2
 
-- Retarget the workload assembly to `net11.0` for the .NET 11-based Azure Functions CLI; the Go worker payload is unchanged.
+- Generate workload metadata with the shared workload SDK and build the content-only package project with .NET 11; the Go worker payload is unchanged. (#5401, #5928)
+
+## 1.0.0-preview.1

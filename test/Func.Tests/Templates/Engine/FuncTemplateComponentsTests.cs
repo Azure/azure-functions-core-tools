@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.PostActions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.TemplateEngine.Abstractions;
 
@@ -25,6 +26,9 @@ public sealed class FuncTemplateComponentsTests
             && descriptor.ImplementationType == typeof(WorkloadTemplateSource)
             && descriptor.Lifetime == ServiceLifetime.Singleton);
         services.Should().ContainSingle(descriptor =>
+            descriptor.ServiceType == typeof(PostActionDispatcher)
+            && descriptor.Lifetime == ServiceLifetime.Singleton);
+        services.Should().Contain(descriptor =>
             descriptor.ServiceType == typeof(ITemplateComponent)
             && descriptor.ImplementationFactory != null
             && descriptor.Lifetime == ServiceLifetime.Singleton);
