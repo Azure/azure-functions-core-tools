@@ -17,23 +17,22 @@ public class NodeWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new NodeWorkload().Configure(builder);
+        new NodeWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<NodeProjectStack>());
         initializer.ProjectStack.Should().BeSameAs(stack);
-        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("javascript", "typescript");
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        FluentActions.Invoking(() => new NodeWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new NodeWorkload(Stack.Descriptor).Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -42,9 +41,8 @@ public class NodeWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new NodeWorkload().Configure(builder);
+        new NodeWorkload(Stack.Descriptor).Configure(builder);
 
         builder.Received(1).AddProjectFactory(Arg.Any<NodeProjectFactory>());
     }

@@ -17,16 +17,15 @@ public class PowerShellWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new PowerShellWorkload().Configure(builder);
+        new PowerShellWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<PowerShellProjectStack>());
         initializer.ProjectStack.Should().BeSameAs(stack);
-        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("powershell");
     }
 
@@ -36,9 +35,8 @@ public class PowerShellWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new PowerShellWorkload().Configure(builder);
+        new PowerShellWorkload(Stack.Descriptor).Configure(builder);
 
         builder.Received(1).AddProjectFactory(Arg.Any<PowerShellProjectFactory>());
     }
@@ -46,6 +44,6 @@ public class PowerShellWorkloadTests
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        FluentActions.Invoking(() => new PowerShellWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new PowerShellWorkload(Stack.Descriptor).Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 }

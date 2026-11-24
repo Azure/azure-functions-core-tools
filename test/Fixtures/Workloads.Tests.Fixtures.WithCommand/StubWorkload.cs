@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand;
 
@@ -16,7 +17,21 @@ public sealed class StubWorkload : Workloads.Workload
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.RegisterCommand(new HelloFromWorkloadCommand(builder.StackDescriptor));
+        builder.RegisterCommand(new HelloFromWorkloadCommand());
+    }
+}
+
+public sealed class StackWorkload(StackDescriptor descriptor) : Workloads.Workload
+{
+    private readonly FixtureStack _stack = new(descriptor);
+
+    public override void Configure(FunctionsCliBuilder builder) => builder.Services.AddSingleton<IProjectStack>(_stack);
+
+    private sealed class FixtureStack(StackDescriptor descriptor) : IProjectStack
+    {
+        public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+
+        public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("fixture", "Fixture")];
     }
 }
 
@@ -36,11 +51,11 @@ public sealed class ThrowingWorkload : Workloads.Workload
 /// Public because the loader instantiates it across the workload ALC
 /// boundary; the test only asserts its presence on the root command tree.
 /// </summary>
-public sealed class HelloFromWorkloadCommand(StackDescriptor? stack) : FuncCommand
+public sealed class HelloFromWorkloadCommand : FuncCommand
 {
     public override string Name => "hello-from-workload";
 
-    public override string Description => stack?.DisplayName ?? "Test command contributed by a fixture workload.";
+    public override string Description => "Test command contributed by a fixture workload.";
 
     public override Task<int> ExecuteAsync(FuncCommandInvocationContext context, CancellationToken cancellationToken)
         => Task.FromResult(0);

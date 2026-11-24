@@ -70,6 +70,7 @@ public static class ProjectFiles
     public static string ReadLocalSettingsTemplate(Assembly assembly, StackDescriptor stack)
     {
         ArgumentNullException.ThrowIfNull(stack);
+
         return ReadTemplate(assembly, "local.settings.json").Replace("\"{WorkerRuntime}\"", JsonSerializer.Serialize(stack.WorkerRuntime), StringComparison.Ordinal);
     }
 

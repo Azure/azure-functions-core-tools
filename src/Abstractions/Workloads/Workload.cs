@@ -9,8 +9,9 @@ namespace Azure.Functions.Cli.Workloads;
 /// package root), then invokes <see cref="Configure"/> so the workload can
 /// register its services with <see cref="FunctionsCliBuilder"/>.
 ///
-/// Mirrors the shape of WebJobs' <c>IWebJobsStartup</c>. Implementations must
-/// have a parameterless constructor.
+/// Entry points normally have a public parameterless constructor. A stack
+/// workload can instead take its installed <see cref="Projects.StackDescriptor"/>
+/// as its sole public constructor parameter.
 ///
 /// Abstract class (rather than an interface) so we can grow the surface with
 /// new properties or virtual members without breaking existing workloads.

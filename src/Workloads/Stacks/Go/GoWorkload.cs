@@ -13,15 +13,16 @@ namespace Azure.Functions.Cli.Workloads.Go;
 /// Entry-point for the Go workload. Registers Go-specific
 /// services (project initializer today; project factory / commands later).
 /// </summary>
-public sealed class GoWorkload : Workload
+public sealed class GoWorkload(StackDescriptor descriptor) : Workload
 {
+    private readonly GoProjectStack _stack = new(descriptor);
+
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        GoProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
-        builder.Services.AddSingleton(stack);
-        builder.Services.AddSingleton<IProjectStack>(stack);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, GoProjectInitializer>();
-        builder.AddProjectFactory(new GoProjectFactory(stack));
+        builder.AddProjectFactory(new GoProjectFactory(_stack));
     }
 }

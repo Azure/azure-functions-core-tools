@@ -13,6 +13,7 @@ public sealed record StackDescriptor
         ArgumentException.ThrowIfNullOrWhiteSpace(stackIdentifier);
         ArgumentException.ThrowIfNullOrWhiteSpace(workerRuntime);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+
         StackIdentifier = stackIdentifier;
         WorkerRuntime = workerRuntime;
         DisplayName = displayName;
@@ -20,11 +21,15 @@ public sealed record StackDescriptor
     }
 
     public string StackIdentifier { get; }
+
     public string WorkerRuntime { get; }
+
     public string DisplayName { get; }
+
     public string? Description { get; }
 
-    public bool Equals(StackDescriptor? other) => other is not null && StringComparer.OrdinalIgnoreCase.Equals(StackIdentifier, other.StackIdentifier);
+    public bool Equals(StackDescriptor? other)
+        => other is not null && StringComparer.OrdinalIgnoreCase.Equals(StackIdentifier, other.StackIdentifier);
 
     public override int GetHashCode() => StringComparer.OrdinalIgnoreCase.GetHashCode(StackIdentifier);
 }

@@ -193,7 +193,7 @@ Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<Package
 
 ## Step 2: Subclass `Workload`
 
-`Workload` is an abstract class in `Azure.Functions.Cli.Abstractions` (under `Azure.Functions.Cli.Workloads`). The CLI loader instantiates the type named in `workload.json` and calls `Configure`. **It must have a parameterless constructor.**
+`Workload` is an abstract class in `Azure.Functions.Cli.Abstractions` (under `Azure.Functions.Cli.Workloads`). The CLI loader instantiates the type named in `workload.json`, then calls `Configure(builder)`. Command-only workloads use a public parameterless constructor. A stack workload opts in to its package's descriptor by declaring a public constructor that takes exactly one `StackDescriptor`. If that constructor exists, the loader always uses it and reports a missing stack declaration rather than passing `null`.
 
 ```csharp
 // NodeWorkload.cs
@@ -209,14 +209,15 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// Entry-point for the Node.js workload. Registers the project initializer
 /// and any Node-specific services.
 /// </summary>
-public sealed class NodeWorkload : Workload
+public sealed class NodeWorkload(StackDescriptor descriptor) : Workload
 {
+    private readonly NodeProjectStack _stack = new(descriptor);
+
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        NodeProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("Missing stack declaration."));
-        builder.Services.AddSingleton(stack);
-        builder.Services.AddSingleton<IProjectStack>(stack);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         // builder.RegisterCommand<NodeTopLevelCommand>();
         // …any other services your providers depend on
@@ -231,7 +232,7 @@ internal sealed class NodeProjectStack(StackDescriptor descriptor) : IProjectSta
 }
 ```
 
-Use **this builder's** descriptor and share the resulting stack with this workload's initializers, project factories, start option contributors and quickstart providers. An unkeyed global `StackDescriptor` would pick the wrong owner when several workloads are installed. Only register capabilities the stack actually provides.
+The loader passes the descriptor from this package version's registry entry directly to the entry-point constructor. Share the resulting stack with this workload's initializers, project factories, start option contributors and quickstart providers. Do not register an unkeyed `StackDescriptor` in the shared service collection: it cannot distinguish between installed owners.
 
 Language descriptors are ordered. Give each a stable CLI ID, a display label, and explicit input aliases. `IsMatch` trims and matches the ID and aliases case-insensitively, not the label. For C#, declare `new("csharp", "C#", "c#")`; both `CSharp` from the external quickstart manifest and `c#` from a user resolve to the same descriptor. Commands emit `csharp`, not a lowercased display label. Shared languages are resolved within the selected stack.
 
@@ -393,19 +394,16 @@ The contract is plain DI, so tests don't need the host:
 public void Configure_RegistersInitializer()
 {
     var services = new ServiceCollection();
-    var builder  = new TestBuilder(services);
+    var builder = Substitute.For<FunctionsCliBuilder>();
+    builder.Services.Returns(services);
+    var descriptor = new StackDescriptor("node", "node", "Node.js");
 
-    new NodeWorkload().Configure(builder);
+    new NodeWorkload(descriptor).Configure(builder);
 
     using var sp = services.BuildServiceProvider();
-    var initializers = sp.GetServices<IProjectInitializer>().ToList();
-    Assert.Single(initializers);
-    Assert.IsType<NodeProjectInitializer>(initializers[0]);
-}
-
-private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuilder
-{
-    public override IServiceCollection Services { get; } = services;
+    var initializer = Assert.Single(sp.GetServices<IProjectInitializer>());
+    Assert.IsType<NodeProjectInitializer>(initializer);
+    Assert.Same(descriptor, initializer.ProjectStack.Descriptor);
 }
 ```
 
@@ -560,7 +558,7 @@ Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`)
 - [ ] `Directory.Version.props` and `release_notes.md` next to the csproj
 - [ ] `README.md` next to the csproj (auto-packed by `Release.props` as `<PackageReadmeFile>`)
 - [ ] Generated `workload.json` in the package, and stack metadata declared in the project if it provides a stack
-- [ ] Subclass of `Workload` with a parameterless constructor, a `CliWorkload` assembly attribute and a `Configure` implementation
+- [ ] Subclass of `Workload` with a `CliWorkload` assembly attribute, a `Configure` implementation, and either a public parameterless constructor or a public `StackDescriptor` constructor for stack workloads
 - [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
 - [ ] `IProjectInitializer.GetInitOptions(IInitOptionRegistry registry)` registers any extra options the initializer needs via `registry.GetOrAdd(...)` and returns the canonical instances (return `[]` for stubs; only throw from `InitializeAsync`)
 - [ ] Test project `test/Workloads/<kind>/<Name>.Tests/Workloads.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workloads.<Name>.Tests` (matches the workload's `InternalsVisibleTo`)

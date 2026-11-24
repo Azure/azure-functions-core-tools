@@ -14,16 +14,17 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// Entry-point for the Node workload. Registers Node-specific
 /// services (project initializer today; project factory / commands later).
 /// </summary>
-public sealed class NodeWorkload : Workload
+public sealed class NodeWorkload(StackDescriptor descriptor) : Workload
 {
+    private readonly NodeProjectStack _stack = new(descriptor);
+
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        NodeProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
-        builder.Services.AddSingleton(stack);
-        builder.Services.AddSingleton<IProjectStack>(stack);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
-        builder.AddProjectFactory(new NodeProjectFactory(stack));
+        builder.AddProjectFactory(new NodeProjectFactory(_stack));
     }
 }

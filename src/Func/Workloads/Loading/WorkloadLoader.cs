@@ -3,6 +3,7 @@
 
 using System.Reflection;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 
@@ -98,7 +99,7 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
                 $"[{entry.PackageId}] Could not load workload: type '{entryPoint.Type}' does not derive from {nameof(Workload)} (install path: '{installPath}').");
         }
 
-        var instance = (Workload)Activator.CreateInstance(type)!;
+        Workload instance = Activate(type, entry);
         return new RuntimeWorkloadInfo(
             Instance: instance,
             PackageId: entry.PackageId,
@@ -113,6 +114,21 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
         {
             Stack = entry.Stack,
         };
+    }
+
+    private static Workload Activate(Type type, WorkloadEntry entry)
+    {
+        const BindingFlags publicInstance = BindingFlags.Public | BindingFlags.Instance | BindingFlags.ExactBinding;
+        ConstructorInfo? stackConstructor = type.GetConstructor(publicInstance, [typeof(StackDescriptor)]);
+        if (stackConstructor is null)
+        {
+            return (Workload)Activator.CreateInstance(type)!;
+        }
+
+        StackDescriptor descriptor = entry.Stack ?? throw new InvalidWorkloadException(
+            $"[{entry.PackageId}@{entry.PackageVersion}] Entry point '{type.FullName}' requires a StackDescriptor, but the installed package has no stack declaration. " +
+            "Declare StackIdentifier in the workload project, then repack and reinstall the workload.");
+        return (Workload)stackConstructor.Invoke([descriptor]);
     }
 
     /// <summary>

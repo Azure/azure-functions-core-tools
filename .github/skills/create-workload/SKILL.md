@@ -90,19 +90,20 @@ Create the following files:
   /// <summary>
   /// Entry-point for the <Name> workload.
   /// </summary>
-  public sealed class <Name>Workload : Workload
+  public sealed class <Name>Workload(StackDescriptor descriptor) : Workload
   {
+      private readonly <Name>ProjectStack _stack = new(descriptor);
+
       public override void Configure(FunctionsCliBuilder builder)
       {
           ArgumentNullException.ThrowIfNull(builder);
-          <Name>ProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("Missing stack declaration."));
-          builder.Services.AddSingleton(stack);
-          builder.Services.AddSingleton<IProjectStack>(stack);
+          builder.Services.AddSingleton(_stack);
+          builder.Services.AddSingleton<IProjectStack>(_stack);
           builder.Services.AddSingleton<IProjectInitializer, <Name>ProjectInitializer>();
       }
   }
   ```
-  - Must be `public sealed` with a parameterless constructor (the loader activates it by reflection).
+  - Use a public constructor taking just `StackDescriptor` for a stack entry point. Command-only workloads use a public parameterless constructor and the same `Configure(builder)` method.
   - The `[assembly: CliWorkload<T>()]` attribute is **required** — the `ResolveWorkloadEntry` MSBuild task scans the compiled assembly for this attribute to auto-generate `workload.json`. Do **not** create a manual `workload.json` file.
   - Pass the same per-workload stack to each capability. Do not redeclare package id, version, or stack identity on the class.
   - Register additional services in `Configure` as needed: `IQuickstartProvider` for post-init guidance, `IFunctionsProjectFactory` via `builder.AddProjectFactory(...)` for project detection, custom commands via `builder.RegisterCommand<T>()`.
@@ -172,7 +173,7 @@ Mirror the source path under `test/Workloads/`: grouped workloads use
   - Omit the `<kind>/` segment in the `ProjectReference` for ungrouped workloads.
   - The `Abstractions` and `Microsoft.Extensions.DependencyInjection` references are needed for DI-based contract tests that verify `Configure(FunctionsCliBuilder)` registrations.
   - Common test dependencies (xUnit, NSubstitute, AwesomeAssertions) are pulled in by `test/Directory.Build.props` — do not redeclare them.
-- [ ] `<Name>WorkloadTests.cs`, contract tests that supply `builder.StackDescriptor` and assert that each registered capability references its owner.
+- [ ] `<Name>WorkloadTests.cs`, contract tests that pass a descriptor to the workload constructor and assert that each registered capability references its owner.
 - [ ] `<Name>ProjectInitializerTests.cs`, unit tests for supported languages and project initialization.
 
 ### 3. Solution file, `Azure.Functions.Cli.slnx`

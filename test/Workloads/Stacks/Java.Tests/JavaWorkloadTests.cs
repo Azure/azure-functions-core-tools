@@ -19,23 +19,22 @@ public class JavaWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new JavaWorkload().Configure(builder);
+        new JavaWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<JavaProjectStack>());
         initializer.ProjectStack.Should().BeSameAs(stack);
-        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("java");
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new JavaWorkload().Configure(null!));
+        Assert.Throws<ArgumentNullException>(() => new JavaWorkload(Stack.Descriptor).Configure(null!));
     }
 
     [Fact]
@@ -44,9 +43,8 @@ public class JavaWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new JavaWorkload().Configure(builder);
+        new JavaWorkload(Stack.Descriptor).Configure(builder);
 
         builder.Received(1).AddProjectFactory(Arg.Any<JavaProjectFactory>());
     }

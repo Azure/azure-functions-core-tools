@@ -239,8 +239,8 @@ The abstractions library exposes the surface workload authors program against:
 
 | Type | Role |
 |------|------|
-| `Workload` | The entry point. Its `Configure(FunctionsCliBuilder)` method registers capabilities; package identity and presentation come from package metadata. |
-| `FunctionsCliBuilder` | Supplies this installed version's `StackDescriptor` (if declared), `Services`, and methods to register commands and project factories. |
+| `Workload` | The entry point. Its `Configure(FunctionsCliBuilder)` method registers capabilities. Stack entry points opt in to their installed package's `StackDescriptor` through a constructor parameter; other entry points use a parameterless constructor. |
+| `FunctionsCliBuilder` | Supplies `Services` and methods to register commands and project factories. |
 | `IProjectInitializer` | Contributes initialization for its `ProjectStack`. Registers init options via `IInitOptionRegistry` and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
 | `IInitOptionRegistry` / `CommonInitOptions` | The registry de-dupes options that multiple workloads contribute (e.g. `--no-bundles`) so each option appears once in `--help` and every workload reads the same parsed value. `CommonInitOptions` is a small factory of the shared options themselves (`NoBundle`, `BundlesChannel`). |
 | `InitContext` | Carries the working directory, project name, resolved language descriptor, and force flag to an initializer. |

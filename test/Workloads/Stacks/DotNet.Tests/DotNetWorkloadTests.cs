@@ -17,16 +17,15 @@ public class DotNetWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new DotNetWorkload().Configure(builder);
+        new DotNetWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<DotNetProjectStack>());
         initializer.ProjectStack.Should().BeSameAs(stack);
-        stack.Descriptor.Should().BeSameAs(builder.StackDescriptor);
+        stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
         stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("csharp", "fsharp");
     }
 
@@ -36,9 +35,8 @@ public class DotNetWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new DotNetWorkload().Configure(builder);
+        new DotNetWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IStartHostOptionContributor contributor = provider.GetRequiredService<IStartHostOptionContributor>();
@@ -49,7 +47,7 @@ public class DotNetWorkloadTests
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        FluentActions.Invoking(() => new DotNetWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DotNetWorkload(Stack.Descriptor).Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -58,9 +56,8 @@ public class DotNetWorkloadTests
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
-        builder.StackDescriptor.Returns(Stack.Descriptor);
 
-        new DotNetWorkload().Configure(builder);
+        new DotNetWorkload(Stack.Descriptor).Configure(builder);
 
         builder.Received(1).AddProjectFactory<DotNetProjectFactory>();
     }

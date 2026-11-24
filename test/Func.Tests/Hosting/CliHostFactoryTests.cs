@@ -25,6 +25,7 @@ public sealed class CliHostFactoryTests : IDisposable
 {
     private const string FixtureAssembly = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.dll";
     private const string CommandWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.StubWorkload";
+    private const string StackWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.StackWorkload";
     private const string ThrowingWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.ThrowingWorkload";
 
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
@@ -88,9 +89,9 @@ public sealed class CliHostFactoryTests : IDisposable
         var paths = new WorkloadPathsOptions(_home);
         var store = new WorkloadStore(paths);
         var token = TestContext.Current.CancellationToken;
-        async Task Stage(string id, StackDescriptor? stack)
+        async Task Stage(string id, string type, StackDescriptor? stack)
         {
-            StageFixtureWorkload(id, "1.0.0", CommandWorkloadType);
+            StageFixtureWorkload(id, "1.0.0", type);
             await store.SaveWorkloadAsync(new WorkloadEntry
             {
                 PackageId = id,
@@ -98,24 +99,41 @@ public sealed class CliHostFactoryTests : IDisposable
                 DisplayName = "Package title",
                 Description = "Package description",
                 Stack = stack,
-                EntryPoint = new() { AssemblyPath = FixtureAssembly, Type = CommandWorkloadType },
+                EntryPoint = new() { AssemblyPath = FixtureAssembly, Type = type },
             }, token);
         }
 
-        await Stage("Contoso.DevKit", new("comet", "native", "Comet v1"));
-        await Stage("Other.Publisher", new("lunar", "lunar", "Lunar"));
-        await Stage("Tool.WithoutStack", null);
+        await Stage("Contoso.DevKit", StackWorkloadType, new("comet", "native", "Comet v1"));
+        await Stage("Other.Publisher", StackWorkloadType, new("lunar", "lunar", "Lunar"));
+        await Stage("Tool.WithoutStack", CommandWorkloadType, null);
         var services = new ServiceCollection();
 
         await WorkloadRegistration.RegisterWorkloadsAsync(services, paths, new TestInteractionService(), token);
 
         using var provider = services.BuildServiceProvider();
-        var commands = provider.GetServices<FuncCliCommand>().OfType<ExternalCommand>().ToDictionary(c => c.Workload.PackageId);
-        commands["Contoso.DevKit"].Source.Description.Should().Be("Comet v1");
-        commands["Other.Publisher"].Source.Description.Should().Be("Lunar");
-        commands["Tool.WithoutStack"].Source.Description.Should().Be("Test command contributed by a fixture workload.");
-        commands["Tool.WithoutStack"].Workload.DisplayName.Should().Be("Package title");
+        var stacks = provider.GetServices<IProjectStack>().ToDictionary(s => s.Descriptor.StackIdentifier);
+        var workloads = provider.GetServices<WorkloadInfo>().ToDictionary(w => w.PackageId);
+        stacks["comet"].Descriptor.Should().BeSameAs(workloads["Contoso.DevKit"].Stack);
+        stacks["lunar"].Descriptor.Should().BeSameAs(workloads["Other.Publisher"].Stack);
+        var command = provider.GetServices<FuncCliCommand>().OfType<ExternalCommand>().Should().ContainSingle().Subject;
+        command.Workload.PackageId.Should().Be("Tool.WithoutStack");
+        command.Workload.DisplayName.Should().Be("Package title");
         provider.GetServices<StackDescriptor>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateHostAsync_StackConstructorWithoutDeclaredStack_ReportsPackageAndSkipsActivation()
+    {
+        StageFixtureWorkload("Contoso.DevKit", "1.0.0", StackWorkloadType);
+        WriteRegistry(("Contoso.DevKit", "1.0.0", StackWorkloadType));
+        var interaction = new TestInteractionService();
+
+        using IHost host = await StartHostAsync(interaction);
+
+        interaction.Lines.Should().Contain(line => line.Contains("Contoso.DevKit@1.0.0")
+            && line.Contains("requires a StackDescriptor") && line.Contains("Declare StackIdentifier"));
+        host.Services.GetServices<IProjectStack>().Should().BeEmpty();
+        host.Services.GetRequiredService<IWorkloadProvider>().GetWorkloads().Should().BeEmpty();
     }
 
     [Fact]

@@ -13,17 +13,18 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// <summary>
 /// Workload for .NET (C#) Azure Functions. Provides tooling and project initialization for .NET Azure Functions projects.
 /// </summary>
-public sealed class DotNetWorkload : Workload
+public sealed class DotNetWorkload(StackDescriptor descriptor) : Workload
 {
+    private readonly DotNetProjectStack _stack = new(descriptor);
+
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IDotnetPathResolver, DotnetPathResolver>();
         builder.Services.AddSingleton<IDotnetCliRunner, DotnetCliRunner>();
         builder.Services.AddSingleton<ITemplateHivePathProvider, TemplateHivePathProvider>();
-        DotNetProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
-        builder.Services.AddSingleton(stack);
-        builder.Services.AddSingleton<IProjectStack>(stack);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
         builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();

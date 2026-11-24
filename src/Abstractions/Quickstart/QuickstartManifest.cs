@@ -25,11 +25,7 @@ public sealed class QuickstartManifest
     /// Returns entries matching all supplied non-null/non-empty criteria,
     /// ordered by <see cref="QuickstartEntry.Priority"/>.
     /// </summary>
-    public IReadOnlyList<QuickstartEntry> Filter(
-        LanguageDescriptor? language = null,
-        string? resource = null,
-        string? iac = null,
-        string? search = null)
+    public IReadOnlyList<QuickstartEntry> Filter(LanguageDescriptor? language = null, string? resource = null, string? iac = null, string? search = null)
     {
         IEnumerable<QuickstartEntry> results = Entries;
 

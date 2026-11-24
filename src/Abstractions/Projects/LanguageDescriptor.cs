@@ -13,13 +13,16 @@ public sealed record LanguageDescriptor
         ArgumentException.ThrowIfNullOrWhiteSpace(languageIdentifier);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         ArgumentNullException.ThrowIfNull(aliases);
+
         LanguageIdentifier = languageIdentifier;
         DisplayName = displayName;
         Aliases = Array.AsReadOnly<string>([.. aliases]);
     }
 
     public string LanguageIdentifier { get; }
+
     public string DisplayName { get; }
+
     public IReadOnlyList<string> Aliases { get; }
 
     public bool Equals(LanguageDescriptor? other) => other is not null && StringComparer.OrdinalIgnoreCase.Equals(LanguageIdentifier, other.LanguageIdentifier);

@@ -492,7 +492,7 @@ Meta package (no payload — bundles other workloads via
 | `$schema`                   | Required                      | Versioned JSON Schema URL. Same convention as the global registry (spec §10.1). The CLI rejects packages whose `$schema` URL it doesn't recognise; the manifest is **never** parsed partially (see "Forward compatibility" below). |
 | `kind`                      | Optional (default `"workload"`) | One of `"workload"`, `"content"`, or `"meta"`. **`workload`** packages carry a runtime payload and contribute services to the host via `Configure()`. **`content`** packages carry a payload but no entry point — the loader skips them; built-in commands resolve their install dirs by package id (e.g. the host runtime; spec §4.6). **`meta`** packages carry no payload — they bundle other workload-or-content packages via the `.nuspec`'s `<dependencies>` (§5.5 "Meta packages"). |
 | `entryPoint.assemblyPath`   | Required for `workload`; **forbidden** for `content` and `meta` | Path to the workload assembly **relative to `tools/any/`** (forward slashes; no leading `/`; no `..` segments; not absolute). Conventionally a bare filename. The loader resolves it as `<workload-home>/workloads/<packageId>/<packageVersion>/tools/any/<assemblyPath>`. |
-| `entryPoint.type`           | Required for `workload`; **forbidden** for `content` and `meta` | Fully-qualified name of the type extending the abstract `Workload` base class. The loader instantiates this type by name when the workload is activated. The pack target validates that this type exists in the assembly, derives from `Workload`, and has a public parameterless constructor (§9.1). |
+| `entryPoint.type`           | Required for `workload`; **forbidden** for `content` and `meta` | Fully-qualified name of the type extending `Workload`. At activation the loader uses a public `StackDescriptor` constructor for an entry point that declares one; otherwise it uses the public parameterless constructor. |
 
 That's the entire v1 schema. The manifest is intentionally minimal:
 
@@ -1358,7 +1358,7 @@ the install pipeline, with rules that **branch on the package's
      (no execution required —
      Mono.Cecil / `System.Reflection.Metadata` scan).
    - The type must derive from the abstract `Workload` base class.
-   - The type must have a public parameterless constructor.
+   - The type must have a public parameterless constructor or a public constructor taking exactly one `StackDescriptor`. The latter requires a stack declaration in the package manifest.
 
 6. **The `kind:workload` tag should be present** in `<tags>`.
    Recommendation, not a hard failure (the tag is convention only —

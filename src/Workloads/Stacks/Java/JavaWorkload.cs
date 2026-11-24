@@ -14,15 +14,16 @@ namespace Azure.Functions.Cli.Workloads.Java;
 /// project initializer (<c>func init --stack java</c>) and the project factory
 /// (language detection for <c>func new</c> / <c>func start</c>).
 /// </summary>
-public sealed class JavaWorkload : Workload
+public sealed class JavaWorkload(StackDescriptor descriptor) : Workload
 {
+    private readonly JavaProjectStack _stack = new(descriptor);
+
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        JavaProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
-        builder.Services.AddSingleton(stack);
-        builder.Services.AddSingleton<IProjectStack>(stack);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, JavaProjectInitializer>();
-        builder.AddProjectFactory(new JavaProjectFactory(stack));
+        builder.AddProjectFactory(new JavaProjectFactory(_stack));
     }
 }

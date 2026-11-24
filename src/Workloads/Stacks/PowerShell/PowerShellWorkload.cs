@@ -13,15 +13,16 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// Entry-point for the PowerShell workload. Registers PowerShell-specific
 /// services (project initializer, project factory).
 /// </summary>
-public sealed class PowerShellWorkload : Workload
+public sealed class PowerShellWorkload(StackDescriptor descriptor) : Workload
 {
+    private readonly PowerShellProjectStack _stack = new(descriptor);
+
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        PowerShellProjectStack stack = new(builder.StackDescriptor ?? throw new InvalidOperationException("The workload manifest does not declare a stack."));
-        builder.Services.AddSingleton(stack);
-        builder.Services.AddSingleton<IProjectStack>(stack);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, PowerShellProjectInitializer>();
-        builder.AddProjectFactory(new PowerShellProjectFactory(stack));
+        builder.AddProjectFactory(new PowerShellProjectFactory(_stack));
     }
 }
