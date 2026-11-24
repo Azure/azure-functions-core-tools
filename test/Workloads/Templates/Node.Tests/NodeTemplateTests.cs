@@ -97,7 +97,7 @@ public sealed class NodeTemplateTests : IAsyncLifetime
 
         using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "local.settings.json")));
         JsonElement values = settings.RootElement.GetProperty("Values");
-        values.TryGetProperty("AzureWebJobsStorage", out _).Should().BeFalse();
+        values.GetProperty("AzureWebJobsStorage").GetString().Should().Be("UseDevelopmentStorage=true");
         values.TryGetProperty("FUNCTIONS_WORKER_RUNTIME", out _).Should().BeFalse();
         File.Exists(Path.Combine(output, ".gitignore")).Should().BeFalse();
         AssertNoTemplateArtifacts(output);
@@ -155,6 +155,52 @@ public sealed class NodeTemplateTests : IAsyncLifetime
 
         result.CreationResult.PostActions.Should().BeEmpty();
         AssertNoTemplateArtifacts(output);
+    }
+
+    [Theory]
+    [InlineData(JavaScript, null, "function", CreationResultStatus.Success)]
+    [InlineData(JavaScript, "anonymous", "anonymous", CreationResultStatus.Success)]
+    [InlineData(JavaScript, "admin", "admin", CreationResultStatus.Success)]
+    [InlineData(JavaScript, "invalid", null, CreationResultStatus.InvalidParamValues)]
+    [InlineData(TypeScript, null, "function", CreationResultStatus.Success)]
+    [InlineData(TypeScript, "anonymous", "anonymous", CreationResultStatus.Success)]
+    [InlineData(TypeScript, "admin", "admin", CreationResultStatus.Success)]
+    [InlineData(TypeScript, "invalid", null, CreationResultStatus.InvalidParamValues)]
+    public async Task HttpTrigger_AuthLevel_ValidatesAndSubstitutes(
+        string language, string? authLevel, string? expectedAuthLevel, CreationResultStatus expectedStatus)
+    {
+        ITemplateInfo template = await GetTemplateAsync("httptrigger", language, "item");
+        Dictionary<string, string?> parameters = [];
+        if (authLevel is not null)
+        {
+            parameters["AuthLevel"] = authLevel;
+        }
+
+        ITemplateCreationResult result = await _host.InstantiateAsync(
+            template, "MyFunction", parameters, cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(expectedStatus, result.ErrorMessage);
+        if (expectedStatus == CreationResultStatus.Success)
+        {
+            string source = File.ReadAllText(Path.Combine(
+                result.OutputBaseDirectory!, "src", "functions", $"MyFunction.{ExtensionFor(language)}"));
+            source.Should().Contain($"authLevel: '{expectedAuthLevel}'");
+            AssertNoTemplateArtifacts(result.OutputBaseDirectory!);
+        }
+    }
+
+    [Theory]
+    [InlineData(JavaScript)]
+    [InlineData(TypeScript)]
+    public void HttpTrigger_ExposesAuthLevelAlias(string language)
+    {
+        string templateLanguage = language == JavaScript ? "javascript" : "typescript";
+        string path = Path.Combine(
+            AppContext.BaseDirectory, "content", "templates", templateLanguage, "httptrigger", ".template.config", "func.host.json");
+        using var metadata = JsonDocument.Parse(File.ReadAllText(path));
+
+        metadata.RootElement.GetProperty("symbolInfo").GetProperty("AuthLevel").GetProperty("longName").GetString()
+            .Should().Be("auth-level");
     }
 
     [Theory]

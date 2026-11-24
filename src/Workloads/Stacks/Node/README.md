@@ -18,7 +18,9 @@ func workload install node
 The workload package includes JavaScript and TypeScript project, HTTP trigger,
 and timer trigger templates under `content/templates`. The template engine can
 discover them through the workload's `templateRoot`. Migrating `func init` and
-`func new` to these templates is separate work.
+`func new` to these templates is separate work. HTTP triggers support function,
+anonymous, and admin authorization levels, defaulting to function. Project
+settings use Azurite for local storage so timer triggers can start locally.
 
 ## Template testing
 
