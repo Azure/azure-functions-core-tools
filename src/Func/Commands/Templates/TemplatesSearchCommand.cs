@@ -23,14 +23,20 @@ internal sealed class TemplatesSearchCommand : FuncCliCommand
         Description = "Optional free-text package query.",
     };
 
-    public Option<string?> SourceOption { get; } = new("--source") { Description = "Additional HTTP(S) V3 NuGet feed to search directly (defaults to nuget.org)." };
+    public Option<string?> SourceOption { get; } = new("--source")
+    {
+        Description = "Single HTTP(S) V3 NuGet feed. Default: FUNC_CLI_TEMPLATES_SOURCE, then nuget.org. NuGet.Config is not read.",
+    };
 
     public Option<bool?> PrereleaseOption { get; } = new("--prerelease")
     {
         Description = "Include prerelease packages (defaults to the CLI's release status).",
     };
 
-    public Option<bool> JsonOption { get; } = new("--json") { Description = "Emit machine-readable package JSON instead of cards." };
+    public Option<string?> FormatOption { get; } = new("--format")
+    {
+        Description = "Output mode: plain (package cards) or json (array). Default: plain.",
+    };
 
     public TemplatesSearchCommand(TemplateCatalog catalog, IInteractionService interaction)
         : base("search", "Search for FuncTemplate packages.")
@@ -40,11 +46,19 @@ internal sealed class TemplatesSearchCommand : FuncCliCommand
         Arguments.Add(QueryArgument);
         Options.Add(SourceOption);
         Options.Add(PrereleaseOption);
-        Options.Add(JsonOption);
+        Options.Add(FormatOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
+        string? rawFormat = parseResult.GetValue(FormatOption);
+        bool json = rawFormat?.Trim().ToLowerInvariant() switch
+        {
+            null or "" or "plain" => false,
+            "json" => true,
+            _ => throw new GracefulException($"--format must be one of: plain, json. Got '{rawFormat}'.", isUserError: true),
+        };
+
         IReadOnlyList<CatalogSearchResult> results;
         try
         {
@@ -59,7 +73,7 @@ internal sealed class TemplatesSearchCommand : FuncCliCommand
         {
             throw new GracefulException(ex.Message, ex, isUserError: true);
         }
-        if (parseResult.GetValue(JsonOption))
+        if (json)
         {
             _interaction.WriteJson(results.Select(r => new TemplatePackageSearchResult(
                 r.PackageId, r.LatestVersion.ToNormalizedString(), r.Title, r.Description)));

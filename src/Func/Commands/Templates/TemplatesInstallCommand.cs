@@ -20,7 +20,10 @@ internal sealed class TemplatesInstallCommand : FuncCliCommand
 
     public Option<string?> VersionOption { get; } = new("--version") { Description = "Exact SemVer version, including prerelease versions." };
 
-    public Option<string?> SourceOption { get; } = new("--source") { Description = "Additional HTTP(S) V3 NuGet feed alongside NuGet.Config sources (HTTP is filtered)." };
+    public Option<string?> SourceOption { get; } = new("--source")
+    {
+        Description = "Single HTTP(S) V3 NuGet feed. Default: FUNC_CLI_TEMPLATES_SOURCE, then nuget.org. NuGet.Config is not read.",
+    };
 
     public Option<bool> PrereleaseOption { get; } = new("--prerelease") { Description = "Resolve the latest version including prereleases." };
 
