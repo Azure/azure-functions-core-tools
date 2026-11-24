@@ -82,6 +82,32 @@ Workloads can add their own subcommands by calling `builder.RegisterCommand(...)
 to show the same command help as `func workload install --help` without executing the command.
 Paths can include nested subcommands and aliases; an unknown path reports an error and exits with code 1.
 
+### Planned template package commands
+
+The proposed [template package management design](templates/package-management.md)
+would add a top-level group separate from function generation:
+
+```text
+func templates
+├── search [query]        Search template NuGet packages
+├── install <package-id>  Install a template NuGet package
+└── uninstall <package-id>  Uninstall a managed template package
+```
+
+Like workload commands, search and install use one feed: `--source`, then
+`FUNC_CLI_TEMPLATES_SOURCE`, then nuget.org. They do not read `NuGet.Config`.
+Install prevalidates the downloaded archive, then delegates package storage and
+registration to the engine's managed provider. Preflight checks require matching
+package identity/version, the `FuncTemplate` package type with no workload type,
+valid `func.host.json` metadata, and at least one template identity; NuGet and
+Microsoft.TemplateEngine handle archive path safety and template-format
+validation. On replacement, the CLI keeps a temporary backup to restore through
+that provider if installation or discovery fails. The engine would record a
+local NuGet package without `NuGetSource`; matching ID/version is a no-op
+regardless of feed. These commands would not require an initialized Functions
+project. They are not yet available; the NuGet catalog, package lifecycle, and
+CLI integration layers must ship first.
+
 ## In-place CLI updates
 
 `func update` first runs the current executable's `--version` through the process
