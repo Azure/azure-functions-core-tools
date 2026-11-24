@@ -21,6 +21,7 @@ public static class PostActionContextExtensions
         /// <returns>Matching paths, or an empty list when the argument or source paths are unavailable.</returns>
         /// <exception cref="ArgumentNullException">The context or <paramref name="argumentName"/> is null.</exception>
         /// <exception cref="ArgumentException"><paramref name="argumentName"/> is empty or whitespace.</exception>
+        /// <exception cref="InvalidOperationException">A matched path resolves outside the output directory.</exception>
         public IReadOnlyList<string> GetConfiguredFiles(string argumentName, Func<string, bool>? matchCriteria = null)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -33,10 +34,11 @@ public static class PostActionContextExtensions
             }
 
             List<string> results = [];
+            string outputDirectory = Path.GetFullPath(context.OutputBasePath);
             foreach (string pattern in ParsePaths(files))
             {
-                string outputDirectory = Path.GetFullPath(context.OutputBasePath);
-                string[] targetPaths = [.. matcher.MatchTargetPaths(pattern).Select(path => Path.GetFullPath(path, outputDirectory))];
+                string[] targetPaths = [.. matcher.MatchTargetPaths(pattern)
+                    .Select(path => Path.GetFullPathWithinDirectory(path, outputDirectory))];
                 foreach (string path in targetPaths)
                 {
                     if (matchCriteria is null || matchCriteria(path))

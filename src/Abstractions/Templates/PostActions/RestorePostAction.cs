@@ -15,6 +15,7 @@ public abstract class RestorePostAction : IPostActionProcessor
     public abstract bool CanProcess(PostActionSelectionContext context);
 
     /// <inheritdoc />
+    /// <exception cref="InvalidOperationException">A restore target resolves outside the generated output directory.</exception>
     public async Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -24,10 +25,21 @@ public abstract class RestorePostAction : IPostActionProcessor
         IReadOnlyList<string> configuredFiles = context.GetConfiguredFiles("files");
         IEnumerable<string> targets = configuredFiles.Count > 0
             ? configuredFiles
-            : context.PrimaryOutputs.Select(path => Path.GetFullPath(path, outputDirectory));
+            : context.PrimaryOutputs;
+
+        StringComparer pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        List<string> validatedTargets = [];
+        foreach (string target in targets)
+        {
+            string fullPath = Path.GetFullPathWithinDirectory(target, outputDirectory);
+            if (!validatedTargets.Contains(fullPath, pathComparer))
+            {
+                validatedTargets.Add(fullPath);
+            }
+        }
 
         bool allSucceeded = true;
-        foreach (string target in targets)
+        foreach (string target in validatedTargets)
         {
             cancellationToken.ThrowIfCancellationRequested();
             context.Reporter.ReportStatus(
