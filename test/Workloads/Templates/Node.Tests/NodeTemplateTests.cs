@@ -74,6 +74,11 @@ public sealed class NodeTemplateTests : IAsyncLifetime
         }
 
         File.Exists(Path.Combine(output, "tsconfig.json")).Should().Be(isTypeScript);
+        if (isTypeScript)
+        {
+            File.ReadAllText(Path.Combine(output, "src", "NoFunctions.ts")).Should().Contain("export {};");
+        }
+
         File.Exists(Path.Combine(output, ".funcignore")).Should().BeTrue();
         File.Exists(Path.Combine(output, "src", "functions", $"HelloWorld.{extension}")).Should().Be(!noHttp);
 
