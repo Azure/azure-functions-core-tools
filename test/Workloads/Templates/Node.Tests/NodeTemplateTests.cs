@@ -71,6 +71,10 @@ public sealed class NodeTemplateTests : IAsyncLifetime
         {
             devDependencies.TryGetProperty("typescript", out _).Should().BeTrue();
             devDependencies.TryGetProperty("@types/node", out _).Should().BeTrue();
+            JsonElement scripts = root.GetProperty("scripts");
+            scripts.GetProperty("build").GetString().Should().Be("npm run clean && tsc");
+            scripts.GetProperty("clean").GetString().Should().Be("rimraf dist");
+            scripts.TryGetProperty("prestart", out _).Should().BeFalse();
         }
 
         File.Exists(Path.Combine(output, "tsconfig.json")).Should().Be(isTypeScript);

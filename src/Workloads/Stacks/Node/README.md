@@ -20,6 +20,13 @@ and timer trigger templates under `content/templates`. The template engine can
 discover them through the workload's `templateRoot`. Migrating `func init` and
 `func new` to these templates is separate work.
 
+## Template testing
+
+From the repository root, run `node --test test/Workloads/Templates/Node.Tests/NodeTemplateBuild.test.mjs`
+to check TypeScript project rebuilds. The test requires the .NET SDK, Node.js,
+and npm. To reuse an existing installation of the project dependencies, set
+`NODE_TEMPLATE_TEST_NODE_MODULES` to its `node_modules` directory.
+
 ## Links
 
 - [Azure Functions CLI](https://github.com/Azure/azure-functions-core-tools)
