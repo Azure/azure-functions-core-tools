@@ -1,6 +1,6 @@
 # FunctionsProject
 
-This Azure Functions project requires Go 1.24 or later. Run `func start` to
+This Azure Functions project requires Go 1.25 or later. Run `func start` to
 build and run it. Run `go mod tidy` after changing its imports or dependencies.
 Timer functions need Azurite or an Azure Storage connection configured in
 `local.settings.json`.

@@ -65,7 +65,7 @@ public sealed class GoTemplateTests : IAsyncLifetime
         result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
         string output = result.OutputBaseDirectory!;
         File.ReadAllText(Path.Combine(output, "go.mod")).Should().ContainAll(
-            $"module {expectedModule}", "go 1.24.0", "github.com/azure/azure-functions-golang-worker v1.0.3");
+            $"module {expectedModule}", "go 1.25.0", "github.com/azure/azure-functions-golang-worker v1.0.3");
         File.ReadAllText(Path.Combine(output, "go.sum")).Should().Contain("github.com/azure/azure-functions-golang-worker v1.0.3 h1:");
         File.ReadAllText(Path.Combine(output, "main.go")).Should().ContainAll("var app = sdk.FunctionApp()", "worker.Start(app)");
         File.ReadAllText(Path.Combine(output, "README.md")).Should().Contain("Sample.App");
