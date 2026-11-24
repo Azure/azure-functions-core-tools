@@ -12,11 +12,11 @@ The first slice is .NET 10 isolated and C#, with the project, HTTP trigger, and 
 
 ## Current foundation
 
-The current code provides a command-scoped `Templater` using the persistent CLI template hive under `<CLI home>/templates`. `Templater.ListAsync` returns installed templates in a `TemplateResolutionResult`. Each `FuncTemplateInfo` forwards the engine metadata, keeps the original `ITemplateInfo`, and exposes parsed `func.host.json` metadata through `HostData`.
+The current code provides a command-scoped `Templater` using the persistent CLI template hive under `<CLI home>/templates`. `Templater.ListAsync` returns installed templates in a `TemplateResolutionResult`; `ListProjectTemplatesAsync` uses native type and language filters, and `FuncTemplateInfo.InstantiateAsync` delegates to `TemplateCreator`. Each `FuncTemplateInfo` forwards the engine metadata, keeps the original `ITemplateInfo`, and exposes parsed `func.host.json` metadata through `HostData`.
 
 Host metadata uses the dotnet host JSON shape: `symbolInfo` supplies parameter aliases and presentation flags, with `usageExamples` and template-level `isHidden` alongside it. `HostData.SymbolInfo` exposes a read-only dictionary of `FuncTemplateSymbol` values keyed by symbol name. Loading prefers the engine's cached `ITemplateInfoHostJsonCache.HostData` content and falls back to the selected `HostConfigPlace` through the engine mount when cached content is unavailable. An absent configuration yields empty metadata; malformed metadata or an unreadable declared file fails explicitly.
 
-Neither `func init` nor `func new` uses this discovery API yet. A workload can declare a `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, and a workload template package provider exposes active runtime workloads' roots without installing them in the CLI hive. The current foundation does not apply host parameter mappings to CLI options, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The rest of this document describes proposed work beyond discovery.
+`func init` uses this discovery API for template-driven project initialization. It filters project candidates by language, selects the unique `func-{stack}` short name, binds host aliases to native parameter definitions, dry-runs validation, and instantiates the result. With no candidates, it falls back to the existing Stack initializer; when candidates exist without a unique default, it fails rather than silently falling back. `func new` does not use this API yet. A workload can declare a `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, and a workload template package provider exposes active runtime workloads' roots without installing them in the CLI hive. The current foundation does not evaluate Functions-specific constraints, verify selected-content integrity, render privately, or provide the guarded publication described below. The rest of this document describes proposed work beyond the current `func init` integration.
 
 <a id="end-to-end-proof"></a>
 
@@ -46,13 +46,13 @@ The proposed command-facing flow is:
 | Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Keep engine resources within the command-scoped templater. |
 | Content producers and workload installation | Build and package templates. A workload declares an optional `templateRoot`; installation persists it and extracts the package payload. The engine reads each active workload's root in place, so install, update and uninstall need no template registration step. |
 
-The proposed CLI flow captures the command, project, and bundle context once. The current `Templater` accepts a context and passes it and the DI-registered engine components to the func host. Its `ListAsync` method lists installed templates. Parameter evaluation and invocation are not implemented yet.
+The CLI flow captures command and project context for `func init`. The current `Templater` accepts a context and passes it and the DI-registered engine components to the func host. Template-driven project initialization uses package-manager filtering and `TemplateCreator` dry-run/instantiation; it does not introduce catalog, group, or resolved-template types.
 
 `FuncTemplateInfo` keeps the original engine template available as `Template` and forwards its metadata, including `HostConfigPlace`. Its factory parses host configuration before construction, and the read-only `HostData` remains usable without an open mount. `TemplateResolutionResult` currently holds the discovered candidates; it does not group or select them. Catalogs, groups, and resolved templates remain design concepts for later work, not current types.
 
 For later selection, the proposed design calls for immutable catalog and group views and one canonical representation of parameter metadata. Only an exact selection issued by the `Templater` should be invoked. Selections from another command scope, or selections that are stale or disposed, must fail.
 
-Template invocation and its temporary rendering resources are not implemented. Define their ownership when invocation is added.
+Template invocation is implemented for template-driven project initialization through `TemplateCreator`. It does not yet render to a private staging area or provide the broader selected-content and filesystem publication guarantees proposed below.
 
 These are responsibilities and useful object-model concepts, not a requirement to introduce a public class or interface for each row. Reuse existing types where they fit. The proposed group, resolution, request, and result shapes inform the command-facing API; their exact signatures still need agreement against concrete command calls.
 
@@ -60,7 +60,7 @@ These are responsibilities and useful object-model concepts, not a requirement t
 
 ## Installed sources, hive, and cache
 
-`Templater.ListAsync` currently lists the templates found in the roots that active workloads declare, plus any packages installed in the isolated CLI hive. The API does not provide template registration or installation, and no CLI command uses it yet.
+`Templater.ListAsync` currently lists the templates found in the roots that active workloads declare, plus any packages installed in the isolated CLI hive. The API does not provide template registration or installation. `func init` uses the filtered project-template API; `func new` does not use it yet.
 
 `TemplaterFactory` uses `<CLI home>/templates` for `EngineEnvironmentSettings`. Microsoft.TemplateEngine stores `templatecache.json` under its host-version settings directory inside that hive. Its managed provider also keeps installed-package state in the hive. Workload payloads remain in the workload store; exposing them through a read-only provider still uses the same engine and hive. There is no second CLI-owned template inventory or cache.
 
@@ -85,7 +85,7 @@ The workload provider does not watch for mutations during an existing command. I
 | --- | --- |
 | Workload acquisition, extraction, ownership, active-version selection, and declared roots | CLI workload infrastructure |
 | Mount folders/archives, find template definitions, parse native template metadata, build/reuse the local cache, and normalize duplicate identities | Microsoft.TemplateEngine |
-| Native filtering, parameter evaluation, and instantiation APIs | Microsoft.TemplateEngine; command integration is still pending |
+| Native filtering, parameter evaluation, and instantiation APIs | Microsoft.TemplateEngine; `func init` uses them, and `func new` integration is pending |
 | Project/Stack context, supported command behavior, prompts, errors, destination permissions, and explicitly supported follow-up work | CLI commands and services |
 | Future standalone NuGet template acquisition, managed-package state, update/uninstall, and archive mounting | Microsoft.TemplateEngine's managed provider, called by future CLI management commands |
 | Functions-specific raw constraint validation and eligibility | Separate constraints increment; not implemented |
@@ -117,7 +117,7 @@ The historical source analysis above used Microsoft.TemplateEngine **10.0.301**:
 
 ## Selection and parameters
 
-Selection and parameter evaluation are not implemented. The proposed design allows a template to be selected by an explicit identifier or through an interactive choice. Selection must preserve the user's choice:
+General template selection and parameter evaluation remain future work. Template-driven project initialization selects a unique `func-{stack}` default and binds `func.host.json` aliases against the selected template's native parameter definitions. The broader design allows templates to be selected by explicit identifier or interactive choice; selection must preserve the user's choice:
 
 - A full template ID identifies one specific candidate. If that candidate is unavailable or incompatible, report the problem; never substitute a related variant.
 - Short names and aliases may identify groups of related templates. Ambiguity must be resolved explicitly, not by an arbitrary first match.
@@ -182,14 +182,24 @@ See [workload authoring](../building-a-workload.md#template-post-actions) for re
 
 ## `func init`
 
-`func init` currently uses the existing Stack initializers, not this Template Engine. Existing initializers continue to serve unmigrated Stacks until template-based replacements pass qualification.
+`func init` uses the Template Engine when applicable project templates are discovered. The existing Stack initializer continues to serve when no applicable template exists. `InitCommand` parses and routes the request; `NewInitCommand` owns template creation and the adoption and repair of existing projects; `LegacyInitCommand` owns the existing Stack scaffolding. Initialization fails when candidates exist but no unique `func-{stack}` default is available.
+
+The transitional grammar is `func init <path> [template options]`: an explicit path precedes template and Stack options, based on the original token order. A path after any such option is rejected, whether the option is template-only, Stack-registered, Boolean, or value-taking.
+
+Public parsing is route-neutral for Stack-contributed syntax. Stack options appear in help, but their typed validation runs only on the route that consumes them, so a Stack option cannot reject syntax that the selected template authors differently:
+
+- The template route binds every alias the selected template authors in `func.host.json` according to that template's native parameter definitions, including spellings a Stack also registers. Stack-only aliases the template does not author, and a native parameter assigned more than once, are rejected.
+- The existing Stack route parses the same tokens against the Stack's typed options before any change.
+- Adoption and repair create no project content; they reject template and Stack options, including registered Stack options, before prompting or writing.
+
+On the template route, creation proceeds in this order: native Template Engine creation, the `.func/config.json` write attempt, Stack setup through `IProjectInitializer.ConfigureProjectAsync`, a cancellation check, the reserved post-action seam, then success. The existing configuration writer can warn and continue after an I/O failure, so a successful exit does not yet guarantee that the configuration was persisted. Cancellation after creation does not remove created files or fall back to Stack scaffolding.
 
 The proposed template-based path for creating a project for a selected Stack and language is:
 
 1. Parse the existing `func init` options and inspect the destination.
 2. Preserve existing project adoption and configuration-repair behavior without running a project template.
 3. For new scaffolding, resolve the Stack, language, and contributed options before any destructive change.
-4. Find the appropriate installed project template; validate eligibility, parameters, and selected content.
+4. Find the default installed project template; validate parameters and selected content.
 5. Render privately and combine the output with required Stack and CLI configuration.
 6. Validate the complete intended project and authorized file effects, then publish files and persist required configuration last.
 7. Report actual changes and failures, including any partial effects.
@@ -198,7 +208,7 @@ Without `--force`, an occupied directory that is **not** already a Functions pro
 
 Diagnose readable malformed CLI configuration without force. Explicit force may authorize regeneration only after the remaining validation succeeds. Unreadable or unsafe configuration is not treated as replaceable malformed content, and force does not bypass that distinction.
 
-`--force` authorizes only the specified operation after validation and the existing confirmation policy. Protect both `.git` directories and `.git` pointer files. A failed required configuration write must return failure rather than report success.
+`--force` authorizes only the specified operation after validation and the existing confirmation policy. Protect both `.git` directories and `.git` pointer files. A failed required configuration write must return failure rather than report success. Current `--force` cleanup preserves a `.git` directory but deletes a `.git` pointer file, so it is not yet safe for Git worktrees.
 
 ## `func new`
 
@@ -247,7 +257,7 @@ Workload templates require no CLI-hive installation or removal step. Install, up
 
 A package can have several owners. Removing or updating one owner must not delete the payload while another owner retains it; final-owner removal allows the physical package and its templates to be removed together. Retention and discovery are separate: only the highest RID-compatible runtime version of each package ID is selected for loading, and only successfully loaded workloads contribute roots. Older versions retained for rollback do not contribute templates while inactive.
 
-In the proposed flow, `func init` and `func new` create a `Templater` and use these roots without registering content themselves. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
+`func init` creates a `Templater` and uses these roots without registering content itself; `func new` is intended to do the same. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
 
 `templateRoot` is optional, and workloads installed before it was persisted do not expose templates until they are reinstalled or updated. A declared root whose directory is missing is currently skipped silently. The planned integration should report that the templates are unavailable and explain how to repair the workload; it should not show an empty list as success. Discovery should not scan arbitrary folders or download content.
 
