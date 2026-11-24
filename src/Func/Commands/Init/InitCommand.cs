@@ -23,6 +23,13 @@ namespace Azure.Functions.Cli.Commands;
 /// (e.g. dotnet's <c>--target-framework</c>).
 /// </summary>
 /// <remarks>
+/// <para>
+/// Parsing is route-neutral: the command line is parsed only for the built-in init options and the
+/// project path. Tokens after them are interpreted by the selected route: the template flow binds them
+/// against the selected template, and the legacy flow parses them against the typed stack options. The
+/// project path is therefore given before template and stack options: <c>func init &lt;path&gt; [options]</c>.
+/// </para>
+/// <para>
 /// When the target directory already contains a <c>host.json</c> but no
 /// <c>.func/config.json</c>, the command "adopts" the project: it writes
 /// the CLI config and skips scaffolding. The stack is taken from
@@ -35,6 +42,8 @@ namespace Azure.Functions.Cli.Commands;
 /// on a multi-language stack, the command "heals" it: it detects the
 /// language via the project resolver and merges the missing key in,
 /// preserving every other key in the file. <c>--force</c> still wipes.
+/// Adoption and healing are owned by <see cref="NewInitCommand"/>.
+/// </para>
 /// </remarks>
 internal class InitCommand : TemplateCommand, IBuiltInCommand
 {
@@ -52,11 +61,13 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
 
     public Option<bool> ForceOption { get; } = new("--force")
     {
-        Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
+        Description = "Re-initialize the directory: deletes its contents (except a .git directory) before scaffolding the new project."
     };
 
+    // Stack options are kept off this command so their typed validation cannot reject a template invocation before
+    // routing; only the routes that consume them parse against this command.
+    private readonly Command _stackOptionsCommand = new("init");
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
-    private readonly IReadOnlyList<Option> _stackSpecificOptions;
     private readonly InitWorkflow _workflow;
     private readonly NewInitCommand _newInit;
     private readonly LegacyInitCommand _legacyInit;
@@ -98,23 +109,23 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
 
         // The registry shares canonical instances across workloads; help uses
         // their ownership to distinguish shared options from stack-specific ones.
-        var registry = new InitOptionRegistry(this);
-        List<Option> stackSpecificOptions = [];
+        var registry = new InitOptionRegistry(_stackOptionsCommand);
         foreach (IProjectInitializer initializer in _initializers)
         {
             registry.SetActiveStack(initializer.Stack);
             IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
-            stackSpecificOptions.AddRange(options);
             // Bundle options stay general even when only one bundle-using stack is installed.
             RegisterStackOptionHelp(initializer.Stack, initializer.DisplayName,
                 options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
                     && option.Name != CommonInitOptions.BundlesChannelOptionName));
         }
-        _stackSpecificOptions = stackSpecificOptions.Distinct().ToList();
     }
 
     protected override string HelpFooterHint =>
+        "Specify the project path before template or stack options: `func init <path> [template options]`. " +
         "Looking for more stacks? Run `func workload search --stack` to list installable stack workloads.";
+
+    internal override IEnumerable<Option> GetHelpOptions() => Options.Concat(_stackOptionsCommand.Options);
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
@@ -204,16 +215,14 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         }
 
         return new InitRequest(
-            parseResult,
             parseResult.GetValue(PathArgument!)!,
             parseResult.GetValue(NameOption),
             parseResult.GetValue(StackOption),
             language,
             parseResult.GetValue(ForceOption),
-            _stackSpecificOptions,
-            GetReservedOptions(_stackSpecificOptions),
-            GetTemplateTokens(parseResult, []),
-            GetTemplateTokens(parseResult, _stackSpecificOptions));
+            _stackOptionsCommand,
+            GetReservedOptions([]),
+            GetTemplateTokens(parseResult, []));
     }
 
     // Builds the help text for `--stack`. Stacks come from installed

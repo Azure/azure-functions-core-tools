@@ -48,11 +48,12 @@ internal sealed class Templater : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
-        return new([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
+        return new TemplateResolutionResult([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
     }
 
     /// <summary>
-    /// Lists project templates for <paramref name="language"/> using the engine's package-manager filters.
+    /// Lists project templates for <paramref name="language"/> using the engine's package-manager filters, keeping
+    /// the engine's match details for each candidate.
     /// </summary>
     public async Task<TemplateResolutionResult> ListProjectTemplatesAsync(string language, CancellationToken cancellationToken = default)
     {
@@ -66,7 +67,8 @@ internal sealed class Templater : IDisposable
                 WellKnownSearchFilters.LanguageFilter(language)
             ],
             cancellationToken);
-        return new([.. matches.Select(match => FuncTemplateInfo.Create(match.Info, _settings))]);
+        return new TemplateResolutionResult(
+            [.. matches.Select(match => (FuncTemplateInfo.Create(match.Info, _settings), match))]);
     }
 
     public void Dispose()

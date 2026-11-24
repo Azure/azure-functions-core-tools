@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.CommandLine;
+using Azure.Functions.Cli.Commands.Templating;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Init;
@@ -26,9 +28,24 @@ internal sealed class LegacyInitCommand(InitWorkflow workflow)
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(initializer);
 
-        if (request.UnmatchedTokens.Count > 0)
+        // Stack options are typed only on this route, so their validation cannot reject a template invocation.
+        ParseResult stackParse = request.StackOptionsCommand.Parse(
+            ["init", .. request.UnmatchedTokens], TemplateCommand.TokenParserConfiguration);
+        if (TemplateCommand.GetInvalidBooleanValueError(stackParse) is { } invalidBooleanValue)
         {
-            return _workflow.RejectUnmatchedTokens(request.UnmatchedTokens);
+            _workflow.Interaction.WriteError(invalidBooleanValue);
+            return 1;
+        }
+
+        if (stackParse.UnmatchedTokens.Count > 0)
+        {
+            return _workflow.RejectUnmatchedTokens(stackParse.UnmatchedTokens);
+        }
+
+        if (stackParse.Errors.Count > 0)
+        {
+            _workflow.Interaction.WriteError(stackParse.Errors[0].Message);
+            return 1;
         }
 
         var context = new InitContext(request.WorkingDirectory, request.ProjectName, language, request.Force);
@@ -45,7 +62,7 @@ internal sealed class LegacyInitCommand(InitWorkflow workflow)
             request.Force);
         _workflow.Interaction.WriteBlankLine();
 
-        await initializer.InitializeAsync(context, request.ParseResult, cancellationToken);
+        await initializer.InitializeAsync(context, stackParse, cancellationToken);
 
         return await _workflow.ReportInitializedAsync(request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
     }

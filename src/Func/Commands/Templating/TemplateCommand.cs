@@ -22,6 +22,12 @@ internal abstract class TemplateCommand : FuncCliCommand
     }
 
     /// <summary>
+    /// Parser configuration for re-parsing tokens this command's parse already produced. Response files were expanded
+    /// by that parse and are not expanded again.
+    /// </summary>
+    protected internal static ParserConfiguration TokenParserConfiguration { get; } = new() { ResponseFileTokenReplacer = null };
+
+    /// <summary>
     /// Returns, in command-line order, the tokens after this command that were not consumed by its options, its
     /// arguments, or inherited recursive options.
     /// </summary>
@@ -36,6 +42,47 @@ internal abstract class TemplateCommand : FuncCliCommand
         ArgumentNullException.ThrowIfNull(parseResult);
         ArgumentNullException.ThrowIfNull(passThroughOptions);
 
+        return [.. GetUnconsumedTokenIndexes(parseResult, passThroughOptions).Select(index => parseResult.Tokens[index].Value)];
+    }
+
+    /// <summary>
+    /// Returns a diagnostic when the first token the parse left unconsumed is a value System.CommandLine rejected for
+    /// the Boolean option immediately before it, such as <c>--flag=value</c>; otherwise <see langword="null"/>.
+    /// </summary>
+    /// <param name="parseResult">The parse result for a command whose options include the Boolean option.</param>
+    protected internal static string? GetInvalidBooleanValueError(ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(parseResult);
+
+        // A Boolean option consumes the following argument token only when it parses as a Boolean, so a rejected
+        // value is the first unconsumed token and directly follows the option's identifier token.
+        int index = GetUnconsumedTokenIndexes(parseResult, []).FirstOrDefault(-1);
+        if (index <= 0)
+        {
+            return null;
+        }
+
+        Token value = parseResult.Tokens[index];
+        Token previous = parseResult.Tokens[index - 1];
+        if (value.Type != TokenType.Argument || value.Value.StartsWith('-') || previous.Type != TokenType.Option)
+        {
+            return null;
+        }
+
+        bool isBooleanOption = parseResult.CommandResult.Command.Options.Any(option =>
+            option.ValueType == typeof(bool)
+            && (string.Equals(option.Name, previous.Value, StringComparison.Ordinal) || option.Aliases.Contains(previous.Value)));
+        return isBooleanOption
+            ? $"Invalid value '{value.Value}' for option '{previous.Value}'. Expected 'true' or 'false'."
+            : null;
+    }
+
+    // Indexes into ParseResult.Tokens, in command-line order, of the tokens after this command that no option,
+    // argument, or inherited recursive option consumed.
+    private static IEnumerable<int> GetUnconsumedTokenIndexes(
+        ParseResult parseResult,
+        IReadOnlyCollection<Option> passThroughOptions)
+    {
         HashSet<Token> consumed = [with(ReferenceEqualityComparer.Instance)];
         foreach (SymbolResult child in parseResult.CommandResult.Children)
         {
@@ -75,11 +122,10 @@ internal abstract class TemplateCommand : FuncCliCommand
 
         // Repeated identifiers of a non-template option are recorded once as the identifier token, so later
         // occurrences are excluded by option name.
-        return [.. parseResult.Tokens
-            .Skip(commandTokenIndex + 1)
-            .Where(token => !consumed.Contains(token)
-                && !(token.Type == TokenType.Option && consumedOptionNames.Contains(token.Value)))
-            .Select(token => token.Value)];
+        return Enumerable.Range(commandTokenIndex + 1, parseResult.Tokens.Count - commandTokenIndex - 1)
+            .Where(index => parseResult.Tokens[index] is var token
+                && !consumed.Contains(token)
+                && !(token.Type == TokenType.Option && consumedOptionNames.Contains(token.Value)));
     }
 
     /// <summary>

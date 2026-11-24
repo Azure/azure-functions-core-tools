@@ -162,7 +162,17 @@ Render into command-scoped private temporary output within defined asset and exp
 
 ## `func init`
 
-`func init` uses the Template Engine when applicable project templates are discovered. The existing Stack initializer continues to serve when no applicable template exists, and `InitCommand` keeps adoption and repair. Initialization fails when candidates exist but no unique `func-{stack}` default is available.
+`func init` uses the Template Engine when applicable project templates are discovered. The existing Stack initializer continues to serve when no applicable template exists. `InitCommand` parses and routes the request; `NewInitCommand` owns template creation and the adoption and repair of existing projects; `LegacyInitCommand` owns the existing Stack scaffolding. Initialization fails when candidates exist but no unique `func-{stack}` default is available.
+
+The transitional grammar is `func init <path> [template options]`: an explicit path precedes template and Stack options, based on the original token order. A path after any such option is rejected, whether the option is template-only, Stack-registered, Boolean, or value-taking.
+
+Public parsing is route-neutral for Stack-contributed syntax. Stack options appear in help, but their typed validation runs only on the route that consumes them, so a Stack option cannot reject syntax that the selected template authors differently:
+
+- The template route binds every alias the selected template authors in `func.host.json` according to that template's native parameter definitions, including spellings a Stack also registers. Stack-only aliases the template does not author, and a native parameter assigned more than once, are rejected.
+- The existing Stack route parses the same tokens against the Stack's typed options before any change.
+- Adoption and repair create no project content; they reject template and Stack options, including registered Stack options, before prompting or writing.
+
+On the template route, creation proceeds in this order: native Template Engine creation, the `.func/config.json` write attempt, Stack setup through `IProjectInitializer.ConfigureProjectAsync`, a cancellation check, the reserved post-action seam, then success. The existing configuration writer can warn and continue after an I/O failure, so a successful exit does not yet guarantee that the configuration was persisted. Cancellation after creation does not remove created files or fall back to Stack scaffolding.
 
 The proposed template-based path for creating a project for a selected Stack and language is:
 
@@ -178,7 +188,7 @@ Without `--force`, an occupied directory that is **not** already a Functions pro
 
 Diagnose readable malformed CLI configuration without force. Explicit force may authorize regeneration only after the remaining validation succeeds. Unreadable or unsafe configuration is not treated as replaceable malformed content, and force does not bypass that distinction.
 
-`--force` authorizes only the specified operation after validation and the existing confirmation policy. Protect both `.git` directories and `.git` pointer files. A failed required configuration write must return failure rather than report success.
+`--force` authorizes only the specified operation after validation and the existing confirmation policy. Protect both `.git` directories and `.git` pointer files. A failed required configuration write must return failure rather than report success. Current `--force` cleanup preserves a `.git` directory but deletes a `.git` pointer file, so it is not yet safe for Git worktrees.
 
 ## `func new`
 

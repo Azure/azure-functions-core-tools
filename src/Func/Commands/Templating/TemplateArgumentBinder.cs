@@ -24,6 +24,10 @@ internal static class TemplateArgumentBinder
     /// <param name="template">The selected template.</param>
     /// <param name="tokens">Tokens left for the template, in command-line order.</param>
     /// <param name="reservedOptions">Options owned by the command that the template may not redefine.</param>
+    /// <param name="unrecognizedTokens">
+    /// The tokens no template option consumed, in command-line order. When any remain, nothing is bound and the
+    /// caller reports them.
+    /// </param>
     /// <returns>Native parameter values keyed by parameter name.</returns>
     /// <exception cref="InvalidOperationException">
     /// The template authors conflicting option names, or <paramref name="tokens"/> cannot be bound.
@@ -31,7 +35,8 @@ internal static class TemplateArgumentBinder
     public static IReadOnlyDictionary<string, string> Bind(
         FuncTemplateInfo template,
         IReadOnlyList<string> tokens,
-        IReadOnlyList<Option> reservedOptions)
+        IReadOnlyList<Option> reservedOptions,
+        out IReadOnlyList<string> unrecognizedTokens)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(tokens);
@@ -83,13 +88,16 @@ internal static class TemplateArgumentBinder
             parametersByOption.Add(option, parameter);
         }
 
-        ParseResult parseResult = command.Parse(["template", .. tokens]);
-        if (parseResult.UnmatchedTokens.Count > 0)
+        ParseResult parseResult = command.Parse(["template", .. tokens], TemplateCommand.TokenParserConfiguration);
+        if (TemplateCommand.GetInvalidBooleanValueError(parseResult) is { } invalidBooleanValue)
         {
-            string token = tokens.First(value => parseResult.UnmatchedTokens.Contains(value));
-            throw new InvalidOperationException(token.StartsWith('-')
-                ? $"Unrecognized option '{token}'."
-                : $"Unrecognized argument '{token}'. Specify the project path before template options.");
+            throw new InvalidOperationException(invalidBooleanValue);
+        }
+
+        unrecognizedTokens = [.. parseResult.UnmatchedTokens];
+        if (unrecognizedTokens.Count > 0)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         foreach (Option option in parametersByOption.Keys)

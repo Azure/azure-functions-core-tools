@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands.Templating;
 using Azure.Functions.Cli.Projects;
@@ -15,8 +17,9 @@ namespace Azure.Functions.Cli.Commands.Init;
 /// and adopts or completes existing projects.
 /// </summary>
 /// <remarks>
-/// Project content is owned by the template. The selected stack contributes only non-scaffolding setup through
-/// <see cref="IProjectInitializer.ConfigureProjectAsync"/>, and stack init options play no role in this flow.
+/// Project content is owned by the template, which also owns the meaning of every option after the project path. The
+/// selected stack contributes only non-scaffolding setup through <see cref="IProjectInitializer.ConfigureProjectAsync"/>,
+/// and stack init options are never parsed in this flow.
 /// </remarks>
 internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory templaterFactory)
 {
@@ -43,7 +46,7 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
 
         // No template or stack scaffolding runs for an existing project, so options only they consume are rejected
         // before any prompt or write.
-        if (request.TemplateTokens.Count > 0)
+        if (request.UnmatchedTokens.Count > 0)
         {
             return RejectExistingProjectTokens(request);
         }
@@ -214,7 +217,12 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
         IReadOnlyDictionary<string, string> parameters;
         try
         {
-            parameters = TemplateArgumentBinder.Bind(template, request.TemplateTokens, request.ReservedOptions);
+            parameters = TemplateArgumentBinder.Bind(
+                template, request.UnmatchedTokens, request.ReservedOptions, out IReadOnlyList<string> unrecognizedTokens);
+            if (unrecognizedTokens.Count > 0)
+            {
+                return _workflow.RejectUnmatchedTokens(unrecognizedTokens);
+            }
         }
         catch (InvalidOperationException ex)
         {
@@ -255,6 +263,9 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
 
         await initializer.ConfigureProjectAsync(context, cancellationToken);
 
+        // Stack setup may observe cancellation and return normally; a cancelled init never reports success.
+        cancellationToken.ThrowIfCancellationRequested();
+
         // POST-ACTION INTEGRATION DEFERRED TO #5963: template post-actions run here, after stack setup and before
         // success is reported.
 
@@ -264,16 +275,18 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
 
     private int RejectExistingProjectTokens(InitRequest request)
     {
-        string token = request.TemplateTokens[0];
-        bool isStackOption = request.StackOptions.Any(option =>
-            string.Equals(option.Name, token, StringComparison.Ordinal) || option.Aliases.Contains(token));
-        if (!isStackOption)
+        // Parse against the stack options only to name a stack option, including its inline '--option=value' form;
+        // nothing is bound for an existing project.
+        ParseResult stackParse = request.StackOptionsCommand.Parse(
+            ["init", .. request.UnmatchedTokens], TemplateCommand.TokenParserConfiguration);
+        Token? first = stackParse.Tokens.SkipWhile(token => token.Type == TokenType.Command).FirstOrDefault();
+        if (first?.Type != TokenType.Option)
         {
-            return _workflow.RejectUnmatchedTokens(request.TemplateTokens);
+            return _workflow.RejectUnmatchedTokens(request.UnmatchedTokens);
         }
 
         _workflow.Interaction.WriteError(
-            $"Option '{token}' is not supported for an existing project because no project content is created. " +
+            $"Option '{first.Value}' is not supported for an existing project because no project content is created. " +
             "Remove it, or pass --force to re-initialize.");
         return 1;
     }

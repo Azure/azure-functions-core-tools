@@ -313,7 +313,7 @@ internal sealed class InitWorkflow
         string token = unmatchedTokens[0];
         _interaction.WriteError(token.StartsWith('-')
             ? $"Unrecognized option '{token}'."
-            : $"Unrecognized argument '{token}'. Specify the project path before template options.");
+            : $"Unrecognized argument '{token}'. Specify the project path before template or stack options.");
         return 1;
     }
 
@@ -456,15 +456,15 @@ internal sealed class InitWorkflow
         }
 
         _interaction.WriteWarning(
-            $"--force will delete all files in '{workingDirectory.FullName}' (except .git) before initializing.");
+            $"--force will delete all files in '{workingDirectory.FullName}' (except a .git directory) before initializing.");
 
         return await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken);
     }
 
     // Wipes everything in the working directory before a --force re-init so
     // leftover files from the prior stack (node_modules, requirements.txt,
-    // etc.) don't pollute the new project. Preserves .git so the user
-    // doesn't lose history.
+    // etc.) don't pollute the new project. Preserves a .git directory so the
+    // user doesn't lose history; a .git pointer file (worktree) is not preserved.
     private static void ClearDirectory(DirectoryInfo workingDirectory)
     {
         DirectoryGuard.ClearExceptGit(workingDirectory);
