@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -29,7 +28,6 @@ public sealed class DotNetWorkload : Workload
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<DotNetProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
-        builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();
         builder.AddProjectFactory<DotNetProjectFactory>();
     }
 }

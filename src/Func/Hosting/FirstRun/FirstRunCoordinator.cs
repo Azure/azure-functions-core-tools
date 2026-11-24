@@ -174,7 +174,7 @@ internal sealed class FirstRunCoordinator(
         // After a successful setup we always short-circuit the user's original
         // command. The workload loader snapshots templates/bundles/host metadata
         // at host build time, so anything the user typed (init, run,
-        // start, quickstart, ...) is operating against the pre-install view
+        // start, ...) is operating against the pre-install view
         // and would either fail outright ("no project here") or silently use
         // stale metadata. Asking them to re-run is the only safe answer until
         // we add an in-process reload.

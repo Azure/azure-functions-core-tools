@@ -65,9 +65,6 @@ func
 │   ├── list [path]       List available profiles
 │   ├── show <name> [path]  Show profile details
 │   └── set <name> [path]   Set the project default profile
-├── quickstart [path]     Scaffold a project from a CDN-hosted template
-│   ├── list [path]       List available quickstart templates
-│   └── info <id> [path]  Show details for a quickstart template
 ├── workload
 │   └── list              List installed workloads
 ├── version (hidden)      Print version info
@@ -233,7 +230,7 @@ interaction.WriteLine(l => l
 
 `RunWithProgressAsync` exposes an `IProgressContext` to the action, which long-running operations can use to update the description, set/report numeric progress, or increment. The Spectre implementation renders a live progress bar; in non-interactive mode each description change is written as a separate line so logs remain readable.
 
-Confirmation prompts use stdout input and do not require ANSI or stderr capabilities. Init and quickstart use an interactive default of No and an unavailable-input fallback of Yes only for explicit `--force` operations. Cancellation and input errors propagate rather than approving the operation.
+Confirmation prompts use stdout input and do not require ANSI or stderr capabilities. Init uses an interactive default of No and an unavailable-input fallback of Yes only for explicit `--force` operations. Cancellation and input errors propagate rather than approving the operation.
 
 ### `IsInteractive` Property
 
@@ -355,7 +352,7 @@ The telemetry instrumentation key is injected at build time via `eng/build/Telem
 
 ## CLI Home Directory
 
-The CLI persists configuration, profiles, caches, the version-check stamp, the quickstart manifest cache, workloads, and the dotnet template hive under a single "func home" root. By default this is `~/.azure-functions/`.
+The CLI persists configuration, profiles, caches, the version-check stamp, workloads, and the dotnet template hive under a single "func home" root. By default this is `~/.azure-functions/`.
 
 - **Override**: set `FUNC_CLI_HOME` to an absolute path to relocate the entire home (handy for sandboxed CI, devcontainers, or per-user installs that can't write the user profile).
 - The env var is read directly (not via `IConfiguration`) so host config, global config, or project `.func/config.json` can't redirect it.
@@ -376,23 +373,6 @@ If a newer version is found, a notice is printed after the command completes.
 ## HTTP Client Defaults
 
 `HttpClientDefaults.AddCliHttpDefaults()` applies a `User-Agent` header (`AzureFunctionsCli/{version} ({os})`) to every `IHttpClientFactory` client. Individual features configure their own timeouts per-client.
-
-## Quickstart Manifest
-
-`func quickstart` scaffolds a project from a CDN-hosted template manifest.
-
-```text
-1. IQuickstartManifestService.GetManifestAsync()
-   ├── Fresh cache (< 24h) → return cached manifest, skip network
-   ├── CDN fetch with ETag/If-None-Match → 200 (cache + return) or 304 (return cached)
-   └── Network failure → stale cache fallback (any age), or error if no cache
-2. QuickstartManifest.Filter(language, resource, iac, search) → filtered entries
-3. Command scaffolds selected template
-```
-
-- **Cache**: `~/.azure-functions/quickstart/` (manifest JSON + ETag metadata), 24h TTL
-- **Validation**: only `v`-prefixed gitRef entries; HTTPS URLs on `github.com` from trusted orgs
-- **Override**: `FUNC_CLI_QUICKSTART_MANIFEST_URL` env var replaces CDN URL
 
 ## Init and New Command Flow
 

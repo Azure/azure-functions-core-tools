@@ -13,7 +13,6 @@ using Azure.Functions.Cli.Console.Terminal;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Http;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Update;
@@ -132,12 +131,10 @@ internal static class CliHostFactory
         builder.Services.AddCliUpdate();
         builder.Services.AddBuiltInCommands();
         builder.Services.AddFirstRunExperience();
-        builder.Services.AddQuickstartScaffolder();
         builder.Services.AddWorkloadStorage();
         builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
-        builder.Services.AddQuickstartManifest();
         builder.Services.AddManagedAzurite();
         builder.Services.AddTemplating();
 
