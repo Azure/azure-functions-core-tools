@@ -44,9 +44,7 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         bool stdoutInput, bool stdoutAnsi, bool stderrInput, bool stderrAnsi, Response response)
     {
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns("python");
-        initializer.DisplayName.Returns("Python");
-        initializer.SupportedLanguages.Returns(["python"]);
+        initializer.Stack.Returns(new TestProjectStack("python", "Python", languages: [new("python", "Python")]));
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);

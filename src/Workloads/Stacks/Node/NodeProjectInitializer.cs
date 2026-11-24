@@ -20,21 +20,11 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
     private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
 
-    private readonly NodeProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     // Internal seam so tests can stub out the `npm install` invocation
     // without spawning real processes.
     internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpmInstall { get; set; } = DefaultRunNpmInstall;
-
-    public string Stack => _stack.Stack;
-
-    public string DisplayName => _stack.DisplayName;
-
-    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
-
-    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
@@ -65,16 +55,15 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
         ArgumentNullException.ThrowIfNull(parseResult);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (context.Language is { } language && !Stack.SupportedLanguages.Contains(language))
+        {
+            throw new ArgumentException($"Language '{language.LanguageIdentifier}' is not supported by this initializer.", nameof(context));
+        }
+
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
 
-        string language = NormalizeLanguage(context.Language);
-        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException($"Language '{context.Language}' is not supported. Supported languages: {string.Join(", ", SupportedLanguages)}.", nameof(context));
-        }
-
-        bool isTypeScript = string.Equals(language, "TypeScript", StringComparison.OrdinalIgnoreCase);
+        bool isTypeScript = context.Language == NodeProjectStack.TypeScript;
         bool noBundle = parseResult.GetValue(NoBundleOption);
         BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
         bool skipNpmInstall = parseResult.GetValue(SkipNpmInstallOption);
@@ -109,7 +98,7 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadTemplate(_assembly, "local.settings.json"),
+            ProjectFiles.ReadLocalSettingsTemplate(_assembly, Stack.Descriptor),
             force);
 
         Directory.CreateDirectory(Path.Combine(root, "src", "functions"));
@@ -197,28 +186,5 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
             // 'npm' may not be installed; the scaffolded files are still valid.
             return (-1, ex.Message);
         }
-    }
-
-    internal string NormalizeLanguage(string? language)
-    {
-        if (string.IsNullOrWhiteSpace(language))
-        {
-            return "JavaScript";
-        }
-
-        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in SupportedLanguageAliases)
-        {
-            if (string.Equals(entry.Key, language, StringComparison.OrdinalIgnoreCase))
-            {
-                return entry.Key;
-            }
-
-            if (entry.Value.Contains(language, StringComparer.OrdinalIgnoreCase))
-            {
-                return entry.Key;
-            }
-        }
-
-        return language;
     }
 }

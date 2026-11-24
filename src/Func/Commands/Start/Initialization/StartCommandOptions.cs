@@ -29,12 +29,12 @@ internal sealed record StartCommandOptions(
     double DemoSpeedMultiplier,
     bool DemoAutoExit,
     bool NoAzurite = false,
-    IReadOnlyDictionary<string, StartHostConfiguration>? StackHostConfigurations = null)
+    IReadOnlyDictionary<IProjectStack, StartHostConfiguration>? StackHostConfigurations = null)
 {
     /// <summary>
-    /// Host run adjustments contributed per stack by installed workloads, keyed by stack id.
+    /// Host run adjustments keyed by the owning installed stack.
     /// The entry matching the resolved project's stack is applied during host startup.
     /// </summary>
-    public IReadOnlyDictionary<string, StartHostConfiguration> StackHostConfigurations { get; init; }
-        = StackHostConfigurations ?? new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<IProjectStack, StartHostConfiguration> StackHostConfigurations { get; init; }
+        = StackHostConfigurations ?? new Dictionary<IProjectStack, StartHostConfiguration>(ReferenceEqualityComparer.Instance);
 }

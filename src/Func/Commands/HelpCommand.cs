@@ -6,6 +6,7 @@ using System.CommandLine.Help;
 using System.CommandLine.Parsing;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -150,14 +151,15 @@ internal class HelpCommand : FuncCliCommand
         WriteArgumentsSection(command);
         WriteSubcommandsSection(command);
 
-        IEnumerable<IGrouping<string?, Option>> optionGroups = command.Options
+        IEnumerable<IGrouping<StackDescriptor?, Option>> optionGroups = command.Options
             .Where(o => !o.Hidden && o is not HelpOption)
-            .GroupBy(o => (command as FuncCliCommand)?.GetOptionHelpHeading(o))
+            .GroupBy<Option, StackDescriptor?>(o => (command as FuncCliCommand)?.GetOptionHelpStack(o), ReferenceEqualityComparer.Instance)
             .OrderBy(group => group.Key is not null)
-            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
-        foreach (IGrouping<string?, Option> group in optionGroups)
+            .ThenBy(group => group.Key?.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(group => group.Key?.Identifier, StringComparer.OrdinalIgnoreCase);
+        foreach (IGrouping<StackDescriptor?, Option> group in optionGroups)
         {
-            WriteOptionsSection(group.Key ?? "Options", group);
+            WriteOptionsSection(group.Key?.DisplayName ?? "Options", group);
         }
     }
 

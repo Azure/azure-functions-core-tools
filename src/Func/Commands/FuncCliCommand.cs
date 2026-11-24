@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -19,7 +20,7 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal abstract class FuncCliCommand : Command
 {
-    private readonly Dictionary<Option, (string Stack, string Heading)?> _stackOptionHelp = [];
+    private readonly Dictionary<Option, StackDescriptor?> _stackOptionHelp = [];
 
     /// <summary>
     /// Strongly-typed path argument for commands that operate on a project
@@ -45,28 +46,27 @@ internal abstract class FuncCliCommand : Command
 
     internal string? GetHelpFooterHint() => HelpFooterHint;
 
-    internal string? GetOptionHelpHeading(Option option)
+    internal StackDescriptor? GetOptionHelpStack(Option option)
     {
         ArgumentNullException.ThrowIfNull(option);
-        return _stackOptionHelp.TryGetValue(option, out (string Stack, string Heading)? owner) ? owner?.Heading : null;
+        return _stackOptionHelp.GetValueOrDefault(option);
     }
 
     /// <summary>
     /// Associates canonical options with a stack heading, leaving options shared by multiple stacks ungrouped.
     /// </summary>
-    protected void RegisterStackOptionHelp(string stack, string displayName, IEnumerable<Option> options)
+    protected void RegisterStackOptionHelp(StackDescriptor descriptor, IEnumerable<Option> options)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
-        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentNullException.ThrowIfNull(options);
 
         foreach (Option option in options)
         {
-            if (!_stackOptionHelp.TryGetValue(option, out (string Stack, string Heading)? owner))
+            if (!_stackOptionHelp.TryGetValue(option, out StackDescriptor? owner))
             {
-                _stackOptionHelp.Add(option, (stack, displayName));
+                _stackOptionHelp.Add(option, descriptor);
             }
-            else if (owner is null || !string.Equals(owner.Value.Stack, stack, StringComparison.OrdinalIgnoreCase))
+            else if (!ReferenceEquals(owner, descriptor))
             {
                 _stackOptionHelp[option] = null;
             }

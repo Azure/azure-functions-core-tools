@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 using static Azure.Functions.Cli.Projects.ProjectCreationResults;
 
 namespace Azure.Functions.Cli.Workloads.Python;
@@ -10,9 +9,10 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// <summary>
 /// Creates Python Functions projects from Python-specific fingerprints.
 /// </summary>
-internal sealed class PythonProjectFactory : IFunctionsProjectFactory
+internal sealed class PythonProjectFactory(PythonProjectStack stack) : IFunctionsProjectFactory
 {
-    private static readonly FunctionsWorkerId _workerId = new("python");
+    private readonly PythonProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+
 
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
@@ -31,7 +31,7 @@ internal sealed class PythonProjectFactory : IFunctionsProjectFactory
             return Task.FromResult(NotCreated("no Python project fingerprint found"));
         }
 
-        FunctionsProject project = new PythonFunctionsProject(context.WorkingDirectory);
+        FunctionsProject project = new PythonFunctionsProject(context.WorkingDirectory, _stack);
         return Task.FromResult(Created(project, reason));
     }
 

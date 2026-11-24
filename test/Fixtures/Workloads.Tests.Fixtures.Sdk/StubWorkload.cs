@@ -15,10 +15,6 @@ namespace Azure.Functions.Cli.Workloads.Tests.Fixtures.Sdk;
 /// </summary>
 public sealed class StubWorkload : Workloads.Workload
 {
-    public override string DisplayName => "Stub (SDK-shaped)";
-
-    public override string Description => "SDK-convention test fixture workload.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
     }

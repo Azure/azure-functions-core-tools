@@ -10,8 +10,10 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// <summary>
 /// Creates PowerShell Functions projects from PowerShell-specific fingerprints.
 /// </summary>
-internal sealed class PowerShellProjectFactory : IFunctionsProjectFactory
+internal sealed class PowerShellProjectFactory(PowerShellProjectStack stack) : IFunctionsProjectFactory
 {
+    private readonly PowerShellProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -29,7 +31,7 @@ internal sealed class PowerShellProjectFactory : IFunctionsProjectFactory
             return Task.FromResult(NotCreated("no PowerShell project fingerprint found"));
         }
 
-        FunctionsProject project = new PowerShellFunctionsProject(context.WorkingDirectory);
+        FunctionsProject project = new PowerShellFunctionsProject(context.WorkingDirectory, _stack);
         return Task.FromResult(Created(project, reason));
     }
 

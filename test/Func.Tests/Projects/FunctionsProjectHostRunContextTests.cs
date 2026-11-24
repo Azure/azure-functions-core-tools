@@ -118,9 +118,7 @@ public sealed class FunctionsProjectHostRunContextTests
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override string StackName => "dotnet-isolated";
-
-        public override string StackDisplayName => ".NET";
+        public override IProjectStack Stack { get; } = new TestProjectStack("dotnet-isolated", ".NET");
 
         public override bool SupportsExtensionBundles => false;
 

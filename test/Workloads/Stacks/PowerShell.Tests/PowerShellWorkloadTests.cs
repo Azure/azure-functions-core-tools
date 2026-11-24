@@ -9,6 +9,8 @@ namespace Azure.Functions.Cli.Workloads.PowerShell.Tests;
 
 public class PowerShellWorkloadTests
 {
+    internal static PowerShellProjectStack Stack { get; } = new(new("powershell", "powershell", "PowerShell"));
+
     [Fact]
     public void Configure_RegistersProjectInitializer()
     {
@@ -16,24 +18,15 @@ public class PowerShellWorkloadTests
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
 
-        new PowerShellWorkload().Configure(builder);
+        new PowerShellWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        initializer.Should().BeOfType<PowerShellProjectInitializer>();
-        initializer.Stack.Should().Be("powershell");
-        initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
-
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
-        stack.Should().BeOfType<PowerShellProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<PowerShellProjectStack>());
-        stack.Should().NotBeAssignableTo<IProjectInitializer>();
-        stack.Stack.Should().Be(initializer.Stack);
-        stack.DisplayName.Should().Be("PowerShell").And.Be(initializer.DisplayName);
-        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
-        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
-        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
-        stack.SupportedLanguageAliases["PowerShell"].Should().Equal("pwsh", "ps");
+        initializer.Stack.Should().BeSameAs(stack);
+        stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
+        stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("powershell");
     }
 
     [Fact]
@@ -43,7 +36,7 @@ public class PowerShellWorkloadTests
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
 
-        new PowerShellWorkload().Configure(builder);
+        new PowerShellWorkload(Stack.Descriptor).Configure(builder);
 
         builder.Received(1).AddProjectFactory(Arg.Any<PowerShellProjectFactory>());
     }
@@ -51,15 +44,6 @@ public class PowerShellWorkloadTests
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        FluentActions.Invoking(() => new PowerShellWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void DisplayNameAndDescription_AreSet()
-    {
-        PowerShellWorkload workload = new();
-
-        workload.DisplayName.Should().Be("PowerShell Stack");
-        workload.Description.Should().Be("Azure Functions CLI tooling for PowerShell projects.");
+        FluentActions.Invoking(() => new PowerShellWorkload(Stack.Descriptor).Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 }

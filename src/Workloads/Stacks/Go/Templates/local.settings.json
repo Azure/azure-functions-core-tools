@@ -1,7 +1,7 @@
 {
   "IsEncrypted": false,
   "Values": {
-    "FUNCTIONS_WORKER_RUNTIME": "native",
+    "FUNCTIONS_WORKER_RUNTIME": "{WorkerRuntime}",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true"
   }
 }

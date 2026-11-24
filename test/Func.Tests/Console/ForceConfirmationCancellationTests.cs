@@ -36,12 +36,11 @@ public class ForceConfirmationCancellationTests
         bool scaffolded = false;
         bool commandConstructed = false;
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns("python");
-        initializer.DisplayName.Returns("Python");
-        initializer.SupportedLanguages.Returns(_ =>
+        initializer.Stack.Descriptor.Returns(new StackDescriptor("python", "python", "Python"));
+        initializer.Stack.SupportedLanguages.Returns(_ =>
         {
             if (gitOnly && commandConstructed) cancellation.Cancel();
-            return new[] { "python" };
+            return new LanguageDescriptor[] { new("python", "Python") };
         });
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         initializer.InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>())

@@ -33,10 +33,11 @@ internal sealed class PythonFunctionsProject : FunctionsProject
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
 
-    public PythonFunctionsProject(WorkingDirectory workingDirectory)
+    public PythonFunctionsProject(WorkingDirectory workingDirectory, PythonProjectStack stack)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        _workerReference = FunctionsWorkerReference.FromWorkload("python");
+        Stack = stack ?? throw new ArgumentNullException(nameof(stack));
+        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.Identifier, stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seams so tests can stub interpreter / pip invocations. stdout and stderr lines are streamed
@@ -51,9 +52,7 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override string StackName => "python";
-
-    public override string StackDisplayName => "Python";
+    public override IProjectStack Stack { get; }
 
     public override bool SupportsExtensionBundles => true;
 

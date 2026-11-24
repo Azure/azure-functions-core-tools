@@ -44,20 +44,7 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsPython()
     {
-        new PythonProjectInitializer(new PythonProjectStack()).Stack.Should().Be("python");
-    }
-
-    [Theory]
-    [InlineData(null, "Python")]
-    [InlineData("", "Python")]
-    [InlineData("py", "Python")]
-    [InlineData("PY", "Python")]
-    [InlineData("Python", "Python")]
-    [InlineData("PYTHON", "Python")]
-    [InlineData("unknown", "unknown")]
-    public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
-    {
-        new PythonProjectInitializer(new PythonProjectStack()).NormalizeLanguage(input).Should().Be(expected);
+        new PythonProjectInitializer(PythonWorkloadTests.Stack).Stack.Descriptor.Identifier.Should().Be("python");
     }
 
     [Fact]
@@ -80,7 +67,7 @@ public class PythonProjectInitializerTests : IDisposable
     public void GetInitOptions_RegistersBundleOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new PythonProjectInitializer(new PythonProjectStack()).GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new PythonProjectInitializer(PythonWorkloadTests.Stack).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         names.Should().Contain("--no-bundles");
@@ -200,11 +187,11 @@ public class PythonProjectInitializerTests : IDisposable
 
     private Task RunAsync(bool force, string[]? args = null, string? language = null)
     {
-        PythonProjectInitializer initializer = new(new PythonProjectStack());
+        PythonProjectInitializer initializer = new(PythonWorkloadTests.Stack);
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: "test",
-            Language: language,
+            Language: language is null ? null : initializer.Stack.SupportedLanguages.SingleOrDefault(l => l.IsMatch(language)) ?? new(language, language),
             Force: force);
 
         RootCommand root = [];

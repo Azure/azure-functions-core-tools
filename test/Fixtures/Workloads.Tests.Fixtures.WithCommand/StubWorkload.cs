@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand;
 
@@ -12,14 +14,24 @@ namespace Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand;
 /// </summary>
 public sealed class StubWorkload : Workloads.Workload
 {
-    public override string DisplayName => "With Command";
-
-    public override string Description => "Fixture that contributes a single hello command.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.RegisterCommand(new HelloFromWorkloadCommand());
+    }
+}
+
+public sealed class StackWorkload(StackDescriptor descriptor) : Workloads.Workload
+{
+    private readonly FixtureStack _stack = new(descriptor);
+
+    public override void Configure(FunctionsCliBuilder builder) => builder.Services.AddSingleton<IProjectStack>(_stack);
+
+    private sealed class FixtureStack(StackDescriptor descriptor) : IProjectStack
+    {
+        public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+
+        public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("fixture", "Fixture")];
     }
 }
 
@@ -30,10 +42,6 @@ public sealed class StubWorkload : Workloads.Workload
 /// </summary>
 public sealed class ThrowingWorkload : Workloads.Workload
 {
-    public override string DisplayName => "Throwing";
-
-    public override string Description => "Fixture whose Configure throws to exercise the warn-and-skip path.";
-
     public override void Configure(FunctionsCliBuilder builder)
         => throw new InvalidOperationException("Boom from ThrowingWorkload.");
 }

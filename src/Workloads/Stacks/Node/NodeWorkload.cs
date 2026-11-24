@@ -13,18 +13,16 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// Entry-point for the Node workload. Registers Node-specific
 /// services (project initializer today; project factory / commands later).
 /// </summary>
-public sealed class NodeWorkload : Workload
+public sealed class NodeWorkload(StackDescriptor descriptor) : Workload
 {
-    public override string DisplayName => "Node.js Stack";
-
-    public override string Description => "Azure Functions CLI tooling for Node.js projects.";
+    private readonly NodeProjectStack _stack = new(descriptor);
 
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<NodeProjectStack>();
-        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
-        builder.AddProjectFactory(new NodeProjectFactory());
+        builder.AddProjectFactory(new NodeProjectFactory(_stack));
     }
 }

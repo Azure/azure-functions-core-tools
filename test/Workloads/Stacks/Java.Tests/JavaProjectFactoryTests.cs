@@ -38,7 +38,7 @@ public class JavaProjectFactoryTests : IDisposable
     [Fact]
     public async Task Empty_directory_does_not_match()
     {
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -53,7 +53,7 @@ public class JavaProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.Created>(result);
@@ -64,7 +64,7 @@ public class JavaProjectFactoryTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "src", "main", "java"));
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
@@ -77,7 +77,7 @@ public class JavaProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("requirements.txt", string.Empty);
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -89,7 +89,7 @@ public class JavaProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", "{}");
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -103,12 +103,12 @@ public class JavaProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("java", created.Project.StackName);
-        Assert.Equal("Java", created.Project.StackDisplayName);
+        Assert.Equal("java", created.Project.Stack.Descriptor.Identifier);
+        Assert.Equal("Java", created.Project.Stack.Descriptor.DisplayName);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         Assert.Equal("java", worker.WorkerRuntime);
         Assert.NotNull(created.Reason);
@@ -122,7 +122,7 @@ public class JavaProjectFactoryTests : IDisposable
         WriteFile("build.gradle", "plugins {}");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "src", "main", "java"));
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
@@ -134,7 +134,7 @@ public class JavaProjectFactoryTests : IDisposable
     {
         WriteFile("host.json", "{}");
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -150,7 +150,7 @@ public class JavaProjectFactoryTests : IDisposable
         _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
             .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
 
-        ProjectCreationResult result = await new JavaProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
@@ -165,7 +165,7 @@ public class JavaProjectFactoryTests : IDisposable
     public async Task NullContext_throws()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new JavaProjectFactory().TryCreateProjectAsync(null!, TestContext.Current.CancellationToken));
+            () => new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(null!, TestContext.Current.CancellationToken));
     }
 
     private void WriteFile(string name, string contents)

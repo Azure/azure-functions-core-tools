@@ -21,13 +21,13 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
-    private readonly string _language;
 
-    public NodeFunctionsProject(WorkingDirectory workingDirectory, string language)
+    public NodeFunctionsProject(WorkingDirectory workingDirectory, NodeProjectStack stack, LanguageDescriptor language)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        _language = language ?? throw new ArgumentNullException(nameof(language));
-        _workerReference = FunctionsWorkerReference.FromWorkload("node");
+        Language = language ?? throw new ArgumentNullException(nameof(language));
+        Stack = stack ?? throw new ArgumentNullException(nameof(stack));
+        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.Identifier, stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seam so tests can stub npm invocations without spawning real
@@ -38,15 +38,13 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override string StackName => "node";
-
-    public override string StackDisplayName => "Node.js";
+    public override IProjectStack Stack { get; }
 
     public override bool SupportsExtensionBundles => true;
 
     public override FunctionsWorkerReference WorkerReference => _workerReference;
 
-    public override string Language => _language;
+    public override LanguageDescriptor Language { get; }
 
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {

@@ -5,18 +5,9 @@ using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Go;
 
-internal sealed class GoProjectStack : IProjectStack
+internal sealed class GoProjectStack(StackDescriptor descriptor) : IProjectStack
 {
-    public string Stack => "go";
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    public string DisplayName => "Go";
-
-    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["native"];
-
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
-    {
-        { "Go", ["golang"] }
-    };
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("go", "Go", "golang")];
 }

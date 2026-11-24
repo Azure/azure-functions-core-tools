@@ -9,5 +9,5 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// A .NET Functions project detected from build output (has host.json, worker.config.json, and .azurefunctions).
 /// Already compiled; no build step needed before host startup.
 /// </summary>
-internal sealed class DotNetOutputProject(WorkingDirectory workingDirectory) : DotNetProject(workingDirectory);
+internal sealed class DotNetOutputProject(WorkingDirectory workingDirectory, DotNetProjectStack stack) : DotNetProject(workingDirectory, stack);
 

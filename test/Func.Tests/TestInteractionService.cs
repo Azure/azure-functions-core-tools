@@ -146,6 +146,14 @@ internal class TestInteractionService : IInteractionService
         return Task.FromResult(choiceList.FirstOrDefault() ?? string.Empty);
     }
 
+    public Task<T> PromptForSelectionAsync<T>(string title, IEnumerable<T> choices, Func<T, string> display, CancellationToken cancellationToken = default) where T : notnull
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        List<T> values = [.. choices];
+        _lines.Add($"SELECT: {title} [{string.Join(", ", values.Select(display))}]");
+        return Task.FromResult(values.First());
+    }
+
     public virtual Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
