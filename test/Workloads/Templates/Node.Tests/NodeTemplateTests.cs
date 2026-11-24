@@ -100,6 +100,14 @@ public sealed class NodeTemplateTests : IAsyncLifetime
         values.GetProperty("AzureWebJobsStorage").GetString().Should().Be("UseDevelopmentStorage=true");
         values.TryGetProperty("FUNCTIONS_WORKER_RUNTIME", out _).Should().BeFalse();
         File.Exists(Path.Combine(output, ".gitignore")).Should().BeFalse();
+
+        IPostAction action = result.CreationResult!.PostActions.Should().ContainSingle().Subject;
+        action.ActionId.Should().Be(new Guid("210D431B-A78B-4D2F-B762-4ED3E3EA9025"));
+        action.ContinueOnError.Should().BeFalse();
+        using var actionFiles = JsonDocument.Parse(action.Args["files"]);
+        actionFiles.RootElement.EnumerateArray().Select(file => file.GetString()).Should().Equal("package.json");
+        action.ManualInstructions.Should().Contain("npm install");
+
         AssertNoTemplateArtifacts(output);
     }
 
@@ -192,15 +200,16 @@ public sealed class NodeTemplateTests : IAsyncLifetime
     [Theory]
     [InlineData(JavaScript)]
     [InlineData(TypeScript)]
-    public void HttpTrigger_ExposesAuthLevelAlias(string language)
+    public void HttpTrigger_ExposesAuthLevelAliases(string language)
     {
         string templateLanguage = language == JavaScript ? "javascript" : "typescript";
         string path = Path.Combine(
             AppContext.BaseDirectory, "content", "templates", templateLanguage, "httptrigger", ".template.config", "func.host.json");
         using var metadata = JsonDocument.Parse(File.ReadAllText(path));
 
-        metadata.RootElement.GetProperty("symbolInfo").GetProperty("AuthLevel").GetProperty("longName").GetString()
-            .Should().Be("auth-level");
+        JsonElement symbol = metadata.RootElement.GetProperty("symbolInfo").GetProperty("AuthLevel");
+        symbol.GetProperty("longName").GetString().Should().Be("auth-level");
+        symbol.GetProperty("shortName").GetString().Should().Be("a");
     }
 
     [Theory]

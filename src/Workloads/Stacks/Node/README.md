@@ -19,8 +19,12 @@ The workload package includes JavaScript and TypeScript project, HTTP trigger,
 and timer trigger templates under `content/templates`. The template engine can
 discover them through the workload's `templateRoot`. Migrating `func init` and
 `func new` to these templates is separate work. HTTP triggers support function,
-anonymous, and admin authorization levels, defaulting to function. Project
-settings use Azurite for local storage so timer triggers can start locally.
+anonymous, and admin authorization levels, defaulting to function; their
+templates declare `--auth-level` and `-a` aliases for future CLI integration.
+Project settings use Azurite for local storage so timer triggers can start locally.
+The project templates declare an npm restore post-action for the func host; a
+Node restore processor is not yet implemented. The action is skipped by
+`dotnet new`, which uses the same action ID for NuGet restore.
 
 ## Template testing
 

@@ -14,6 +14,10 @@
   },
   "preferNameDirectory": true,
   "symbols": {
+    "HostIdentifier": {
+      "type": "bind",
+      "binding": "host:HostIdentifier"
+    },
     "NoHttp": {
       "type": "parameter",
       "datatype": "bool",
@@ -85,5 +89,19 @@
   ],
   "primaryOutputs": [
     { "path": "package.json" }
+  ],
+  "postActions": [
+    {
+      "condition": "(HostIdentifier == \"func\")",
+      "description": "Install npm packages required by this project.",
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": false,
+      "args": {
+        "files": [ "package.json" ]
+      },
+      "manualInstructions": [
+        { "text": "Run 'npm install' in the generated project directory." }
+      ]
+    }
   ]
 }

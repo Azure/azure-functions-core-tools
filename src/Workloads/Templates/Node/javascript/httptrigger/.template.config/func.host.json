@@ -1,5 +1,5 @@
 {
   "symbolInfo": {
-    "AuthLevel": { "longName": "auth-level" }
+    "AuthLevel": { "longName": "auth-level", "shortName": "a" }
   }
 }
