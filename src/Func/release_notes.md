@@ -4,6 +4,7 @@
 
 - Require Python 3.10 or later for local Python projects; Python 3.9 is no longer supported.
 - Move the Azure Functions CLI runtime and build toolchain to .NET 11. Workloads must target .NET 11 to use the updated Abstractions contracts; generated .NET applications still default to `net10.0`.
+- Fail `func run` with a clear error and nonzero exit code when the host stops restarting a failing language worker.
 - Make `func --version` display the semantic version without commit metadata or line wrapping, matching the Version field in `func --verbose`. Preserve the full build identity separately in the verbose Build field. (#5840)
 
 ## 5.0.0-preview.5

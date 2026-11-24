@@ -82,6 +82,23 @@ public class HostProcessEventStreamTests
     }
 
     [Fact]
+    public async Task RequestShutdownAsync_AfterHostExitedAndWasDisposed_DoesNotThrow()
+    {
+        var process = new CompletedHostProcess(stdout: string.Empty, stderr: string.Empty, exitCode: 0);
+        var stream = new HostProcessEventStream(
+            process,
+            new LineHostProcessOutputParser(),
+            CreateLaunchInfo(),
+            TimeSpan.FromMilliseconds(1));
+        await ReadAllAsync(stream);
+        await stream.WaitForExitAsync(CancellationToken.None);
+
+        await stream.RequestShutdownAsync(CancellationToken.None);
+
+        process.Disposed.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task DisposeAsync_IsIdempotent()
     {
         var process = new BlockingHostProcess();
@@ -166,7 +183,7 @@ public class HostProcessEventStreamTests
 
         public TextWriter StandardInput { get; } = new StringWriter();
 
-        public bool HasExited => true;
+        public bool HasExited => Disposed ? throw new InvalidOperationException("No process is associated with this object.") : true;
 
         public int ExitCode { get; } = exitCode;
 
