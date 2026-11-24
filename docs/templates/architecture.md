@@ -156,7 +156,19 @@ The proposed rendering path uses the installed workload content mounted by Micro
 
 The exact Microsoft.TemplateEngine mount and invocation API is still to be qualified. Use the existing engine APIs through the command-scoped `Templater` rather than introducing a second engine or a separate lifecycle framework.
 
-Render into command-scoped private temporary output within defined asset and expansion limits. Return bounded planned file bytes, explicit directories and diagnostics; these are not completed destination effects. Preserve the supported func host bindings, but do not execute authored post-actions or unapproved custom bind sources. Reject unsupported effects before touching the destination. Rendering failures must not become empty success, and unexpected internal errors remain distinct from invalid user input.
+Render into command-scoped private temporary output within defined asset and expansion limits. Return bounded planned file bytes, explicit directories and diagnostics; these are not completed destination effects. Preserve the supported func host bindings, but do not execute unapproved custom bind sources. Reject unsupported effects before touching the destination. Rendering failures must not become empty success, and unexpected internal errors remain distinct from invalid user input.
+
+<a id="post-actions"></a>
+
+## Post actions
+
+`PostActionDispatcher` (`src/Func/Templates/PostActions/`) processes a creation result's post actions in declared order. It is not yet wired into `func init` or `func new`.
+
+- Call `templater.ProcessPostActionsAsync(creationResult, isDryRun, cancellationToken)` to resolve the dispatcher from the template engine components and run it. `AddTemplating()` registers the dispatcher with dependency injection and the engine.
+- Each action is resolved through the template engine components by `actionId`. Processors implement `IPostActionProcessor` and are registered with `AddTemplateComponent<IPostActionProcessor, T>()`. No processors are registered yet.
+- When no processor is found, or a processor returns `false`, the dispatcher reports the failure with the action's description and manual instructions, if any. A failure remains in the aggregate status; `continueOnError` controls whether later actions run.
+- Dry runs list the actions that would run without processing them.
+- Run-script (`3A7C4B45-1F5D-4A30-959A-51B88E82B5D2`) is not implemented. It currently falls back to manual instructions; its allow, deny, or prompt policy is still to be designed.
 
 <a id="non-force-init"></a>
 

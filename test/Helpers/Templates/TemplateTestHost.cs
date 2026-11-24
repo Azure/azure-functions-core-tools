@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.TemplateEngine.Abstractions;
@@ -43,6 +45,7 @@ public sealed class TemplateTestHost : IAsyncDisposable
 
         _services = new ServiceCollection()
             .AddSingleton(new CliConfigurationPathsOptions(Path.Combine(Root, "home")))
+            .AddSingleton<IInteractionService>(new SpectreInteractionService(new DefaultTheme()))
             .AddSingleton<IWorkloadTemplateSource>(new FixedTemplateSource(root))
             .AddTemplating()
             .BuildServiceProvider();

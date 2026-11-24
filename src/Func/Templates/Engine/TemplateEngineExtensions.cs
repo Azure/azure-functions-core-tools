@@ -2,9 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Templates.PostActions;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Mount;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Edge.Template;
 using Microsoft.TemplateEngine.Utils;
 
 namespace Azure.Functions.Cli.Templates.Engine;
@@ -14,6 +16,29 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal static class TemplateEngineExtensions
 {
+    extension(Templater templater)
+    {
+        /// <summary>
+        /// Resolves the registered dispatcher and processes the creation result's post actions in declared order.
+        /// </summary>
+        public Task<PostActionExecutionStatus> ProcessPostActionsAsync(
+            ITemplateCreationResult creationResult, bool isDryRun, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(templater);
+            ArgumentNullException.ThrowIfNull(creationResult);
+
+            if (!templater.Settings.Components.TryGetComponent(
+                PostActionDispatcher.ComponentId, out PostActionDispatcher? dispatcher)
+                || dispatcher is null)
+            {
+                throw new InvalidOperationException(
+                    "The template post-action dispatcher is not registered. Register templating services with AddTemplating.");
+            }
+
+            return dispatcher.ProcessAsync(templater, creationResult, isDryRun, cancellationToken);
+        }
+    }
+
     extension(IEngineEnvironmentSettings settings)
     {
         /// <summary>
