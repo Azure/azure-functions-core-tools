@@ -41,15 +41,20 @@ public sealed class GoTemplateTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("project", "ModulePath", "module")]
-    [InlineData("project", "NoHttp", "no-http")]
-    [InlineData("httptrigger", "AuthLevel", "auth-level")]
-    public void TemplateHostMetadata_ExposesOptionAliases(string template, string symbol, string alias)
+    [InlineData("project", "ModulePath", "module", null)]
+    [InlineData("project", "NoHttp", "no-http", null)]
+    [InlineData("httptrigger", "AuthLevel", "auth-level", "a")]
+    public void TemplateHostMetadata_ExposesOptionAliases(string template, string symbol, string alias, string? shortAlias)
     {
         string path = Path.Combine(AppContext.BaseDirectory, "content", "templates", template, ".template.config", "func.host.json");
         using var metadata = JsonDocument.Parse(File.ReadAllText(path));
 
-        metadata.RootElement.GetProperty("symbolInfo").GetProperty(symbol).GetProperty("longName").GetString().Should().Be(alias);
+        JsonElement symbolInfo = metadata.RootElement.GetProperty("symbolInfo").GetProperty(symbol);
+        symbolInfo.GetProperty("longName").GetString().Should().Be(alias);
+        if (shortAlias is not null)
+        {
+            symbolInfo.GetProperty("shortName").GetString().Should().Be(shortAlias);
+        }
     }
 
     [Theory]
