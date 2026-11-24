@@ -3,10 +3,10 @@
 ## 4.47.0-preview
 
 - Updated the Python worker payload to 4.47.0, removing Python 3.9 builds.
+- Build the content-only workload project with .NET 11. (#5928)
 
 ## 4.46.2-preview
 
-- Retarget the workload assembly to `net11.0` for the .NET 11-based Azure Functions CLI; the Python worker payload is unchanged.
 - Updated the Python worker payload to 4.46.2, adding support for Python 3.15.
 - Added Windows ARM64 (`win-arm64`) support with a Python 3.15-only payload. Other platforms retain all Python versions supplied by the upstream worker.
 
