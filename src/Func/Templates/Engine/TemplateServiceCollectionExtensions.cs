@@ -51,7 +51,6 @@ internal static class TemplateServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
             services.TryAddSingleton<ITemplaterFactory, TemplaterFactory>();
             services.TryAddSingleton<IFuncTemplateComponentProvider, FuncTemplateComponentsProvider>();
-            services.TryAddSingleton<TemplateHiveTransaction>();
             services.TryAddSingleton<TemplatePackageValidator>();
             services.TryAddSingleton<TemplatePackageVerifier>();
             services.TryAddSingleton<TemplatePackageService>();

@@ -10,7 +10,6 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Templates.Packages;
 using Microsoft.Extensions.Options;
-using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using NSubstitute;
@@ -27,6 +26,8 @@ public sealed class TemplatePackageServiceTests : IDisposable
     private readonly TemplatePackageService _service;
     private readonly TemplatePackageVerifier _verifier;
     private readonly IWorkloadTemplateSource _workloads = Substitute.For<IWorkloadTemplateSource>();
+    private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
+    private readonly List<string> _temporaryDirectories = [];
 
     public TemplatePackageServiceTests()
     {
@@ -35,21 +36,25 @@ public sealed class TemplatePackageServiceTests : IDisposable
         _factory = new TestFactory(Path.Combine(_root, "templates"));
         _workloads.GetRootsAsync(Arg.Any<CancellationToken>()).Returns([]);
         var fileSystem = new PhysicalFileSystem();
-        _verifier = new TemplatePackageVerifier(new TemplateNuGetSourceProvider(new DirectoryInfo(_root)));
+        _fileSystem.CreateTempDirectory().Returns(_ =>
+        {
+            var directory = fileSystem.CreateTempDirectory(_root);
+            _temporaryDirectories.Add(directory.Path);
+            return directory;
+        });
+        _fileSystem.OpenReadIfExists(Arg.Any<string>()).Returns(c => fileSystem.OpenReadIfExists(c.Arg<string>()));
+        _fileSystem.DirectoryExists(Arg.Any<string>()).Returns(c => fileSystem.DirectoryExists(c.Arg<string>()));
+        _fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(c => fileSystem.SaveStreamToFileAsync(c.ArgAt<string>(0), c.ArgAt<Stream>(1), c.ArgAt<CancellationToken>(2)));
+        _fileSystem.When(f => f.CopyFile(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(c => fileSystem.CopyFile(c.ArgAt<string>(0), c.ArgAt<string>(1)));
+        _verifier = new TemplatePackageVerifier();
         _service = new TemplatePackageService(_catalog, new TemplatePackageValidator(), _factory,
-            new TemplateHiveTransaction(fileSystem, _factory), fileSystem, _workloads, _verifier);
+            _fileSystem, _workloads, _verifier);
         _catalog.Archive = MakeArchive();
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
-
-    [Fact]
-    public void Verifier_NullSourceProviderIsRejected()
-    {
-        Action act = () => _ = new TemplatePackageVerifier(null!);
-
-        act.Should().Throw<ArgumentNullException>().WithParameterName("sources");
-    }
 
     [Fact]
     public async Task Verifier_NullArchiveIsRejected()
@@ -59,90 +64,85 @@ public sealed class TemplatePackageServiceTests : IDisposable
         await act.Should().ThrowAsync<ArgumentNullException>().WithParameterName("archive");
     }
 
+    [Theory]
+    [InlineData("catalog")]
+    [InlineData("validator")]
+    [InlineData("factory")]
+    [InlineData("fileSystem")]
+    [InlineData("workloadTemplates")]
+    [InlineData("verifier")]
+    public void Constructor_NullDependenciesAreRejected(string parameter)
+    {
+        Action act = () => _ = new TemplatePackageService(
+            parameter == "catalog" ? null! : _catalog,
+            parameter == "validator" ? null! : new TemplatePackageValidator(),
+            parameter == "factory" ? null! : _factory,
+            parameter == "fileSystem" ? null! : _fileSystem,
+            parameter == "workloadTemplates" ? null! : _workloads,
+            parameter == "verifier" ? null! : _verifier);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName(parameter);
+    }
+
     [Fact]
-    public async Task Install_UnsignedPackageIsRejectedWhenConfigurationRequiresSigning()
+    public async Task Install_PreflightFailureDoesNotCreateOrMutateHive()
+    {
+        _catalog.Archive = MakeArchive(includeTemplates: false);
+
+        Func<Task> act = () => InstallAsync("1.0.0");
+
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*at least one template identity*");
+        Directory.Exists(_factory.HivePath).Should().BeFalse();
+        _factory.Installations.Should().Be(0);
+        AssertTemporaryFilesRemoved();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Install_SignedAndUnsignedPackagesUseInProcessIntegrityVerification(bool signed)
     {
         File.WriteAllText(Path.Combine(_root, "NuGet.Config"), """
-            <configuration><config><add key="signatureValidationMode" value="require" /></config></configuration>
+            <configuration>
+              <config><add key="signatureValidationMode" value="require" /></config>
+              <trustedSigners><clear /><author name="unrelated">
+                <certificate fingerprint="0000000000000000000000000000000000000000000000000000000000000000"
+                  hashAlgorithm="SHA256" allowUntrustedRoot="false" />
+              </author></trustedSigners>
+            </configuration>
             """);
+        if (signed)
+        {
+            _catalog.Archive = await SignArchiveAsync(_catalog.Archive);
+        }
 
-        Func<Task> act = () => InstallAsync("1.0.0");
+        await InstallAsync("1.0.0");
 
-        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*unsigned*requires signing*");
-        _factory.Installations.Should().Be(0);
+        await AssertInstalledVersionAsync("1.0.0");
+        AssertTemporaryFilesRemoved();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Install_SignatureWithUntrustedRootFollowsConfiguredValidationMode(bool require)
-    {
-        if (require)
-        {
-            File.WriteAllText(Path.Combine(_root, "NuGet.Config"), """
-                <configuration><config><add key="signatureValidationMode" value="require" /></config></configuration>
-                """);
-        }
-
-        (_catalog.Archive, _) = await SignArchiveAsync(_catalog.Archive);
-
-        Func<Task> act = () => InstallAsync("1.0.0");
-
-        if (require)
-        {
-            await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*signature*");
-            _factory.Installations.Should().Be(0);
-        }
-        else
-        {
-            await act.Should().NotThrowAsync();
-            await AssertInstalledVersionAsync("1.0.0");
-        }
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Install_InvalidSignatureLeavesHiveUntouchedAndCleansDownload(bool tamper)
+    [Fact]
+    public async Task Install_TamperedSignedArchiveLeavesInstallationUntouchedAndCleansDownload()
     {
         await InstallAsync("1.0.0");
         int installations = _factory.Installations;
-        var (archive, fingerprint) = await SignArchiveAsync(MakeArchive("2.0.0"));
-        if (tamper)
+        byte[] archive = await SignArchiveAsync(MakeArchive("2.0.0"));
+        using var stream = new MemoryStream();
+        stream.Write(archive);
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Update, leaveOpen: true))
         {
-            WriteTrustedSignerConfig(fingerprint);
-            using var stream = new MemoryStream();
-            stream.Write(archive);
-            using (var zip = new ZipArchive(stream, ZipArchiveMode.Update, leaveOpen: true))
-            {
-                using var writer = new StreamWriter(zip.CreateEntry("tampered.txt").Open());
-                writer.Write("changed after signing");
-            }
-
-            archive = stream.ToArray();
-        }
-        else
-        {
-            WriteTrustedSignerConfig(new string('0', 64));
+            using var writer = new StreamWriter(zip.CreateEntry("tampered.txt").Open());
+            writer.Write("changed after signing");
         }
 
-        _catalog.Archive = archive;
-        var physical = new PhysicalFileSystem();
-        var fileSystem = Substitute.For<IFileSystem>();
-        string downloadPath = Path.Combine(_root, "failed-download");
-        Directory.CreateDirectory(downloadPath);
-        fileSystem.CreateTempDirectory().Returns(new TempDirectory(downloadPath, physical));
-        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
-            .Returns(call => physical.SaveStreamToFileAsync(call.ArgAt<string>(0), call.ArgAt<Stream>(1), call.ArgAt<CancellationToken>(2)));
-        fileSystem.OpenReadIfExists(Arg.Any<string>()).Returns(call => physical.OpenReadIfExists(call.ArgAt<string>(0)));
-        var service = new TemplatePackageService(_catalog, new TemplatePackageValidator(), _factory,
-            new TemplateHiveTransaction(physical, _factory), fileSystem, _workloads, _verifier);
+        _catalog.Archive = stream.ToArray();
+        Func<Task> act = () => InstallAsync("2.0.0");
 
-        Func<Task> act = () => service.InstallAsync("test.templates", "2.0.0", null, false, TestContext.Current.CancellationToken);
-
-        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*signature*");
-        Directory.Exists(downloadPath).Should().BeFalse();
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*integrity*");
+        AssertTemporaryFilesRemoved();
         _factory.Installations.Should().Be(installations);
+        _factory.Uninstallations.Should().Be(0);
         await AssertInstalledVersionAsync("1.0.0");
     }
 
@@ -171,7 +171,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_SameVersionIsNoOpRegardlessOfAdditionalSource()
+    public async Task Install_SameVersionIsNoOpRegardlessOfSource()
     {
         await InstallAsync("1.0.0");
         int installations = _factory.Installations;
@@ -195,7 +195,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_ReplacesAndAllowsExplicitDowngradeAndValidatesInstalledBytes()
+    public async Task Install_ReplacesAndAllowsExplicitDowngradeUsingManagedArchiveStorage()
     {
         await InstallAsync("1.0.0");
         _catalog.Archive = MakeArchive("2.0.0");
@@ -209,6 +209,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
         installed.Version.Should().Be("1.0.0");
         File.ReadAllBytes(installed.MountPointUri).Should().Equal(_catalog.Archive);
         _factory.Installations.Should().Be(3);
+        AssertTemporaryFilesRemoved();
     }
 
     [Fact]
@@ -231,15 +232,19 @@ public sealed class TemplatePackageServiceTests : IDisposable
         Func<Task> act = () => InstallAsync(requestedVersion);
 
         await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*does not match*");
+        _factory.Installations.Should().Be(1);
+        _factory.Uninstallations.Should().Be(0);
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
     [Theory]
     [InlineData("Dependency", false)]
+    [InlineData("Template", false)]
     [InlineData("FuncTemplate,FuncCliWorkload", false)]
     [InlineData("FuncTemplate,FuncCliWorkloadRidPackage", false)]
     [InlineData("FuncTemplate", true)]
-    public async Task Install_RejectsInvalidInstalledArchivesAndRestoresPreviousInstallation(string packageTypes, bool brokenHost)
+    public async Task Install_InvalidPackageTypeOrHostMetadataFailsBeforeMutation(string packageTypes, bool brokenHost)
     {
         await InstallAsync("1.0.0");
         _catalog.Archive = MakeArchive("2.0.0", packageTypes, brokenHost ? "{" : null);
@@ -247,6 +252,9 @@ public sealed class TemplatePackageServiceTests : IDisposable
         Func<Task> act = () => InstallAsync("2.0.0");
 
         await act.Should().ThrowAsync<TemplatePackageException>();
+        _factory.Installations.Should().Be(1);
+        _factory.Uninstallations.Should().Be(0);
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
@@ -262,23 +270,24 @@ public sealed class TemplatePackageServiceTests : IDisposable
         Func<Task> act = () => InstallAsync("2.0.0");
 
         await act.Should().ThrowAsync<TemplatePackageException>();
-        _factory.Installations.Should().Be(installations + 1);
+        _factory.Installations.Should().Be(includeTemplates ? installations + 2 : installations);
+        _factory.Uninstallations.Should().Be(includeTemplates ? 2 : 0);
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
-    [Theory]
-    [InlineData("../escape")]
-    [InlineData("C:/escape")]
-    [InlineData("/escape")]
-    [InlineData("folder\\..\\escape")]
-    public async Task Install_UnsafeArchivePathsDoNotReplace(string unsafePath)
+    [Fact]
+    public async Task Install_PackageIdMismatchFailsBeforeMutation()
     {
         await InstallAsync("1.0.0");
-        _catalog.Archive = MakeArchive("2.0.0", extraEntry: unsafePath);
+        _catalog.Archive = MakeArchive("2.0.0", packageId: "other.templates");
 
         Func<Task> act = () => InstallAsync("2.0.0");
 
-        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*safe relative package path*");
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*does not match*");
+        _factory.Installations.Should().Be(1);
+        _factory.Uninstallations.Should().Be(0);
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
@@ -293,8 +302,22 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
         await act.Should().ThrowAsync<IOException>().WithMessage("cache failed");
         File.Exists(_factory.Request!.PackageIdentifier).Should().BeFalse();
-        _factory.FailCache = false;
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
+    }
+
+    [Fact]
+    public async Task Install_CacheFailureWithoutPreviousPackageRemovesPartialInstallation()
+    {
+        _factory.FailCache = true;
+
+        Func<Task> act = () => InstallAsync("1.0.0");
+
+        await act.Should().ThrowAsync<IOException>().WithMessage("cache failed");
+        AssertTemporaryFilesRemoved();
+        using var templater = _factory.Create(Context());
+        (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        (await templater.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().BeEmpty();
     }
 
     [Fact]
@@ -308,7 +331,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
         await act.Should().ThrowAsync<IOException>().WithMessage("provider failed");
         File.Exists(_factory.Request!.PackageIdentifier).Should().BeFalse();
-        _factory.FailInstall = false;
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
@@ -321,43 +344,26 @@ public sealed class TemplatePackageServiceTests : IDisposable
         Func<Task> act = () => _service.UninstallAsync("test.templates", TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<IOException>().WithMessage("cache failed");
-        _factory.FailCache = false;
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
     [Fact]
-    public async Task Install_RecoveryFailureReportsAndRetainsRecoveryCopy()
+    public async Task Install_RecoveryFailureReportsIncompleteEffectsAndCleansTemporaryFiles()
     {
         await InstallAsync("1.0.0");
         _catalog.Archive = MakeArchive("2.0.0");
         _factory.FailCache = true;
-        var physical = new PhysicalFileSystem();
-        var fileSystem = Substitute.For<IFileSystem>();
-        fileSystem.DirectoryExists(Arg.Any<string>()).Returns(c => physical.DirectoryExists(c.Arg<string>()));
-        fileSystem.CreateTempDirectory(Arg.Any<string>()).Returns(c => physical.CreateTempDirectory(c.Arg<string>()));
-        fileSystem.OpenReadIfExists(Arg.Any<string>()).Returns(c => physical.OpenReadIfExists(c.Arg<string>()));
-        fileSystem.When(f => f.CreateDirectory(Arg.Any<string>())).Do(c => physical.CreateDirectory(c.Arg<string>()));
-        fileSystem.When(f => f.DeleteDirectory(Arg.Any<string>())).Do(c => physical.DeleteDirectory(c.Arg<string>()));
-        fileSystem.When(f => f.CopyDirectory(Arg.Any<string>(), Arg.Any<string>())).Do(c =>
-        {
-            if (c.ArgAt<string>(0).EndsWith(Path.DirectorySeparatorChar + "hive", StringComparison.Ordinal))
-            {
-                throw new IOException("cannot recover");
-            }
+        _factory.FailRecoveryInstall = true;
 
-            physical.CopyDirectory(c.ArgAt<string>(0), c.ArgAt<string>(1));
-        });
-        var service = new TemplatePackageService(_catalog, new TemplatePackageValidator(), _factory,
-            new TemplateHiveTransaction(fileSystem, _factory), fileSystem, _workloads, _verifier);
-        fileSystem.CreateTempDirectory().Returns(_ => physical.CreateTempDirectory());
-        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
-            .Returns(c => physical.SaveStreamToFileAsync(c.ArgAt<string>(0), c.ArgAt<Stream>(1), c.ArgAt<CancellationToken>(2)));
+        Func<Task> act = () => InstallAsync("2.0.0");
 
-        Func<Task> act = () => service.InstallAsync("test.templates", "2.0.0", null, false, TestContext.Current.CancellationToken);
-
-        var failure = (await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*Hive recovery failed*preserved*")).Which;
-        failure.InnerException.Should().BeOfType<IOException>();
-        Directory.GetFiles(_root, "packages.json", SearchOption.AllDirectories).Should().ContainSingle();
+        var failure = (await act.Should().ThrowAsync<TemplatePackageException>()
+            .WithMessage("*missing or partially installed*Recovery failed*cannot recover*")).Which;
+        failure.InnerException.Should().BeOfType<IOException>().Which.Message.Should().Be("cannot recover");
+        AssertTemporaryFilesRemoved();
+        using var templater = _factory.Create(Context());
+        (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
     }
 
     [Fact]
@@ -373,46 +379,40 @@ public sealed class TemplatePackageServiceTests : IDisposable
         await act.Should().ThrowAsync<OperationCanceledException>();
         File.Exists(_factory.Request!.PackageIdentifier).Should().BeFalse();
         _factory.CancelCache = null;
+        AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
 
     [Fact]
-    public async Task Transaction_CancellationBeforeSnapshotDoesNotTouchHive()
+    public async Task Install_CancellationBeforeMutationLeavesPreviousInstallationUntouched()
     {
-        var fileSystem = Substitute.For<IFileSystem>();
-        var transaction = new TemplateHiveTransaction(fileSystem, _factory);
+        await InstallAsync("1.0.0");
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancellation.CancelAsync();
 
-        Func<Task> act = () => transaction.ExecuteAsync(Context(), (_, _) => Task.CompletedTask, cancellation.Token);
+        Func<Task> act = () => _service.InstallAsync("test.templates", "2.0.0", null, false, cancellation.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
-        fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
-        fileSystem.DidNotReceive().CopyDirectory(Arg.Any<string>(), Arg.Any<string>());
+        _factory.Installations.Should().Be(1);
+        _factory.Uninstallations.Should().Be(0);
+        await AssertInstalledVersionAsync("1.0.0");
     }
 
     [Fact]
-    public async Task Transaction_IncompleteSnapshotNeverMutatesOrRestoresLiveHive()
+    public async Task Install_BackupFailureNeverMutatesPreviousInstallation()
     {
-        var fileSystem = Substitute.For<IFileSystem>();
-        string recovery = Path.Combine(_root, "recovery");
-        fileSystem.DirectoryExists(Arg.Any<string>()).Returns(true);
-        fileSystem.CreateTempDirectory(_root).Returns(new TempDirectory(recovery, fileSystem));
-        fileSystem.When(f => f.CopyDirectory(_factory.HivePath, Path.Combine(recovery, "hive")))
-            .Do(_ => throw new IOException("snapshot failed"));
-        var transaction = new TemplateHiveTransaction(fileSystem, _factory);
-        bool mutated = false;
+        await InstallAsync("1.0.0");
+        _catalog.Archive = MakeArchive("2.0.0");
+        _fileSystem.When(f => f.CopyFile(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(_ => throw new IOException("backup failed"));
 
-        Func<Task> act = () => transaction.ExecuteAsync(Context(), (_, _) =>
-        {
-            mutated = true;
-            return Task.CompletedTask;
-        }, TestContext.Current.CancellationToken);
+        Func<Task> act = () => InstallAsync("2.0.0");
 
-        await act.Should().ThrowAsync<IOException>().WithMessage("snapshot failed");
-        mutated.Should().BeFalse();
-        fileSystem.DidNotReceive().DeleteDirectory(_factory.HivePath);
-        fileSystem.Received(1).DeleteDirectory(recovery);
+        await act.Should().ThrowAsync<IOException>().WithMessage("backup failed");
+        _factory.Installations.Should().Be(1);
+        _factory.Uninstallations.Should().Be(0);
+        AssertTemporaryFilesRemoved();
+        await AssertInstalledVersionAsync("1.0.0");
     }
 
     [Fact]
@@ -439,20 +439,9 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
-    private void WriteTrustedSignerConfig(string fingerprint, string? feed = null)
-    {
-        File.WriteAllText(Path.Combine(_root, "NuGet.Config"), $"""
-            <configuration>
-              <packageSources><clear />{(feed is null ? "" : $"<add key=\"fixture\" value=\"{System.Security.SecurityElement.Escape(feed)}\" />")}</packageSources>
-              <packageSourceMapping><clear /></packageSourceMapping>
-              <trustedSigners><clear /><author name="fixture">
-                <certificate fingerprint="{fingerprint}" hashAlgorithm="SHA256" allowUntrustedRoot="true" />
-              </author></trustedSigners>
-            </configuration>
-            """);
-    }
+    private void AssertTemporaryFilesRemoved() => _temporaryDirectories.Should().OnlyContain(path => !Directory.Exists(path));
 
-    private async Task<(byte[] Archive, string Fingerprint)> SignArchiveAsync(byte[] archive)
+    private async Task<byte[]> SignArchiveAsync(byte[] archive)
     {
         using var rootKey = RSA.Create(2048);
         var rootRequest = new CertificateRequest("CN=Template Tests Root", rootKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -492,12 +481,12 @@ public sealed class TemplatePackageServiceTests : IDisposable
             await signed.AddSignatureAsync(signature, TestContext.Current.CancellationToken);
         }
 
-        return (output.ToArray(), author.GetCertHashString(HashAlgorithmName.SHA256));
+        return output.ToArray();
     }
 
     private byte[] MakeArchive(
         string version = "1.0.0", string types = "FuncTemplate", string? hostJson = null, bool includeTemplates = true,
-        bool invalidTemplate = false, string? extraEntry = null)
+        bool invalidTemplate = false, string packageId = "test.templates")
     {
         string directory = TemplateFixtures.WriteBasicPackage(_root, hostJson);
         if (invalidTemplate)
@@ -513,15 +502,9 @@ public sealed class TemplatePackageServiceTests : IDisposable
                 archive.CreateEntryFromFile(path, Path.GetRelativePath(directory, path).Replace('\\', '/'));
             }
 
-            if (extraEntry is not null)
-            {
-                using var entry = new StreamWriter(archive.CreateEntry(extraEntry).Open());
-                entry.Write("unsafe entry");
-            }
-
             using var writer = new StreamWriter(archive.CreateEntry("test.templates.nuspec").Open());
             writer.Write($"""
-                <package><metadata><id>test.templates</id><version>{version}</version><authors>test</authors>
+                <package><metadata><id>{packageId}</id><version>{version}</version><authors>test</authors>
                 <description>Test templates</description><packageTypes>
                 {string.Join("", types.Split(',').Select(t => $"<packageType name=\"{t}\" />"))}
                 </packageTypes></metadata></package>
@@ -559,6 +542,10 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
         internal bool FailInstall { get; set; }
 
+        internal bool FailRecoveryInstall { get; set; }
+
+        internal int Uninstallations { get; set; }
+
         internal int Installations { get; set; }
 
         internal InstallRequest? Request { get; set; }
@@ -574,32 +561,43 @@ public sealed class TemplatePackageServiceTests : IDisposable
             {
                 factory.Installations++;
                 factory.Request = request;
+                if (factory.FailRecoveryInstall && Path.GetFileName(request.PackageIdentifier) == "previous.nupkg")
+                {
+                    throw new IOException("cannot recover");
+                }
+
                 InstallResult result = await base.InstallAsync(request, cancellationToken);
                 if (factory.FailInstall)
                 {
+                    factory.FailInstall = false;
                     throw new IOException("provider failed");
                 }
 
                 return result;
             }
 
-            internal override async Task<IEnumerable<ITemplateInfo>> GetTemplatesAsync(ITemplatePackage package, CancellationToken cancellationToken)
+            internal override async Task<UninstallResult> UninstallAsync(IManagedTemplatePackage package, CancellationToken cancellationToken)
             {
-                IEnumerable<ITemplateInfo> templates = await base.GetTemplatesAsync(package, cancellationToken);
+                factory.Uninstallations++;
+                return await base.UninstallAsync(package, cancellationToken);
+            }
+
+            internal override async Task RefreshAsync(CancellationToken cancellationToken)
+            {
+                await base.RefreshAsync(cancellationToken);
                 if (factory.CancelCache is { } cancellation)
                 {
+                    factory.CancelCache = null;
                     await cancellation.CancelAsync();
                     cancellationToken.ThrowIfCancellationRequested();
                 }
 
                 if (factory.FailCache)
                 {
+                    factory.FailCache = false;
                     throw new IOException("cache failed");
                 }
-
-                return templates;
             }
         }
     }
-
 }

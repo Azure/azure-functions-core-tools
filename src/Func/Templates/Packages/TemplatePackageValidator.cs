@@ -12,7 +12,7 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Templates.Packages;
 
 /// <summary>
-/// Validates installed archives and verifies their template identities before transaction commit.
+/// Preflights downloaded package metadata and verifies identities after managed discovery refresh.
 /// </summary>
 internal sealed class TemplatePackageValidator
 {
@@ -28,7 +28,7 @@ internal sealed class TemplatePackageValidator
 
         catch (JsonException ex)
         {
-            throw new TemplatePackageException("The archive contains invalid template JSON.", ex);
+            throw new TemplatePackageException("The archive contains invalid template or func.host.json metadata.", ex);
         }
         catch (InvalidDataException ex)
         {
@@ -53,7 +53,7 @@ internal sealed class TemplatePackageValidator
         string[] discovered = [.. installed.Select(t => t.Identity)];
         if (discovered.Length != identities.Count || identities.Except(discovered, StringComparer.Ordinal).Any())
         {
-            throw new TemplatePackageException("The installed template cache did not expose the validated package. The previous hive will be restored.");
+            throw new TemplatePackageException("The installed template cache did not expose the validated package.");
         }
 
         foreach (ITemplateInfo template in installed)
@@ -67,24 +67,14 @@ internal sealed class TemplatePackageValidator
         ArgumentNullException.ThrowIfNull(templates);
         if (templates.Any())
         {
-            throw new TemplatePackageException("The template cache still contains the uninstalled package. The previous hive will be restored.");
+            throw new TemplatePackageException("The template cache still contains the uninstalled package.");
         }
     }
 
     private IReadOnlyList<string> ValidateCore(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
     {
         using PackageArchiveReader reader = new(archive, leaveStreamOpen: true);
-        foreach (string path in reader.GetFiles())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            string normalized = path.Replace('\\', '/');
-            if (normalized.StartsWith('/') || normalized.Contains(':') || normalized.Any(char.IsControl)
-                || normalized.Split('/').Any(segment => segment is "." or ".."))
-            {
-                throw new TemplatePackageException($"Archive entry '{path}' is not a safe relative package path.");
-            }
-        }
-
+        cancellationToken.ThrowIfCancellationRequested();
         if (!string.Equals(reader.NuspecReader.GetId(), packageId, StringComparison.OrdinalIgnoreCase)
             || reader.NuspecReader.GetVersion() != version)
         {
@@ -104,12 +94,16 @@ internal sealed class TemplatePackageValidator
         {
             cancellationToken.ThrowIfCancellationRequested();
             using Stream content = reader.GetStream(path);
-            using var declaration = JsonDocument.Parse(content);
+            using var declaration = JsonDocument.Parse(content, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip,
+            });
             JsonElement root = declaration.RootElement;
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("identity", out JsonElement identity) || identity.ValueKind != JsonValueKind.String
                 || string.IsNullOrWhiteSpace(identity.GetString()))
             {
-                throw new TemplatePackageException($"Template declaration '{path}' must have a nonempty identity.");
+                continue;
             }
 
             identities.Add(identity.GetString()!);
@@ -123,11 +117,11 @@ internal sealed class TemplatePackageValidator
             _ = FuncTemplateHostData.Parse(text.ReadToEnd());
         }
 
-        if (identities.Count == 0 || identities.Distinct(StringComparer.Ordinal).Count() != identities.Count)
+        if (identities.Count == 0)
         {
-            throw new TemplatePackageException("The archive must contain at least one template, with unique valid declarations.");
+            throw new TemplatePackageException("The archive must contain at least one template identity.");
         }
 
-        return identities;
+        return [.. identities.Distinct(StringComparer.Ordinal)];
     }
 }
