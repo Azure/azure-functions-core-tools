@@ -155,6 +155,9 @@ dotnet build
 dotnet test
 ```
 
+For local help/version latency measurements and harness checks, see
+[Measuring CLI startup](docs/cli-startup-performance.md).
+
 ### Run Locally
 
 ```bash
