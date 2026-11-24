@@ -62,15 +62,20 @@ public sealed class TemplateTestHost : IAsyncDisposable
     public string OutputDirectory { get; }
 
     /// <summary>
-    /// Gets the single template with <paramref name="shortName"/>.
+    /// Gets the single template with <paramref name="shortName"/>, optionally narrowed to a <c>language</c> tag.
     /// </summary>
-    /// <exception cref="InvalidOperationException">No template, or more than one, has the short name.</exception>
-    public async Task<ITemplateInfo> GetTemplateAsync(string shortName, CancellationToken cancellationToken = default)
+    /// <param name="shortName">The template short name.</param>
+    /// <param name="language">The <c>language</c> tag to match, or <see langword="null"/> to match any language.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The matching template.</returns>
+    /// <exception cref="InvalidOperationException">No template, or more than one, matches.</exception>
+    public async Task<ITemplateInfo> GetTemplateAsync(string shortName, string? language = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(shortName);
 
         TemplateResolutionResult result = await _templater.ListAsync(cancellationToken);
-        return result.Templates.Single(template => template.ShortNameList.Contains(shortName));
+        return result.Templates.Single(template => template.ShortNameList.Contains(shortName)
+            && (language is null || (template.TagsCollection.TryGetValue("language", out string? tag) && tag == language)));
     }
 
     /// <summary>

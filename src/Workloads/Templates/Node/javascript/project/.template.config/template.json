@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Cloud" ],
+  "identity": "Azure.Functions.Cli.Node.Project.JavaScript",
+  "groupIdentity": "Azure.Functions.Cli.Node.Project",
+  "name": "Azure Functions JavaScript project",
+  "description": "A Node.js Azure Functions project using the v4 programming model.",
+  "shortName": "func-node",
+  "tags": {
+    "language": "JavaScript",
+    "stack": "node",
+    "type": "project"
+  },
+  "preferNameDirectory": true,
+  "symbols": {
+    "NoHttp": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the sample HTTP function."
+    },
+    "NoBundle": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the extension bundle from host.json."
+    },
+    "BundlesChannel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "Stable",
+      "description": "The extension bundle release channel.",
+      "choices": [
+        { "choice": "Stable", "description": "Generally available extension bundle." },
+        { "choice": "Preview", "description": "Preview extension bundle." },
+        { "choice": "Experimental", "description": "Experimental extension bundle." }
+      ]
+    },
+    "BundleId": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "Microsoft.Azure.Functions.ExtensionBundle",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          { "condition": "(BundlesChannel == \"Preview\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Preview" },
+          { "condition": "(BundlesChannel == \"Experimental\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Experimental" },
+          { "condition": "", "value": "Microsoft.Azure.Functions.ExtensionBundle" }
+        ]
+      }
+    },
+    "LowerName": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "name",
+        "toLower": true
+      }
+    },
+    "PackageName": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "functions-project",
+      "parameters": {
+        "source": "LowerName",
+        "steps": [
+          { "regex": "[^a-z0-9._-]+", "replacement": "-" }
+        ]
+      }
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": [ ".template.config/**" ],
+      "modifiers": [
+        {
+          "condition": "NoHttp",
+          "exclude": [ "src/functions/HelloWorld.js" ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "package.json" }
+  ]
+}

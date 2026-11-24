@@ -1,0 +1,8 @@
+*.js.map
+*.ts
+.git*
+.vscode
+local.settings.json
+test
+node_modules/@types/
+node_modules/typescript/bin/

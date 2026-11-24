@@ -1,0 +1,7 @@
+{
+  "symbolInfo": {
+    "NoHttp": { "longName": "no-http" },
+    "NoBundle": { "longName": "no-bundles" },
+    "BundlesChannel": { "longName": "bundles-channel", "shortName": "c" }
+  }
+}

@@ -13,10 +13,12 @@ func workload install Azure.Functions.Cli.Workloads.Node
 func workload install node
 ```
 
-## Status
+## Bundled templates
 
-Preview. The project initializer is currently a stub; full scaffolding lands
-in a follow-up release.
+The workload package includes JavaScript and TypeScript project, HTTP trigger,
+and timer trigger templates under `content/templates`. The template engine can
+discover them through the workload's `templateRoot`. Migrating `func init` and
+`func new` to these templates is separate work.
 
 ## Links
 
