@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
@@ -19,8 +20,16 @@ internal static class TemplateFixtures
     public const string ItemTemplateShortName = "func-tests-item";
     public const string ProjectTemplateIdentity = "Func.Tests.Project";
     public const string ProjectTemplateShortName = "func-tests-project";
+    public const string InitProjectTemplateIdentity = "Func.Tests.InitProject";
+    public const string InitProjectTemplateShortName = "func-python";
     public const string OtherTypeTemplateIdentity = "Func.Tests.OtherType";
     public const string UntypedTemplateIdentity = "Func.Tests.Untyped";
+
+    public static ITemplaterFactory CreateEmptyTemplaterFactory()
+        => CreateTemplaterFactory(Path.Combine(Path.GetTempPath(), "func-init-template-tests", Guid.NewGuid().ToString("N")));
+
+    public static ITemplaterFactory CreateTemplaterFactory(string home)
+        => new TemplaterFactory(new CliConfigurationPathsOptions(home), []);
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -65,7 +74,7 @@ internal static class TemplateFixtures
               "identity": "{{ProjectTemplateIdentity}}",
               "name": "Func Tests Project",
               "shortName": "{{ProjectTemplateShortName}}",
-              "tags": { "type": "project" },
+              "tags": { "type": "project", "language": "python" },
               "sourceName": "FuncProject"
             }
             """,
@@ -111,6 +120,102 @@ internal static class TemplateFixtures
             }
             """,
             ("Function.txt", "Function content"));
+
+        return packageDirectory;
+    }
+
+    public static string WriteInitProjectPackage(
+        string parentDirectory,
+        string shortName = InitProjectTemplateShortName,
+        string language = "python",
+        string alternateShortName = "func-python-alternative",
+        string alternateIdentity = $"{InitProjectTemplateIdentity}.Alternative",
+        string targetFrameworkAlias = "target-framework",
+        string targetFrameworkShortName = "tfm",
+        bool alternateFirst = false)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "init-templates");
+        string templateDirectory = Path.Combine(packageDirectory, alternateFirst ? "z-project" : "project");
+        void WriteAlternativeTemplate() => WriteTemplate(
+            Path.Combine(packageDirectory, alternateFirst ? "a-project-alternative" : "project-alternative"),
+            $$"""
+            {
+              "identity": "{{alternateIdentity}}",
+              "name": "Alternative Python Project",
+              "shortName": "{{alternateShortName}}",
+              "tags": { "type": "project", "language": "{{language}}" }
+            }
+            """,
+            ("Alternative.txt", "Alternative project"));
+
+        if (alternateFirst)
+        {
+            WriteAlternativeTemplate();
+        }
+
+        WriteTemplate(
+            templateDirectory,
+            $$"""
+            {
+              "$schema": "http://json.schemastore.org/template",
+              "identity": "{{InitProjectTemplateIdentity}}",
+              "name": "Func Tests Init Project",
+              "shortName": "{{shortName}}",
+              "sourceName": "FunctionsProject",
+              "tags": { "type": "project", "language": "{{language}}" },
+              "symbols": {
+                "TargetFramework": {
+                  "type": "parameter",
+                  "datatype": "choice",
+                  "defaultValue": "net10.0",
+                  "replaces": "net10.0",
+                  "choices": [ { "choice": "net10.0" }, { "choice": "net11.0" } ]
+                },
+                "NoHttp": {
+                  "type": "parameter",
+                  "datatype": "bool",
+                  "defaultValue": "false"
+                },
+                "NoTelemetry": {
+                  "type": "parameter",
+                  "datatype": "bool",
+                  "defaultValue": "false"
+                }
+              },
+              "sources": [
+                {
+                  "source": "./",
+                  "target": "./",
+                  "exclude": [ ".template.config/**" ],
+                  "modifiers": [ { "condition": "NoHttp", "exclude": [ "Http.txt" ] } ]
+                }
+              ]
+            }
+            """,
+            ("FunctionsProject.txt", "net10.0"),
+            ("func.host.json", $$"""
+                {
+                  "symbolInfo": {
+                    "TargetFramework": { "longName": "{{targetFrameworkAlias}}", "shortName": "{{targetFrameworkShortName}}" },
+                    "NoHttp": { "longName": "no-http" },
+                    "NoTelemetry": { "longName": "no-telemetry" },
+                    "RemovedParameter": { "longName": "stale" }
+                  }
+                }
+                """));
+        File.WriteAllText(Path.Combine(templateDirectory, "Http.txt"), "HTTP function");
+        File.WriteAllText(Path.Combine(templateDirectory, "Program.cs"), """
+            var builder = FunctionsApplication.CreateBuilder(args);
+            #if (!NoTelemetry)
+            var telemetry = builder.Services.AddOpenTelemetry();
+            #endif
+            await builder.Build().RunAsync();
+            """);
+
+        if (!alternateFirst)
+        {
+            WriteAlternativeTemplate();
+        }
 
         return packageDirectory;
     }

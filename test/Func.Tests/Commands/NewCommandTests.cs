@@ -102,7 +102,7 @@ public class NewCommandTests
             new[] { "new", "--template", "HttpTrigger-Python", "-name", "ttpt" },
             new ParserConfiguration { EnablePosixBundling = false });
 
-        result.Errors.Should().Contain(e => e.Message.Contains("Unrecognized option '-name'", System.StringComparison.Ordinal));
+        result.Errors.Should().Contain(e => e.Message.Contains("Unrecognized command or argument '-name'", System.StringComparison.Ordinal));
     }
 
     [Theory]

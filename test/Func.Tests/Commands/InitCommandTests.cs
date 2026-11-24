@@ -8,6 +8,8 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Tests.Templates;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
@@ -43,8 +45,11 @@ public class InitCommandTests
             .Returns([]);
     }
 
-    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers, ITemplaterFactory? templaterFactory = null,
+        TestInteractionService? interaction = null) =>
+        new(interaction ?? _interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+            new InstalledBundleScanner(_installedBundles),
+            templaterFactory ?? TemplateFixtures.CreateEmptyTemplaterFactory(), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -104,10 +109,8 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_CreatesMissingDirectoryBeforeDispatch()
+    public async Task InitCommand_DoesNotCreateDirectoryWhenStackCannotBeSelected()
     {
-        // Even when --stack is missing, InitCommand creates the target
-        // directory before validating (directory creation is unconditional).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         Directory.Exists(newDir).Should().BeFalse();
 
@@ -118,9 +121,8 @@ public class InitCommandTests
 
             var exitCode = await result.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-            // No --stack provided → exit 1, but directory was still created.
             exitCode.Should().Be(1);
-            Directory.Exists(newDir).Should().BeTrue();
+            Directory.Exists(newDir).Should().BeFalse();
         }
         finally
         {
@@ -128,6 +130,651 @@ public class InitCommandTests
             {
                 Directory.Delete(newDir, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_UsesDefaultTemplateAndBindsHostOptionAliases()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                extraArgs: ["-tfm", "net11.0", "--no-http"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0, string.Join(Environment.NewLine, _interaction.Lines));
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net11.0");
+            File.Exists(Path.Combine(output, "Http.txt")).Should().BeFalse();
+            AssertConfigJsonHasShape(output, expectedStack: "python", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_NoTelemetryAliasDisablesTelemetryInGeneratedContent()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                extraArgs: ["--no-telemetry"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            string generatedProgram = File.ReadAllText(Path.Combine(output, "Program.cs"));
+            generatedProgram.Should().Contain("FunctionsApplication.CreateBuilder");
+            generatedProgram.Should().NotContain("AddOpenTelemetry");
+            AssertConfigJsonHasShape(output, expectedStack: "python", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_UnknownTemplateOptionPreservesExistingDirectory()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        string sentinel = Path.Combine(output, "keep.txt");
+        Directory.CreateDirectory(output);
+        File.WriteAllText(sentinel, "original content");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                extraArgs: ["--does-not-exist"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(sentinel).Should().Be("original content");
+            File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeFalse();
+            _interaction.Lines.Should().Contain(line => line.Contains("Unrecognized option '--does-not-exist'."));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_SelectsDefaultWhenAlternativeIsEnumeratedFirst()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(
+                root,
+                alternateShortName: "a-quickstart-alternative",
+                alternateIdentity: "A.Func.Tests.InitProject.Alternative",
+                alternateFirst: true);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            ITemplaterFactory templaterFactory = TemplateFixtures.CreateTemplaterFactory(home);
+            using (Templater templater = templaterFactory.Create(new TemplateEngineContext(WorkingDirectory.FromExplicit(root))))
+            {
+                TemplateResolutionResult candidates = await templater.ListProjectTemplatesAsync(
+                    "python", TestContext.Current.CancellationToken);
+                candidates.Templates.SelectMany(template => template.ShortNameList)
+                    .Should().ContainInOrder("a-quickstart-alternative", "func-python");
+            }
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: templaterFactory);
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net10.0");
+            File.Exists(Path.Combine(output, "Alternative.txt")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_LeavesUnspecifiedTemplateParametersToEngineDefaults()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0);
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net10.0");
+            File.Exists(Path.Combine(output, "Http.txt")).Should().BeTrue();
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_InvalidTemplateParameterDoesNotModifyTarget(bool force)
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        string sentinel = Path.Combine(output, "keep.txt");
+        if (force)
+        {
+            Directory.CreateDirectory(output);
+            File.WriteAllText(sentinel, "original");
+        }
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                force: force,
+                extraArgs: ["--target-framework", "invalid"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1, string.Join(Environment.NewLine, _interaction.Lines));
+            initializer.WasInvoked.Should().BeFalse();
+            if (force)
+            {
+                File.ReadAllText(sentinel).Should().Be("original");
+            }
+            else
+            {
+                Directory.Exists(output).Should().BeFalse();
+            }
+            File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateCandidatesWithoutUniqueDefaultDoNotFallBack()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root, shortName: "func-python-other");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.Exists(output).Should().BeFalse();
+            _interaction.Lines.Should().Contain(line => line.Contains("Expected one default project template"));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_DuplicateDefaultTemplatesDoNotFallBack()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(
+                root,
+                alternateShortName: TemplateFixtures.InitProjectTemplateShortName);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.Exists(output).Should().BeFalse();
+            _interaction.Lines.Should().Contain(line => line.Contains("found 2"));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateAliasesCannotShadowRecursiveGlobalOptions()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root, targetFrameworkAlias: "verbose");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+            var command = CreateCommand([initializer], TemplateFixtures.CreateTemplaterFactory(home));
+            var rootCommand = new RootCommand { command };
+            rootCommand.Options.Add(new Option<bool>("--verbose") { Recursive = true });
+
+            int exitCode = await rootCommand.Parse(
+                ["init", output, "--language", "python", "--stack", "python", "--verbose"])
+                .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.Exists(output).Should().BeFalse();
+            _interaction.Lines.Should().Contain(line => line.Contains("conflicts with a built-in option"));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Theory]
+    [InlineData("-fw")]
+    [InlineData("--target-framework")]
+    public async Task InitCommand_EveryTemplateAliasBindsWhenStackOptionPartiallyOverlaps(string alias)
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root, targetFrameworkShortName: "fw");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            FakeProjectInitializer initializer = CreateInitializerWithTargetFrameworkOption();
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                extraArgs: [alias, "net11.0"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0, string.Join(Environment.NewLine, _interaction.Lines));
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net11.0");
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_PathAfterTemplateOptionIsRejectedBeforeCreation()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+            var rootCommand = new RootCommand
+            {
+                CreateCommand([initializer], TemplateFixtures.CreateTemplaterFactory(home)),
+            };
+
+            int exitCode = await rootCommand.Parse(
+                ["init", "--target-framework", "net11.0", output, "--stack", "python", "--language", "python"])
+                .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+            exitCode.Should().Be(1);
+            _interaction.Lines.Should().Contain(
+                $"ERROR: Unrecognized argument '{output}'. Specify the project path before template options.");
+            Directory.Exists(output).Should().BeFalse();
+            initializer.WasInvoked.Should().BeFalse();
+            initializer.ConfigureCount.Should().Be(0);
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+    [Fact]
+    public async Task InitCommand_StackOnlyAliasIsRejectedByTemplate()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root, targetFrameworkShortName: "fw");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            FakeProjectInitializer initializer = CreateInitializerWithTargetFrameworkOption();
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                extraArgs: ["-tfm", "net11.0"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.Exists(output).Should().BeFalse();
+            _interaction.Lines.Should().Equal("ERROR: Unrecognized option '-tfm'.");
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Theory]
+    [InlineData("-fw", "--target-framework")]
+    [InlineData("--target-framework", "-fw")]
+    [InlineData("-fw", "-fw")]
+    public async Task InitCommand_TemplateParameterAssignedTwiceIsRejected(string first, string second)
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root, targetFrameworkShortName: "fw");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            FakeProjectInitializer initializer = CreateInitializerWithTargetFrameworkOption();
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                extraArgs: [first, "net10.0", second, "net11.0"],
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.Exists(output).Should().BeFalse();
+            _interaction.Lines.Should().ContainSingle(line => line.Contains("was specified more than once."));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateCreation_RunsStackSetupAfterConfigurationAndBeforeSuccess()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            bool? projectCreatedBeforeSetup = null;
+            bool? configurationWrittenBeforeSetup = null;
+            int linesBeforeSetup = -1;
+            var initializer = new FakeProjectInitializer("python", ["python"], onConfigure: context =>
+            {
+                projectCreatedBeforeSetup = File.Exists(Path.Combine(output, "App.txt"));
+                configurationWrittenBeforeSetup = File.Exists(Path.Combine(output, ".func", "config.json"));
+                linesBeforeSetup = _interaction.Lines.Count;
+                context.WorkingDirectory.Info.FullName.Should().Be(Path.GetFullPath(output));
+                context.Language.Should().Be("python");
+            });
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0, string.Join(Environment.NewLine, _interaction.Lines));
+            initializer.WasInvoked.Should().BeFalse();
+            initializer.ConfigureCount.Should().Be(1);
+            projectCreatedBeforeSetup.Should().BeTrue();
+            configurationWrittenBeforeSetup.Should().BeTrue();
+            _interaction.Lines.Take(linesBeforeSetup).Should().NotContain(line => line.Contains("Project initialized for"));
+            _interaction.Lines.Skip(linesBeforeSetup).Should().Contain(line => line.Contains("Project initialized for"));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateCreation_StackSetupFailureDoesNotReportSuccess()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer(
+                "python", ["python"], onConfigure: _ => throw new InvalidOperationException("setup failed"));
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.ConfigureCount.Should().Be(1);
+            _interaction.Lines.Should().NotContain(line => line.Contains("Project initialized for"));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_LegacyScaffolding_DoesNotRunTemplateStackSetup()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var python = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(path, python, language: "python", stack: "python");
+
+            exitCode.Should().Be(0, string.Join(Environment.NewLine, _interaction.Lines));
+            python.WasInvoked.Should().BeTrue();
+            python.ConfigureCount.Should().Be(0);
+        }
+        finally
+        {
+            CleanupDirectory(path);
+        }
+    }
+
+    private static FakeProjectInitializer CreateInitializerWithTargetFrameworkOption() =>
+        new(
+            "python",
+            ["python"],
+            optionFactory: registry => [registry.GetOrAdd(new Option<string>("--target-framework", "-tfm"))]);
+
+    [Fact]
+    public async Task InitCommand_TemplateCreation_DeclinedForceDoesNotCreateProject()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            Directory.CreateDirectory(output);
+            string sentinel = Path.Combine(output, "keep.txt");
+            File.WriteAllText(sentinel, "original content");
+            var interaction = new InteractiveTestInteractionService();
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+            var rootCommand = new RootCommand
+            {
+                CreateCommand([initializer], TemplateFixtures.CreateTemplaterFactory(home), interaction),
+            };
+
+            int exitCode = await rootCommand.Parse(
+                ["init", output, "--stack", "python", "--language", "python", "--force"])
+                .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+            exitCode.Should().Be(1);
+            interaction.Lines.Should().Contain(line => line.StartsWith("CONFIRM:"));
+            Directory.GetFileSystemEntries(output).Should().Equal(sentinel);
+            File.ReadAllText(sentinel).Should().Be("original content");
+            initializer.WasInvoked.Should().BeFalse();
+            initializer.ConfigureCount.Should().Be(0);
+            interaction.Lines.Should().NotContain(line => line.Contains("Project initialized for"));
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateCollisionDoesNotOverwriteExistingFile()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        Directory.CreateDirectory(output);
+        string generatedFile = Path.Combine(output, "Http.txt");
+        File.WriteAllText(generatedFile, "user content");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(generatedFile).Should().Be("user content");
+            File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateConfigurationWriteFailurePreservesWarningAndSuccess()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            Directory.CreateDirectory(output);
+            string configFolder = Path.Combine(output, ".func");
+            File.WriteAllText(configFolder, "user content");
+            var initializer = new FakeProjectInitializer("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net10.0");
+            File.ReadAllText(configFolder).Should().Be("user content");
+            string expectedWarning = $"Could not write {Path.Combine(".func", "config.json")}";
+            _interaction.Lines.Should().Contain(line => line.Contains(expectedWarning));
+            File.Exists(Path.Combine(configFolder, "config.json")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(root);
         }
     }
 
@@ -291,9 +938,11 @@ public class InitCommandTests
         IProjectInitializer initializer,
         string? language,
         string? stack = null,
-        bool force = false)
+        bool force = false,
+        IReadOnlyList<string>? extraArgs = null,
+        ITemplaterFactory? templaterFactory = null)
     {
-        return await RunInitAsync(path, [initializer], language, stack, force);
+        return await RunInitAsync(path, [initializer], language, stack, force, extraArgs, templaterFactory);
     }
 
     private async Task<int> RunInitAsync(
@@ -302,9 +951,10 @@ public class InitCommandTests
         string? language = null,
         string? stack = null,
         bool force = false,
-        IReadOnlyList<string>? extraArgs = null)
+        IReadOnlyList<string>? extraArgs = null,
+        ITemplaterFactory? templaterFactory = null)
     {
-        var cmd = CreateCommand(initializers);
+        var cmd = CreateCommand(initializers, templaterFactory);
         var root = new RootCommand { cmd };
         var args = new List<string> { "init", path };
         if (stack is not null)
@@ -327,6 +977,26 @@ public class InitCommandTests
         }
         ParseResult result = root.Parse(args.ToArray());
         return await result.InvokeAsync();
+    }
+
+    [Fact]
+    public async Task InitCommand_FreshStack_RejectsUnknownOptionBeforeCreatingDestination()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var python = new FakeProjectInitializer("python", ["python"]);
+            int exitCode = await RunInitAsync(path, python, language: "python", stack: "python", extraArgs: ["--does-not-exist"]);
+
+            exitCode.Should().Be(1);
+            _interaction.Lines.Should().Equal("ERROR: Unrecognized option '--does-not-exist'.");
+            Directory.Exists(path).Should().BeFalse();
+            python.WasInvoked.Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(path);
+        }
     }
 
     [Fact]
@@ -655,7 +1325,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), TemplateFixtures.CreateEmptyTemplaterFactory(), [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync(
@@ -806,6 +1477,36 @@ public class InitCommandTests
         }
     }
 
+    [Theory]
+    [InlineData(new[] { "--does-not-exist" }, "ERROR: Unrecognized option '--does-not-exist'.")]
+    [InlineData(new[] { "-tfm", "net11.0" }, "ERROR: Option '-tfm' is not supported for an existing project because no project content is created. Remove it, or pass --force to re-initialize.")]
+    public async Task InitCommand_Adopt_RejectsUnusedOptionBeforePromptingForStack(string[] extraArgs, string expectedError)
+    {
+        string path = Directory.CreateTempSubdirectory("func-init-").FullName;
+        try
+        {
+            string host = Path.Combine(path, "host.json");
+            File.WriteAllText(host, """{ "version": "2.0" }""");
+            byte[] original = File.ReadAllBytes(host);
+            var interactive = new InteractiveTestInteractionService();
+            FakeProjectInitializer python = CreateInitializerWithTargetFrameworkOption();
+            var root = new RootCommand { CreateCommand([python], interaction: interactive) };
+
+            int exitCode = await root.Parse(["init", path, .. extraArgs]).InvokeAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            exitCode.Should().Be(1);
+            interactive.Lines.Should().Equal(expectedError);
+            Directory.GetFileSystemEntries(path).Should().Equal(host);
+            File.ReadAllBytes(host).Should().Equal(original);
+            python.WasInvoked.Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(path);
+        }
+    }
+
     [Fact]
     public async Task InitCommand_Adopt_NoProjectSignal_Interactive_PromptsForStack()
     {
@@ -820,7 +1521,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), TemplateFixtures.CreateEmptyTemplaterFactory(), [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync(
@@ -1184,6 +1886,39 @@ public class InitCommandTests
         }
     }
 
+    [Theory]
+    [InlineData(new[] { "--does-not-exist" }, "ERROR: Unrecognized option '--does-not-exist'.")]
+    [InlineData(new[] { "--target-framework", "net11.0" }, "ERROR: Option '--target-framework' is not supported for an existing project because no project content is created. Remove it, or pass --force to re-initialize.")]
+    public async Task InitCommand_Heal_RejectsUnusedOptionBeforeUpdatingConfig(string[] extraArgs, string expectedError)
+    {
+        string path = Directory.CreateTempSubdirectory("func-init-").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(path, ".func"));
+            string config = Path.Combine(path, ".func", "config.json");
+            File.WriteAllText(config, """{ "stack": { "runtime": "dotnet" }, "profiles": { "keep": true } }""");
+            byte[] original = File.ReadAllBytes(config);
+            var interactive = new InteractiveTestInteractionService();
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                ["C#", "F#"],
+                optionFactory: registry => [registry.GetOrAdd(new Option<string>("--target-framework", "-tfm"))]);
+            var root = new RootCommand { CreateCommand([dotnet], interaction: interactive) };
+
+            int exitCode = await root.Parse(["init", path, .. extraArgs]).InvokeAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            exitCode.Should().Be(1);
+            interactive.Lines.Should().Equal(expectedError);
+            File.ReadAllBytes(config).Should().Equal(original);
+            dotnet.WasInvoked.Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(path);
+        }
+    }
+
     [Fact]
     public async Task InitCommand_Heal_FillsMissingLanguageWithoutForce()
     {
@@ -1303,7 +2038,8 @@ public class InitCommandTests
         IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
         Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
         Action<FakeProjectInitializer, ParseResult>? onInitialize = null,
-        IReadOnlyList<string>? workerRuntimeAliases = null) : IProjectInitializer
+        IReadOnlyList<string>? workerRuntimeAliases = null,
+        Action<InitContext>? onConfigure = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
@@ -1328,6 +2064,15 @@ public class InitCommandTests
         {
             WasInvoked = true;
             onInitialize?.Invoke(this, parseResult);
+            return Task.CompletedTask;
+        }
+
+        public int ConfigureCount { get; private set; }
+
+        public Task ConfigureProjectAsync(InitContext context, CancellationToken cancellationToken = default)
+        {
+            ConfigureCount++;
+            onConfigure?.Invoke(context);
             return Task.CompletedTask;
         }
     }

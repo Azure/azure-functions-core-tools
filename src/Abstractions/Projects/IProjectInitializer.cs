@@ -70,4 +70,13 @@ public interface IProjectInitializer
     /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.
     /// </summary>
     public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs stack-owned, non-scaffolding setup after an installed project template has created
+    /// the project at <see cref="WorkloadContext.WorkingDirectory"/> and <c>.func/config.json</c>
+    /// has been written. Implementations must not create or overwrite template content; project
+    /// files are owned by the template. The default implementation does nothing.
+    /// </summary>
+    public Task ConfigureProjectAsync(InitContext context, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }
