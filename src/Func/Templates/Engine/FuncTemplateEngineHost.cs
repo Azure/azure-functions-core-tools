@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 
 namespace Azure.Functions.Cli.Templates.Engine;
@@ -11,12 +12,14 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 /// <param name="context">The template engine context for the current command.</param>
 /// <param name="components">The template components to expose to the engine.</param>
-internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable<ITemplateComponent> components)
+internal class FuncTemplateEngineHost(
+    TemplateEngineContext context, IReadOnlyList<ICoreTemplateComponent> components)
     : DefaultTemplateEngineHost(
         Identifier,
         AssemblyCliVersionProvider.Instance.Version,
         CreateDefaults(context),
-        FuncTemplateComponents.Get(components))
+        [.. (components ?? throw new ArgumentNullException(nameof(components)))
+            .Select(component => (component.InterfaceType, component.Instance))])
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a

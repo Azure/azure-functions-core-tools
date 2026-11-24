@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads;
@@ -63,4 +64,21 @@ public abstract class FunctionsCliBuilder
     /// <typeparam name="TFactory">A concrete <see cref="IFunctionsProjectFactory"/>.</typeparam>
     public abstract void AddProjectFactory<TFactory>()
         where TFactory : class, IFunctionsProjectFactory;
+
+    /// <summary>
+    /// Adds a workload template component. Unsupported component contracts are ignored by the engine.
+    /// Core CLI components cannot be overridden.
+    /// </summary>
+    /// <param name="component">The caller-owned component instance.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="component"/> is null.</exception>
+    public abstract void AddTemplateComponent(ITemplateComponent component);
+
+    /// <summary>
+    /// Adds a template component with singleton lifetime, reusing an existing DI registration when present.
+    /// Unsupported component contracts are ignored by the engine; no project stack registration is required.
+    /// </summary>
+    /// <typeparam name="TComponent">A concrete workload template component.</typeparam>
+    /// <exception cref="ArgumentException">The component type is abstract.</exception>
+    public abstract void AddTemplateComponent<TComponent>()
+        where TComponent : class, ITemplateComponent;
 }

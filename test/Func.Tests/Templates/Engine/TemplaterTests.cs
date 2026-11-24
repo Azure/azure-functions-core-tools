@@ -3,9 +3,11 @@
 
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Settings;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -157,7 +159,10 @@ public sealed class TemplaterTests : IDisposable
     public void Constructor_RegistersSuppliedComponents()
     {
         TestComponent component = new();
-        using Templater templater = new(Context(), _hive, [new TestTemplateComponent(component)]);
+        ICoreTemplateComponent registration = Substitute.For<ICoreTemplateComponent>();
+        registration.InterfaceType.Returns(typeof(ITestComponent));
+        registration.Instance.Returns(component);
+        using Templater templater = new(Context(), _hive, [registration]);
 
         templater.Settings.Components.OfType<ITestComponent>().Should().ContainSingle().Which.Should().BeSameAs(component);
     }
@@ -175,7 +180,8 @@ public sealed class TemplaterTests : IDisposable
 
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
-    private Templater CreateTemplater() => new(Context(), _hive, []);
+    private Templater CreateTemplater()
+        => new(Context(), _hive, new FuncTemplateComponents([], [], Substitute.For<IInteractionService>()).Get());
 
     private interface ITestComponent : IIdentifiedComponent
     {
@@ -184,12 +190,5 @@ public sealed class TemplaterTests : IDisposable
     private sealed class TestComponent : ITestComponent, IIdentifiedComponent
     {
         public Guid Id { get; } = Guid.NewGuid();
-    }
-
-    private sealed class TestTemplateComponent(IIdentifiedComponent instance) : ITemplateComponent
-    {
-        public Type InterfaceType => typeof(ITestComponent);
-
-        public IIdentifiedComponent Instance { get; } = instance;
     }
 }

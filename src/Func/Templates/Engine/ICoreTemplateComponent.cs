@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Represents a template component that can be registered with the dependency injection container.
 /// </summary>
-public interface ITemplateComponent
+internal interface ICoreTemplateComponent
 {
     /// <summary>
     /// Gets the declared interface type to register to <see cref="IComponentManager"/> as.
