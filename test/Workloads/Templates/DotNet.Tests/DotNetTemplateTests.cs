@@ -82,6 +82,50 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task Project_DefaultExclusions_OmitBuildAndUserFiles()
+    {
+        string source = Path.Combine(AppContext.BaseDirectory, "content", "templates", "project");
+        string packageRoot = Path.Combine(_host.Root, "templates");
+        string projectRoot = Path.Combine(packageRoot, "project");
+        foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            string destination = Path.Combine(projectRoot, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination);
+        }
+
+        string[] excludedFiles =
+        [
+            Path.Combine("bin", "artifact.dll"),
+            Path.Combine("obj", "generated.txt"),
+            "settings.user",
+            "packages.lock.json",
+        ];
+        foreach (string relativePath in excludedFiles)
+        {
+            string path = Path.Combine(projectRoot, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "excluded");
+        }
+
+        await using var host = new TemplateTestHost(packageRoot);
+        ITemplateInfo template = await host.GetTemplateAsync("func-dotnet", TestContext.Current.CancellationToken);
+
+        ITemplateCreationResult result = await host.InstantiateAsync(
+            template, "Sample.App", new Dictionary<string, string?> { ["NoHttp"] = "true" },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+        foreach (string relativePath in excludedFiles)
+        {
+            File.Exists(Path.Combine(result.OutputBaseDirectory!, relativePath)).Should().BeFalse();
+        }
+
+        Directory.Exists(Path.Combine(result.OutputBaseDirectory!, ".template.config")).Should().BeFalse();
+        File.Exists(Path.Combine(result.OutputBaseDirectory!, "HelloWorld.cs")).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("net11.0", CreationResultStatus.Success)]
     [InlineData("net9.0", CreationResultStatus.InvalidParamValues)]
