@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 
 namespace Azure.Functions.Cli.Templates.Engine;
