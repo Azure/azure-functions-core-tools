@@ -53,9 +53,9 @@ internal class TemplateCatalog(
                 throw new TemplatePackageException("Use either --version for an exact version or --prerelease for the latest prerelease-inclusive version.");
             }
 
-            if (!SemanticVersion.TryParse(version, out _) || !NuGetVersion.TryParse(version, out NuGetVersion? exact))
+            if (!NuGetVersion.TryParse(version, out NuGetVersion? exact))
             {
-                throw new TemplatePackageException($"'{version}' is not an exact SemVer version.");
+                throw new TemplatePackageException($"'{version}' is not an exact NuGet version.");
             }
 
             return exact;

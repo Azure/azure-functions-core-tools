@@ -82,7 +82,8 @@ successful search. Network and malformed-response failures remain failures.
 
 Without `--version`, resolve the latest stable version by default;
 `--prerelease` permits prerelease versions. An explicit `--version` pins an
-exact NuGet version, including an explicitly requested prerelease version.
+exact NuGet version, including four-component versions such as `1.2.3.4` and
+an explicitly requested prerelease version. Version ranges are not accepted.
 Reject invalid package IDs and versions before changing installed state.
 `--version` and `--prerelease` are mutually exclusive: choose either an exact
 version or prerelease-inclusive latest-version resolution.

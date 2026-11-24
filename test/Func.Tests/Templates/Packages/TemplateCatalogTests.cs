@@ -138,8 +138,6 @@ public sealed class TemplateCatalogTests
 
     [Theory]
     [InlineData("1.*", false)]
-    [InlineData("1.0", false)]
-    [InlineData("1.0.0.0", false)]
     [InlineData("[1.0,2.0)", false)]
     [InlineData("1.0.0", true)]
     public async Task ResolveVersion_RejectsRangesAndConflictingOptions(string version, bool prerelease)
@@ -149,6 +147,18 @@ public sealed class TemplateCatalogTests
         Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", version, "https://feed.test/index.json", prerelease, CancellationToken.None);
 
         await act.Should().ThrowAsync<TemplatePackageException>();
+    }
+
+    [Fact]
+    public async Task ResolveVersion_AcceptsFourPartNuGetVersion()
+    {
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
+            _ => throw new InvalidOperationException());
+
+        NuGetVersion version = await catalog.ResolveVersionAsync(
+            "test.templates", "1.2.3.4", "https://feed.test/index.json", false, TestContext.Current.CancellationToken);
+
+        version.ToNormalizedString().Should().Be("1.2.3.4");
     }
 
     [Fact]
