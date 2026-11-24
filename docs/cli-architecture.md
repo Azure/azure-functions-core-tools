@@ -94,14 +94,19 @@ func templates
 └── uninstall <package-id>  Uninstall a managed template package
 ```
 
-`--source` overrides `FUNC_CLI_TEMPLATES_SOURCE` as an optional additional feed.
-Install uses ambient `NuGet.Config` plus that feed, filters HTTP like
-`dotnet new install`, and validates the installed archive inside a rollback
-transaction. The engine would record a local NuGet package without `NuGetSource`;
-matching ID/version is a no-op regardless of feed. Search queries the additional
-feed directly, or nuget.org when none is supplied. These commands would not
-require an initialized Functions project. They are not yet available; the NuGet
-catalog, package lifecycle, and CLI integration layers must ship first.
+Like workload commands, search and install use one feed: `--source`, then
+`FUNC_CLI_TEMPLATES_SOURCE`, then nuget.org. They do not read `NuGet.Config`.
+Install prevalidates the downloaded archive, then delegates package storage and
+registration to the engine's managed provider. Preflight checks require matching
+package identity/version, the `FuncTemplate` package type with no workload type,
+valid `func.host.json` metadata, and at least one template identity; NuGet and
+Microsoft.TemplateEngine handle archive path safety and template-format
+validation. On replacement, the CLI keeps a temporary backup to restore through
+that provider if installation or discovery fails. The engine would record a
+local NuGet package without `NuGetSource`; matching ID/version is a no-op
+regardless of feed. These commands would not require an initialized Functions
+project. They are not yet available; the NuGet catalog, package lifecycle, and
+CLI integration layers must ship first.
 
 ## In-place CLI updates
 

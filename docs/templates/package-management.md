@@ -15,7 +15,7 @@ workloads automatically.
 ## Command surface
 
 ```text
-func templates search [query] [--source <feed>] [--prerelease] [--json]
+func templates search [query] [--source <feed>] [--prerelease] [--format <plain|json>]
 func templates install <package-id> [--version <version>] [--source <feed>] [--prerelease]
 func templates uninstall <package-id>
 ```
@@ -26,31 +26,27 @@ NuGet packages, not individual template identities or short names.
 
 ## Feed configuration
 
-An optional additional feed is selected in this order:
+Template commands resolve one feed the same way workload commands do. The first
+configured value wins:
 
 1. The command's `--source` option.
 2. `FUNC_CLI_TEMPLATES_SOURCE`.
+3. The nuget.org V3 service index, `https://api.nuget.org/v3/index.json`.
 
-Installation uses enabled sources from ambient `NuGet.Config` for the current
-directory, with NuGet package source mappings, plus the optional additional
-feed. Neither option replaces or isolates the configured feeds. With no
-additional feed, installation uses only ambient configuration; it does not
-inject nuget.org. Additional feeds follow the engine's source-mapping semantics.
+Search and install use that single feed. They do not read `NuGet.Config`, apply
+package source mappings, or aggregate several feeds. A broader func CLI
+configuration story, including whether to honor user or machine NuGet
+configuration, is out of scope for this proposal and would apply to workloads and
+templates together.
 
-Search retains its bounded single-feed behavior: search the additional feed
-directly when supplied, otherwise search the nuget.org V3 service index,
-`https://api.nuget.org/v3/index.json`. It does not aggregate ambient feeds.
-
-An explicit source must be an absolute HTTP(S) V3 feed URL. Unsupported sources
-fail with guidance rather than falling back to nuget.org.
-
-For installation, HTTP feeds are filtered out like `dotnet new install`;
-use HTTPS instead. The CLI does not set the engine's force flag to bypass
-filtering, including during replacement.
+An explicit source must be an absolute HTTP(S) V3 feed URL, matching workload
+source validation. Unsupported sources fail with guidance rather than falling
+back to nuget.org.
 
 Reuse the existing NuGet transport and source-validation mechanisms, not the
-workload catalog's configuration values. Do not add an application configuration
-file or a layered configuration pipeline.
+workload catalog's configuration values; the template and workload feed
+variables are independent. Do not add an application configuration file or a
+layered configuration pipeline.
 
 Uninstall uses installed package identity and recorded state; it does not
 contact or resolve a feed.
@@ -64,8 +60,8 @@ Keep the initial search similar to the basic workload search experience:
   more packages may exist and suggest refining the query.
 - Render package cards by default, with title, package ID, latest matching
   version, and description. Use the package ID when the title is absent.
-- With `--json`, emit an array containing `packageId`, `latestVersion`, `title`,
-  and `description`, without presentation hints in the JSON output.
+- With `--format json`, emit an array containing `packageId`, `latestVersion`,
+  `title`, and `description`, without presentation hints in the JSON output.
 - Return an empty result successfully when no packages match.
 
 Search targets the `FuncTemplate` NuGet package type using the V3
@@ -91,40 +87,33 @@ Reject invalid package IDs and versions before changing installed state.
 `--version` and `--prerelease` are mutually exclusive: choose either an exact
 version or prerelease-inclusive latest-version resolution.
 
-Version resolution stays in `TemplateCatalog` over the ambient and additional
-install feeds. The CLI downloads that exact version to a temporary directory,
-verifies the staged file in-process, holds it open read-only, and passes the
-local `.nupkg` to the built-in engine NuGet installer. Package integrity and any
-configured `trustedSigners` are always enforced. Certificate-chain trust follows
-NuGet's restore policy for the configured `signatureValidationMode`: `accept`
-tolerates roots the operating system does not trust, because Linux and macOS
-system stores lack code-signing roots outside the .NET SDK's bundled
-certificates; `require` rejects them unless a trusted signer sets
-`allowUntrustedRoot`. Unsigned template packages are accepted unless
-`NuGet.Config` requires signing; the official workload publisher allowlist does
-not apply. This requires no .NET SDK. If a package has no
-stable release, install fails with an error suggesting `--prerelease`; there is
-no warning followed by an implicit preview install. Use `--prerelease` to
-select the latest preview, or `--version` to request a specific preview.
+Version resolution stays in `TemplateCatalog` over the resolved feed. The CLI
+downloads that exact version to a temporary directory and verifies the archive
+in-process before changing installed state. NuGet verifies the content integrity
+of a signed archive. Unsigned template packages are accepted, and the official
+workload publisher allowlist does not apply. This requires no .NET SDK. If a
+package has no stable release, install fails with an error suggesting
+`--prerelease`; there is no warning followed by an implicit preview install. Use
+`--prerelease` to select the latest preview, or `--version` to request a
+specific preview.
 
-Inside the rollback-protected install transaction:
+Before installation, inspect the downloaded archive. Require the resolved
+package ID and version, the `FuncTemplate` package type, and no workload
+package type. Require valid `func.host.json` metadata and at least one
+template identity. A standard `Template` package type alone is not sufficient
+for this initial catalog. Leave archive path safety and template-format
+validation to NuGet and Microsoft.TemplateEngine.
 
-1. Snapshot the hive, remove the previous version if replacing, and install the
-   verified download through Microsoft.TemplateEngine's built-in NuGet installer.
-   For a local `.nupkg`, the engine copies the archive into the hive; unlike
-   folder installation, it does not retain the original path. Delete the
-   temporary download after success, failure, or cancellation.
-2. Open the installed `.nupkg` at its managed package mount point and verify its
-   package ID and version match the resolved request.
-3. Inspect its NuGet metadata. Require `FuncTemplate`, and reject packages that
-   also declare a workload package type. A standard `Template` package type
-   alone is not sufficient for this initial catalog.
-4. Validate template declarations and content, including unsafe package paths
-   and malformed declared func host metadata.
-5. Require at least one unique template declaration.
-6. Refresh discovery and verify that Microsoft.TemplateEngine exposes exactly
-   the validated template identities before reporting success. There is no
-   separate pre-install engine scan; failed discovery restores the previous hive.
+Pass the validated local `.nupkg` to Microsoft.TemplateEngine's built-in
+managed NuGet provider. The engine owns package registration, storage and
+discovery; do not snapshot or rewrite its hive. The engine uninstalls an
+existing version before installing its replacement, so keep a temporary copy
+of the previous package when replacing. After installation, refresh discovery
+and verify the expected template identities. If installation or discovery
+fails, use the same managed provider to remove any partially installed version
+and reinstall the backup when replacing. If recovery fails, report the
+incomplete effects and recovery failure instead of reporting success. Delete
+temporary downloads and backups after success, failure, or cancellation.
 
 Installation does not execute authored post-actions or load package-supplied
 code components. A valid installed template is not necessarily compatible with
@@ -138,7 +127,7 @@ use the engine's update or vulnerability-check paths.
 | Existing installation | Result |
 | --- | --- |
 | No managed package with this ID | Install the resolved version. |
-| Same ID and version | Report already installed without replacing it, regardless of the additional feed. |
+| Same ID and version | Report already installed without replacing it, regardless of the feed. |
 | Same ID, different version | Replace with the requested version; explicit downgrades are allowed. |
 
 ## Uninstall and ownership
@@ -161,28 +150,29 @@ precedence policy.
 
 Use the same func hive and DI-registered engine components as installed-template
 discovery. Keep the command-scoped `Templater` boundary limited to engine
-primitives; package orchestration and identity validation belong outside it.
-The factory supplies the shared hive path and coordinated discovery entry point.
-Keep managed providers, installers, and engine
-package objects internal. Do not maintain a second package registry or directly
-rewrite Microsoft.TemplateEngine's private persistence schema.
+primitives; package preflight validation and recovery orchestration belong
+outside it. The factory supplies the shared hive path and coordinated discovery
+entry point. Keep managed providers, installers, and engine package objects
+internal. Do not maintain a second package registry or directly rewrite
+Microsoft.TemplateEngine's private persistence schema.
 
 Qualify the pinned engine's install, replacement, uninstall, and cache behavior
-with focused integration tests. In particular, do not assume that replacing a
-managed package preserves the old installation if acquisition fails.
+with focused integration tests. Replacement must preserve a copy of the old
+package for recovery because the engine removes it before installing a new
+version.
 
-The temporary download and signature verification complete before hive mutation.
-There is no separate installer. Validation inspects the installed archive before
-transaction commit; a validation or discovery failure restores the previous hive.
-Acquisition or signature failure leaves the hive untouched. Template operations do not
-coordinate concurrent CLI processes that share a func home, matching workload
-package operations. Avoid running template installs or uninstalls concurrently
-against the same home.
+Archive verification and preflight validation complete before hive mutation.
+There is no separate installer or whole-hive snapshot. The service uses the
+engine's managed provider for install, uninstall, and recovery. Acquisition,
+verification, or preflight failure leaves installed state untouched. Template
+operations do not coordinate concurrent CLI processes that share a func home,
+matching workload package operations. Avoid running template installs or
+uninstalls concurrently against the same home.
 
-If replacement or discovery refresh fails, preserve or restore the previous
-installation. Report incomplete effects and recovery failures explicitly;
-never report success after a failed registration, refresh, or recovery.
-Cancellation follows the same recovery requirements once mutation has begun.
+If replacement, discovery refresh, or cancellation fails after mutation begins,
+use the managed provider to restore the previous package when possible. Report
+incomplete effects and recovery failures explicitly; never report success after
+a failed registration, refresh, or recovery.
 
 Commands remain thin: parse a typed request, delegate to a service, and render
 through `IInteractionService`. Use narrow command-boundary catches for
@@ -201,12 +191,15 @@ Focused coverage must establish:
   same-version no-op behavior.
 - Install visibility through the existing discovery path and removal after
   uninstall.
-- Archive ownership in the hive and fresh discovery after temporary download
-  cleanup; signed installs without invoking an external SDK; chain trust under
-  `accept` and `require` signature validation modes.
-- Ambient plus additional feed behavior, source-independent no-op installs, and protection of workload-owned content.
-- Cancellation, failed replacement, cache-refresh failure, recovery failure,
-  and coordinated access to installed state.
+- Package identity, package-type, `func.host.json` metadata, and nonempty-template
+  preflight checks before mutation; engine-managed package storage and fresh
+  discovery after temporary download cleanup; signed and unsigned installs
+  without invoking an external SDK.
+- Single-feed resolution without `NuGet.Config`, source-independent no-op
+  installs, and protection of workload-owned content.
+- Cancellation, failed replacement with restoration of the prior package,
+  cache-refresh failure, recovery failure, and coordinated access to installed
+  state.
 
 For the implementation layers, run relevant tests and a strict Release build
 before publishing. Failed or

@@ -261,22 +261,29 @@ layers; this documentation alone changes no CLI behavior.
 
 In that proposed implementation, `Templater` would expose engine primitives for
 listing and managed package operations. `TemplatePackageService` would
-orchestrate package validation and transactional mutation, and
-`TemplateHiveTransaction` would own snapshot and recovery. As with workload
-operations, template package operations would not coordinate concurrent CLI
-processes that share a func home.
+prevalidate packages and orchestrate managed-provider operations, keeping a
+temporary backup of the previous package during replacement for recovery. The
+engine would own package registration, storage and discovery; the CLI would not
+snapshot or rewrite its hive. As with workload operations, template package
+operations would not coordinate concurrent CLI processes that share a func
+home.
 
-Package acquisition would use ambient `NuGet.Config` sources and an optional
-additional feed selected by `--source` or `FUNC_CLI_TEMPLATES_SOURCE`, filtering
-HTTP feeds. The CLI would download the exact version to a temporary directory
-and verify it in-process without requiring the .NET SDK. Integrity and configured
-trusted signers would always be enforced; certificate-chain trust would follow
-NuGet's `signatureValidationMode`. The engine's built-in NuGet installer would
-copy the local `.nupkg` into the hive, allowing temporary-download cleanup.
-Validation of the installed archive would precede transaction commit; failures
-would restore the previous hive. The engine would record a local NuGet package
-without `NuGetSource`; package identity and version alone would determine no-op
-or replacement behavior. There would be no separate installer.
+Package acquisition would resolve one feed like workload commands: `--source`,
+then `FUNC_CLI_TEMPLATES_SOURCE`, then nuget.org, without reading `NuGet.Config`.
+The CLI would download the exact version to a temporary directory and verify it
+in-process without requiring the .NET SDK. NuGet would verify the integrity of
+signed archives; unsigned packages would be accepted. Before mutation, the CLI
+would validate package identity and version, require the `FuncTemplate` package
+type and reject workload package types, require valid `func.host.json` metadata
+and at least one template identity. NuGet and Microsoft.TemplateEngine would
+handle archive path safety and template-format validation. The engine's
+managed provider would install the local `.nupkg` into the hive and own
+registration and discovery. Because replacement uninstalls the old version
+before installing the new one, the CLI would retain a temporary copy of the old
+package and use the managed provider to restore it if install or discovery
+fails. The engine would record a local NuGet package without `NuGetSource`;
+package identity and version alone would determine no-op or replacement
+behavior. There would be no separate installer or whole-hive snapshot.
 
 Standalone packages would share the func template hive and discovery path but
 remain separately owned from workload-provided roots. Template package uninstall
@@ -302,7 +309,7 @@ This document defines the proposed initial contract. Archived task lists are not
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
 | Engine integration | Retain host context, engine metadata, native duplicate precedence, func-host aliases and exact invocation. Blanket duplicate-ID rejection, projection-driven conditional evaluation and full-ID widening are superseded. Richer grouping/selection frameworks and authored action plumbing are deferred. |
 | Constraints | Raw validation and fail-closed evaluation belong to the separate constraints increment. They do not block the initial constraint-free .NET/HTTP slice. Installer/update preflight and producer-specific rules are deferred with those workflows. |
-| Package lifecycle | The proposed `func templates search/install/uninstall` surface uses bounded search and ambient-plus-additional NuGet install feeds, with transactional validation and recovery. These commands are not yet available. Standalone packages use the engine's managed provider and existing hive; workload roots retain the read-only workload provider. Replacement safety must be qualified in the lifecycle layer. |
+| Package lifecycle | The proposed `func templates search/install/uninstall` surface uses bounded search and install over one feed resolved like workload commands, with preflight validation and managed-provider recovery. These commands are not yet available. Standalone packages use the engine's managed provider and existing hive; workload roots retain the read-only workload provider. Replacement safety must be qualified in the lifecycle layer. |
 | Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 
