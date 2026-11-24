@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Timer" ],
+  "identity": "Azure.Functions.Cli.Go.TimerTrigger",
+  "name": "Azure Functions timer trigger (Go)",
+  "description": "A timer trigger using the Go worker SDK.",
+  "shortName": "timertrigger",
+  "defaultName": "TimerFunction",
+  "tags": {
+    "language": "Go",
+    "stack": "go",
+    "type": "item"
+  },
+  "sourceName": "SourceFunction",
+  "symbols": {
+    "FunctionName": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "TemplateFunctionName",
+      "fileRename": "TemplateFunctionFile",
+      "parameters": {
+        "source": "name",
+        "steps": [
+          { "regex": "[^a-zA-Z0-9_]", "replacement": "_" },
+          { "regex": "^[^a-zA-Z]", "replacement": "Function$&" }
+        ]
+      }
+    }
+  },
+  "primaryOutputs": [
+    { "path": "TemplateFunctionFile_function.go" }
+  ]
+}

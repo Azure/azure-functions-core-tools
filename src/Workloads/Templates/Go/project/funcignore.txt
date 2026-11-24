@@ -1,0 +1,6 @@
+.git*
+.vscode
+local.settings.json
+*_test.go
+vendor/
+bin/

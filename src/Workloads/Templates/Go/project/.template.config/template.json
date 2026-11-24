@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Cloud" ],
+  "identity": "Azure.Functions.Cli.Go.Project",
+  "name": "Azure Functions Go project",
+  "description": "A Go Functions project with an optional HTTP function.",
+  "shortName": "func-go",
+  "tags": {
+    "language": "Go",
+    "stack": "go",
+    "type": "project"
+  },
+  "sourceName": "FunctionsProject",
+  "preferNameDirectory": true,
+  "symbols": {
+    "ModulePath": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "description": "The Go module path. Defaults to a normalized project name."
+    },
+    "NoHttp": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the starter HTTP function."
+    },
+    "NormalizedProjectName": {
+      "type": "generated",
+      "generator": "regex",
+      "parameters": {
+        "source": "name",
+        "steps": [
+          { "regex": "[^a-zA-Z0-9_-]+", "replacement": "-" },
+          { "regex": "^-+|-+$", "replacement": "" },
+          { "regex": "^$", "replacement": "app" }
+        ]
+      }
+    },
+    "DefaultModulePath": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "NormalizedProjectName",
+        "toLower": true
+      }
+    },
+    "ResolvedModulePath": {
+      "type": "generated",
+      "generator": "coalesce",
+      "replaces": "FunctionsModule",
+      "parameters": {
+        "sourceVariableName": "ModulePath",
+        "fallbackVariableName": "DefaultModulePath"
+      }
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "rename": {
+        "funcignore.txt": ".funcignore"
+      },
+      "modifiers": [
+        {
+          "condition": "NoHttp",
+          "exclude": [ "HelloWorld_function.go" ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "go.mod" }
+  ]
+}

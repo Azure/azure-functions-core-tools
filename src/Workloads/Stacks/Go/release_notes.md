@@ -3,7 +3,7 @@
 ## 1.0.0-preview.3
 
 - Retarget the stack workload to `net11.0` for the .NET 11-based Azure Functions CLI; generated Go applications are unchanged.
-- Add a workload template root with placeholder scaffolding for future Go templates. (#5960)
+- Replace the Go template placeholder with workload-included Go project, HTTP-trigger, and timer-trigger templates; generated projects require Go 1.25 or later. (#5960, #5992)
 - **Compatibility:** Requires Azure Functions CLI 5.0.0-preview.7 or later for the .NET 11 runtime and contracts.
 
 ## 1.0.0-preview.2
