@@ -14,11 +14,13 @@ The current CLI includes:
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
-- Workload template roots: a workload can declare an optional `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, the loader resolves it for active runtime workloads, and `WorkloadTemplatePackageProviderFactory` exposes the roots to the engine as read-only template packages. The .NET workload packages its project, HTTP trigger, and Timer trigger templates under `content/templates` and declares that directory as `templateRoot`. Installs that predate `templateRoot` persistence need a reinstall.
+- Workload template roots: a workload can declare an optional `templateRoot` in `workload.json`. The workload store persists it and hydrates the package root, the loader resolves it for active runtime workloads, and `WorkloadTemplatePackageProviderFactory` exposes the roots to the engine as read-only template packages. The .NET workload packages its project, HTTP trigger, and Timer trigger templates under `content/templates` and declares that directory as `templateRoot`. The HTTP trigger template declares an `AuthorizationLevel` parameter (`Anonymous`, `Function`, or `Admin`; default `Function`) with `--auth-level` and `-a` host aliases. Installs that predate `templateRoot` persistence need a reinstall.
 - Test-only local template installation in isolated hives.
 - Real-engine discovery tests cover persistent cache reuse, source addition/removal, missing roots, active-version replacement, same-version timestamp refresh, native duplicate precedence, and aggregation with a managed provider. The cache persists across commands; the workload source list is cached for each engine instance.
 
 The discovery foundation is not yet integrated with `func init` or `func new`. It does not apply host parameter mappings to CLI options, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
+
+Microsoft.TemplateEngine accepts an explicitly empty choice value even when it is not a declared choice. For the HTTP trigger template this produces an incomplete `AuthorizationLevel` member, so command integration must reject empty explicit choices before invocation.
 
 ### Existing initialization limitations
 
