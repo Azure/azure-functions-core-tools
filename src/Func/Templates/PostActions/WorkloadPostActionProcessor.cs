@@ -47,6 +47,10 @@ internal sealed class WorkloadPostActionProcessor(
         }
 
         IPostAction action = context.Action;
+        IPostActionFileMatcher? fileMatcher = context.CreationEffects is ICreationEffects2 effects
+            ? new PostActionFileMatcher(effects.FileChanges)
+            : null;
+        // TODO: Implement a reporter that displays workload post-action output.
         PostActionContext snapshot = new(
             action.ActionId,
             action.Args ?? new Dictionary<string, string>(),
@@ -55,7 +59,7 @@ internal sealed class WorkloadPostActionProcessor(
             action.ContinueOnError,
             context.OutputBasePath,
             context.CreationResult.PrimaryOutputs.Select(output => output.Path).ToArray(),
-            context.CreationEffects.FileChanges.Select(change => new PostActionFileChange(
+            context.CreationEffects.FileChanges?.Select(change => new PostActionFileChange(
                 change.TargetRelativePath,
                 change.ChangeKind switch
                 {
@@ -64,7 +68,8 @@ internal sealed class WorkloadPostActionProcessor(
                     ChangeKind.Overwrite => PostActionFileChangeKind.Overwrite,
                     ChangeKind.Change => PostActionFileChangeKind.Change,
                     _ => throw new InvalidOperationException($"Unknown template file change kind '{change.ChangeKind}'."),
-                })).ToArray());
+                })).ToArray() ?? [],
+            fileMatcher: fileMatcher);
         return matches[0].Processor.ProcessAsync(snapshot, cancellationToken);
     }
 }
