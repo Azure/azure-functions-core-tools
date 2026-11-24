@@ -121,7 +121,7 @@ internal class TemplatePackageService(
         using TempDirectory recovery = _fileSystem.CreateTempDirectory();
         string backupPath = Path.Combine(recovery.Path, "previous.nupkg");
         _fileSystem.CopyFile(installed.MountPointUri, backupPath);
-        NuGetVersion previousVersion = NuGetVersion.Parse(installed.Version!);
+        var previousVersion = NuGetVersion.Parse(installed.Version!);
         IReadOnlyList<string> identities = [.. (await inspection.GetTemplatesAsync(installed, cancellationToken)).Select(t => t.Identity)];
         inspection.Dispose();
         cancellationToken.ThrowIfCancellationRequested();

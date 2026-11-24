@@ -517,8 +517,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
     private sealed class ArchiveCatalog(string archivePath) : TemplateCatalog(Options.Create(new TemplateCatalogOptions
     {
         Source = "https://feed.test/index.json",
-    }), _ => throw new InvalidOperationException("No networking in engine tests."),
-        Substitute.For<TemplateNuGetSourceProvider>(new DirectoryInfo(Directory.GetCurrentDirectory())))
+    }), _ => throw new InvalidOperationException("No networking in engine tests."))
     {
         public override Task<Stream> OpenPackageAsync(
             string packageId, NuGetVersion version, string? source, CancellationToken cancellationToken)
