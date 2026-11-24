@@ -168,7 +168,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. 3.11.x, 3.12.x, 3.13.x, 3.14.x, or 3.15.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. 3.10.x, 3.11.x, 3.12.x, 3.13.x, 3.14.x, or 3.15.x is recommended, and used in Azure Functions.";
                 if (errorIfNoVersion)
                 {
                     throw new CliException(message);
@@ -194,15 +194,15 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (errorIfNotSupported)
                 {
-                    throw new CliException($"Python 3.11.x to 3.15.x is required for this operation. " +
-                        $"Please install Python 3.11, 3.12, 3.13, 3.14 or 3.15 and use a virtual environment to switch to Python 3.11, 3.12, 3.13, 3.14 or 3.15.");
+                    throw new CliException($"Python 3.10.x to 3.15.x is required for this operation. " +
+                        $"Please install Python 3.10, 3.11, 3.12, 3.13, 3.14 or 3.15 and use a virtual environment to switch to the appropriate Python version.");
                 }
 
-                ColoredConsole.WriteLine(WarningColor("Python 3.11.x, 3.12.x, 3.13.x, 3.14.x or 3.15.x is recommended, and used in Azure Functions."));
+                ColoredConsole.WriteLine(WarningColor("Python 3.10.x, 3.11.x, 3.12.x, 3.13.x, 3.14.x or 3.15.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.[11|12|13|14|15]) is required.";
+            var error = "Python 3.x (recommended version 3.[10|11|12|13|14|15]) is required.";
             if (errorIfNoVersion)
             {
                 throw new CliException(error);
@@ -234,7 +234,6 @@ namespace Azure.Functions.Cli.Helpers
             // Linux / OSX / Venv Interpreter Entrypoints
             var python3GetVersionTask = GetVersion("python3");
             var pythonGetVersionTask = GetVersion("python");
-            var python39GetVersionTask = GetVersion("python3.9");
             var python310GetVersionTask = GetVersion("python3.10");
             var python311GetVersionTask = GetVersion("python3.11");
             var python312GetVersionTask = GetVersion("python3.12");
@@ -247,7 +246,6 @@ namespace Azure.Functions.Cli.Helpers
                 await pyGetVersionTask,
                 await python3GetVersionTask,
                 await pythonGetVersionTask,
-                await python39GetVersionTask,
                 await python310GetVersionTask,
                 await python311GetVersionTask,
                 await python312GetVersionTask,
@@ -256,7 +254,7 @@ namespace Azure.Functions.Cli.Helpers
                 await python315GetVersionTask
             };
 
-            // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
+            // Highest preference -- Go through the list and prioritize the first supported Python worker.
             WorkerLanguageVersionInfo recommendedPythonWorker = versions.FirstOrDefault(w => IsVersionSupported(w));
             if (recommendedPythonWorker != null)
             {
@@ -327,7 +325,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception)
             {
-                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 or 3.7 installed.");
+                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.10, 3.11, 3.12, 3.13, 3.14, or 3.15 installed.");
             }
 
             if (exitCode == 0)
@@ -598,8 +596,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
-                    case 9:
-                        return StaticResources.DockerfilePython39;
                     case 10:
                         return StaticResources.DockerfilePython310;
                     case 11:
@@ -615,18 +611,19 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
-            return StaticResources.DockerfilePython39;
+            return StaticResources.DockerfilePython310;
         }
 
         // Build environment images for building native dependencies for python function apps
-        private static async Task<(string Image, bool IsLocal)> GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
+        internal static async Task<(string Image, bool IsLocal)> GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
         {
+            // Validate before selecting an image so unsupported versions cannot use the fallback image.
+            AssertPythonVersion(info, errorIfNotSupported: true);
+
             if (info?.Major == 3)
             {
                 switch (info?.Minor)
                 {
-                    case 9:
-                        return (DockerImages.LinuxPython39ImageAmd64, false);
                     case 10:
                         return (DockerImages.LinuxPython310ImageAmd64, false);
                     case 11:
@@ -658,8 +655,7 @@ namespace Azure.Functions.Cli.Helpers
                     case 13:
                     case 12:
                     case 11:
-                    case 10:
-                    case 9: return true;
+                    case 10: return true;
                     default: return false;
                 }
             }
