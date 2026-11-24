@@ -552,6 +552,38 @@ public class StartCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task StartCommand_WhenHostStopsRestartingWorker_ThrowsGracefulException()
+    {
+        InMemoryHostEventStream source = new();
+        source.Write(new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "RpcFunctionInvocationDispatcher",
+            LogLevel.Error,
+            default,
+            "Exceeded language worker restart retry count for runtime:python. Shutting down and proactively recycling the Functions Host to recover",
+            Exception: null,
+            HostLogEntry.EmptyAttributes));
+        source.Complete();
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(CreateInitializationResult(source));
+
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, services =>
+        {
+            services.AddSingleton(_cliVersionProvider);
+            services.AddSingleton(_initializationRunner);
+        });
+        var root = Parser.CreateCommand(services);
+
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        var ex = (await FluentActions.Awaiting(() => root.Parse($"run \"{_tempDir}\" --format=plain").InvokeAsync(config))
+            .Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("python language worker failed");
+    }
+
+    [Fact]
     public async Task StartCommand_ProjectCleanupFailure_DoesNotReplaceExitCode()
     {
         var source = new InMemoryHostEventStream();

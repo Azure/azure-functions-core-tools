@@ -66,7 +66,7 @@ internal sealed partial class HostProcessEventStream : IHostEventStream, IHostEv
 
     public async Task RequestShutdownAsync(CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(ref _shutdownRequested, 1) == 0 && !_process.HasExited)
+        if (!_exitTask.IsCompleted && Interlocked.Exchange(ref _shutdownRequested, 1) == 0 && !_process.HasExited)
         {
             try
             {

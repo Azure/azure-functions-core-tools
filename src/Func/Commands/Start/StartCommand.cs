@@ -6,6 +6,7 @@ using System.CommandLine.Invocation;
 using System.Globalization;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
+using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -277,9 +278,19 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
                 hostStreamForDashboard = azuriteFailureDetector;
             }
 
+            var workerFailureDetector = new WorkerFailureDetectingHostEventStream(hostStreamForDashboard);
+            hostStreamForDashboard = workerFailureDetector;
+
             IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, hostStreamForDashboard);
             var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink, _interaction);
             int exitCode = await pipeline.RunAsync(cancellationToken);
+
+            // The host exits 0 after it stops restarting a failing worker, so surface that failure here.
+            if (workerFailureDetector.Detected)
+            {
+                throw new GracefulException(BuildWorkerFailureMessage(workerFailureDetector.Runtime!, workerFailureDetector.Cause), isUserError: true);
+            }
+
             outcome = FunctionsProjectHostRunOutcomes.Completed(exitCode);
             return exitCode;
         }
@@ -335,6 +346,19 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         => $"Managed Azurite returned a 500 (Internal Server Error), which usually means its data directory is "
             + $"corrupted or in a bad state. Delete '{paths.DataDirectory}' to reset Azurite, then run 'func run' again. "
             + $"Azurite debug log: '{paths.LogFilePath}'.";
+
+    private static string BuildWorkerFailureMessage(string runtime, string? cause)
+    {
+        string message = $"The {runtime} language worker failed and could not be restarted, so the host stopped.";
+        return cause switch
+        {
+            null => message,
+            _ when cause.Contains("filename or extension is too long", StringComparison.OrdinalIgnoreCase)
+                => $"{message} Cause: {cause} A file path in the workloads directory is too long for the operating system. "
+                    + $"Set {Constants.WorkloadsHomeEnvironmentVariable} to a shorter path, run 'func setup', then run 'func run' again.",
+            _ => $"{message} Cause: {cause}",
+        };
+    }
 
     private HostStartupOptions GetHostStartupOptions(DirectoryInfo projectDirectory)
         => ProjectDirectoryResolver.IsProjectDirectory(projectDirectory)
