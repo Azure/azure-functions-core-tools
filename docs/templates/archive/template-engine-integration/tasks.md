@@ -1,4 +1,4 @@
-> **HISTORICAL task list with already-implemented helper work, not current implementation instructions.** Do not recreate existing factory/session/context/catalog types from unchecked boxes or freeze the list-shaped group and invocation/post-action APIs below. See [Templates Architecture](../../README.md) for the proposed first-slice contract and separate authorization gates. Original checkboxes remain checkpoint evidence.
+> **HISTORICAL task list, not current implementation instructions.** The factory, context, `Templater`, and persistent hive exist; the separate session abstraction, catalog projection, and custom constraint helpers were removed. Do not recreate historical types or freeze future APIs from these checkboxes. See [Templates Architecture](../../README.md) for the minimal command slice and engine delegation. Original checkboxes remain checkpoint evidence.
 
 ## 1. Context and Engine Lifetime
 

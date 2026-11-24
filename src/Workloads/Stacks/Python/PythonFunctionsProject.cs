@@ -88,6 +88,15 @@ internal sealed class PythonFunctionsProject : FunctionsProject
             }
         }
 
+        string venvPython = GetVenvExecutablePath(venvPath, "python");
+        string? majorMinor = await ReadPythonVersion(venvPython, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(majorMinor) && !IsSupportedPythonVersion(majorMinor))
+        {
+            throw new GracefulException(
+                $"Python {majorMinor} is not supported. Install Python 3.10 or later and recreate the virtual environment.",
+                isUserError: true);
+        }
+
         string requirementsPath = Path.Combine(root, RequirementsFileName);
         if (File.Exists(requirementsPath))
         {
@@ -116,13 +125,11 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         // Point the host at the venv interpreter so the worker process actually has
         // the packages we just pip-installed. Without this, the host falls back to
         // the system Python and `import <user-dep>` fails at runtime.
-        string venvPython = GetVenvExecutablePath(venvPath, "python");
         context.EnvironmentVariables[WorkerExecutablePathEnvVar] = venvPython;
 
-        // Tell the host which Python worker to load (3.9 vs 3.13 etc.). Best-effort:
+        // Tell the host which Python worker to load. Best-effort:
         // if we can't parse `python --version`, we leave it unset and let the host
         // fall back to whatever default it would pick.
-        string? majorMinor = await ReadPythonVersion(venvPython, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrEmpty(majorMinor))
         {
             context.EnvironmentVariables[WorkerRuntimeVersionEnvVar] = majorMinor;
@@ -135,6 +142,9 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         string name = OperatingSystem.IsWindows() ? executable + ".exe" : executable;
         return Path.Combine(venvPath, folder, name);
     }
+
+    private static bool IsSupportedPythonVersion(string majorMinor)
+        => Version.TryParse(majorMinor, out Version? version) && version.Major == 3 && version.Minor >= 10;
 
     // Pick the venv to use, in priority order:
     //   1. $VIRTUAL_ENV (set by the `activate` script) so an explicitly-activated

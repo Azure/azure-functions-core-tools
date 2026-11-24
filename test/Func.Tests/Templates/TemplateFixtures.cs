@@ -99,6 +99,24 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
+    public static string WriteItemPackage(string parentDirectory, string identity, string name)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "item-template");
+        WriteTemplate(
+            packageDirectory,
+            $$"""
+            {
+              "identity": "{{identity}}",
+              "name": "{{name}}",
+              "shortName": "func-tests-item",
+              "tags": { "type": "item" }
+            }
+            """,
+            ("Function.txt", "Function content"));
+
+        return packageDirectory;
+    }
+
     /// <summary>
     /// Installs a folder package into the template engine settings at <paramref name="settingsLocation"/>.
     /// </summary>

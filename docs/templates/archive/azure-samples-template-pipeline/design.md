@@ -1,4 +1,4 @@
-> **DEFERRED producer design, not the proposed first-slice command contract.** The separate control plane, release pipeline, synthesis/actions and publication flows below require their own owner approval; they are not prerequisites for a bounded local engine/command proof. Preserve source/package/provenance evidence. See [Templates Architecture](../../README.md) for current proposed authority and approved-content/registration decisions still required before public availability.
+> **DEFERRED historical producer design, not the first-slice command contract.** The control plane, release pipeline, synthesis/actions and publication flows below are separate from the workload-provided .NET/HTTP slice. The single-template/source assumptions do not establish the future schema: one repository may publish one package containing multiple templates. Preserve source/package/provenance evidence. See [Templates Architecture](../../README.md) for the current workload provider, persistent hive, and future standalone flow.
 
 ## Context
 

@@ -8,4 +8,4 @@ Navigation gateway, not a competing specification. Start with [Templates Archite
 
 `func new` skips first-run setup. Its unavailable-command handler returns exit code 1 without running setup.
 
-The existing [Templater](../src/Func/Templates/Engine/Templater.cs) lists installed templates in a command-scoped session. Command-facing resolution, parameter evaluation, selection and invocation are not wired. Test-only local hive registration is not production registration of workload-delivered templates. Public generation, package lifecycle and grammar changes remain unauthorized; historical specifications and checkboxes are evidence only.
+The existing [Templater](../src/Func/Templates/Engine/Templater.cs) lists installed templates, including those exposed from workload `templateRoot` paths. Command-facing resolution, parameter evaluation, selection and invocation are not wired. Public generation, package lifecycle and grammar changes remain unauthorized; historical specifications and checkboxes are evidence only.

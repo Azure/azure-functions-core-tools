@@ -1,4 +1,4 @@
-> **DEFERRED lifecycle design with existing-infrastructure references.** New install/update/uninstall commands, feed acquisition and replacement transactions below are not implemented or required for the first engine/command proof. Preserve package/source/replacement evidence, but do not confuse test-only installation or the current hive with approved production workload registration. See [Templates Architecture](../../README.md) and the [Phase 6 registration seam](../../architecture.md#workload-registration).
+> **DEFERRED historical lifecycle design.** Future management uses `func templates` and the engine's managed provider in the existing CLI hive, not a second installer/catalog. Workload roots use a read-only provider and do not require managed-package registration. Historical command names, projections, and replacement guarantees below are not current implementation. See [Templates Architecture](../../README.md) and the [future standalone flow](../../architecture.md#future-standalone-template-packages).
 
 ## Context
 
