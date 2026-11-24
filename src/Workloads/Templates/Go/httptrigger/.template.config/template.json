@@ -19,12 +19,22 @@
       "datatype": "choice",
       "defaultValue": "function",
       "description": "The authorization level for the HTTP trigger.",
-      "replaces": "__AUTH_LEVEL__",
       "choices": [
         { "choice": "function", "description": "Require a function key." },
         { "choice": "anonymous", "description": "Allow anonymous requests." },
         { "choice": "admin", "description": "Require the host master key." }
       ]
+    },
+    "AuthLevelExpression": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "sdk.WithAuth(\"function\")",
+      "parameters": {
+        "source": "AuthLevel",
+        "steps": [
+          { "regex": "^(.*)$", "replacement": "sdk.WithAuth(\"$1\")" }
+        ]
+      }
     },
     "FunctionName": {
       "type": "generated",

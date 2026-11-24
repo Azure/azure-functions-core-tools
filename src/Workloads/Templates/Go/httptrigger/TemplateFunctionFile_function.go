@@ -9,7 +9,7 @@ import (
 func init() {
 	app.HTTP("TemplateFunctionName", handleTemplateFunctionName,
 		sdk.WithMethods(http.MethodGet, http.MethodPost),
-		sdk.WithAuth("__AUTH_LEVEL__"),
+		sdk.WithAuth("function"),
 	)
 }
 

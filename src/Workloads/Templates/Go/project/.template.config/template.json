@@ -62,8 +62,7 @@
       "target": "./",
       "exclude": [ ".template.config/**" ],
       "rename": {
-        "funcignore.txt": ".funcignore",
-        "gitignore.txt": ".gitignore"
+        "funcignore.txt": ".funcignore"
       },
       "modifiers": [
         {

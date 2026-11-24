@@ -80,7 +80,6 @@ public sealed class TemplateTestHost : IAsyncDisposable
     /// <param name="name">The name passed to the template, also used as the fallback name.</param>
     /// <param name="parameters">The template parameter values.</param>
     /// <param name="outputDirectory">The output directory; defaults to <see cref="OutputDirectory"/>.</param>
-    /// <param name="forceCreation">Whether existing files can be overwritten.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The template creation result.</returns>
     public Task<ITemplateCreationResult> InstantiateAsync(
@@ -88,7 +87,6 @@ public sealed class TemplateTestHost : IAsyncDisposable
         string name,
         IReadOnlyDictionary<string, string?>? parameters = null,
         string? outputDirectory = null,
-        bool forceCreation = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(template);
@@ -101,7 +99,6 @@ public sealed class TemplateTestHost : IAsyncDisposable
             name,
             outputDirectory ?? OutputDirectory,
             parameters ?? new Dictionary<string, string?>(),
-            forceCreation: forceCreation,
             cancellationToken: cancellationToken);
     }
 

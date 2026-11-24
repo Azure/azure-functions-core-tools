@@ -14,27 +14,6 @@
   },
   "sourceName": "SourceFunction",
   "symbols": {
-    "Schedule": {
-      "type": "parameter",
-      "datatype": "string",
-      "defaultValue": "0 */5 * * * *",
-      "description": "The timer schedule as an NCRONTAB expression or app setting."
-    },
-    "EscapedSchedule": {
-      "type": "generated",
-      "generator": "regex",
-      "replaces": "__TIMER_SCHEDULE__",
-      "parameters": {
-        "source": "Schedule",
-        "steps": [
-          { "regex": "\\\\", "replacement": "\\\\" },
-          { "regex": "\"", "replacement": "\\\"" },
-          { "regex": "\\r", "replacement": "\\r" },
-          { "regex": "\\n", "replacement": "\\n" },
-          { "regex": "\\t", "replacement": "\\t" }
-        ]
-      }
-    },
     "FunctionName": {
       "type": "generated",
       "generator": "regex",

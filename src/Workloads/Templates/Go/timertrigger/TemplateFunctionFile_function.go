@@ -10,7 +10,7 @@ import (
 
 func init() {
 	app.Timer("TemplateFunctionName", handleTemplateFunctionName,
-		sdk.WithSchedule("__TIMER_SCHEDULE__"),
+		sdk.WithSchedule("0 */5 * * * *"),
 	)
 }
 

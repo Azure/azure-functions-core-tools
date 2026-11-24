@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 
 namespace Azure.Functions.Cli.Templates.Engine;
@@ -17,7 +16,7 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable
         Identifier,
         AssemblyCliVersionProvider.Instance.Version,
         CreateDefaults(context),
-        FuncTemplateComponents.Get(components)), ITemplateEngineHost
+        FuncTemplateComponents.Get(components))
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -43,12 +42,6 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable
 
         return base.TryGetHostParamDefault(paramName, out value);
     }
-
-    // TemplateCreator still consults this callback unless force is requested.
-    [Obsolete]
-    bool ITemplateEngineHost.OnPotentiallyDestructiveChangesDetected(
-        IReadOnlyList<IFileChange> changes,
-        IReadOnlyList<IFileChange> destructiveChanges) => false;
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {
