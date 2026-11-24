@@ -12,10 +12,17 @@ func workload install Azure.Functions.Cli.Workloads.Go
 func workload install go
 ```
 
+## Templates
+
+The workload includes TemplateEngine templates for a Go project, HTTP trigger,
+and timer trigger. The project targets Go 1.24 or later and pins the Go worker
+SDK. Generated trigger files register with the project's shared `app` during
+package initialization; use a unique name for each function. These templates
+do not yet back `func init` or `func new`.
+
 ## Status
 
-Preview. The project initializer is currently a stub; full scaffolding lands
-in a follow-up release.
+Preview.
 
 ## Links
 

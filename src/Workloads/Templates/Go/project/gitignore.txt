@@ -1,0 +1,10 @@
+bin/
+local.settings.json
+.secrets
+*.exe
+*.test
+*.out
+vendor/
+__blobstorage__
+__queuestorage__
+__azurite_db*.json

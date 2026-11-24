@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Timer" ],
+  "identity": "Azure.Functions.Cli.Go.TimerTrigger",
+  "name": "Azure Functions timer trigger (Go)",
+  "description": "A timer trigger using the Go worker SDK.",
+  "shortName": "timertrigger",
+  "defaultName": "TimerFunction",
+  "tags": {
+    "language": "Go",
+    "stack": "go",
+    "type": "item"
+  },
+  "sourceName": "SourceFunction",
+  "symbols": {
+    "Schedule": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "0 */5 * * * *",
+      "description": "The timer schedule as an NCRONTAB expression or app setting."
+    },
+    "EscapedSchedule": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "__TIMER_SCHEDULE__",
+      "parameters": {
+        "source": "Schedule",
+        "steps": [
+          { "regex": "\\\\", "replacement": "\\\\" },
+          { "regex": "\"", "replacement": "\\\"" },
+          { "regex": "\\r", "replacement": "\\r" },
+          { "regex": "\\n", "replacement": "\\n" },
+          { "regex": "\\t", "replacement": "\\t" }
+        ]
+      }
+    },
+    "FunctionName": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "TemplateFunctionName",
+      "fileRename": "TemplateFunctionFile",
+      "parameters": {
+        "source": "name",
+        "steps": [
+          { "regex": "[^a-zA-Z0-9_]", "replacement": "_" },
+          { "regex": "^[^a-zA-Z]", "replacement": "Function$&" }
+        ]
+      }
+    }
+  },
+  "primaryOutputs": [
+    { "path": "TemplateFunctionFile_function.go" }
+  ]
+}

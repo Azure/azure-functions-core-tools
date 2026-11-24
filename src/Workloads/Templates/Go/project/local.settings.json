@@ -1,0 +1,8 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "native",
+    "FUNCTIONS_CLI_NATIVE_LANGUAGE": "go",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true"
+  }
+}
