@@ -122,6 +122,6 @@ public sealed class FunctionsProjectResolverTests
     {
         IFunctionsProjectFactory factory = Substitute.For<IFunctionsProjectFactory>();
         factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>()).Returns(result);
-        return (stack, new(TestWorkloads.CreateInfo($"Contoso.{stack.Descriptor.StackIdentifier}") with { Stack = stack.Descriptor }, factory));
+        return (stack, new(TestWorkloads.CreateInfo($"Contoso.{stack.Descriptor.Identifier}") with { Stack = stack.Descriptor }, factory));
     }
 }

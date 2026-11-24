@@ -32,7 +32,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
         Stack = stack ?? throw new ArgumentNullException(nameof(stack));
-        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.StackIdentifier, stack.Descriptor.WorkerRuntime);
+        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.Identifier, stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seam so tests can stub out the `go build` invocation

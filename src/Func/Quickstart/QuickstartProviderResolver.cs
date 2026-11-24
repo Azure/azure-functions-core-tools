@@ -16,9 +16,9 @@ internal sealed class QuickstartProviderResolver(IInteractionService interaction
 
     public async Task<IQuickstartProvider?> SelectProviderAsync(string? requestedStack, string actionDescription, CancellationToken cancellationToken)
     {
-        string[] installed = [.. _providers.Select(p => p.Stack.Descriptor.StackIdentifier)];
+        string[] installed = [.. _providers.Select(p => p.Stack.Descriptor.Identifier)];
         IQuickstartProvider[] candidates = requestedStack is null ? [.. _providers] : [.. _providers.Where(p =>
-            string.Equals(p.Stack.Descriptor.StackIdentifier, requestedStack.Trim(), StringComparison.OrdinalIgnoreCase))];
+            string.Equals(p.Stack.Descriptor.Identifier, requestedStack.Trim(), StringComparison.OrdinalIgnoreCase))];
 
         if (candidates.Length == 0)
         {
@@ -38,7 +38,7 @@ internal sealed class QuickstartProviderResolver(IInteractionService interaction
         {
             if (requestedStack is null)
             {
-                _hintRenderer.Render(new WorkloadHint(WorkloadHintKind.AutoSelectedSoleWorkload, actionDescription, candidates[0].Stack.Descriptor.StackIdentifier, installed));
+                _hintRenderer.Render(new WorkloadHint(WorkloadHintKind.AutoSelectedSoleWorkload, actionDescription, candidates[0].Stack.Descriptor.Identifier, installed));
             }
 
             return candidates[0];
@@ -50,13 +50,13 @@ internal sealed class QuickstartProviderResolver(IInteractionService interaction
             return null;
         }
 
-        return await _interaction.PromptForSelectionAsync("Select a stack:", candidates, p => $"{p.Stack.Descriptor.DisplayName} ({p.Stack.Descriptor.StackIdentifier})", cancellationToken);
+        return await _interaction.PromptForSelectionAsync("Select a stack:", candidates, p => $"{p.Stack.Descriptor.DisplayName} ({p.Stack.Descriptor.Identifier})", cancellationToken);
     }
 
     public async Task<LanguageDescriptor?> ResolveOrPromptLanguageAsync(string? requestedLanguage, IQuickstartProvider provider, QuickstartManifest manifest, CancellationToken cancellationToken)
     {
         IProjectStack stack = provider.Stack;
-        string id = stack.Descriptor.StackIdentifier;
+        string id = stack.Descriptor.Identifier;
         LanguageDescriptor[] available = [.. stack.SupportedLanguages.Where(l => manifest.Entries.Any(e => l.IsMatch(e.Language)))];
         if (requestedLanguage is not null)
         {
@@ -118,7 +118,7 @@ internal sealed class QuickstartProviderResolver(IInteractionService interaction
         IProjectStack? owner;
         try
         {
-            owner = _catalog.FindStack(stack.StackIdentifier);
+            owner = _catalog.FindStack(stack.Identifier);
         }
         catch (ProjectStackResolutionException ex)
         {
@@ -126,6 +126,6 @@ internal sealed class QuickstartProviderResolver(IInteractionService interaction
         }
 
         return ReferenceEquals(owner, provider.Stack) && _providers.Count(p => p.Stack.Descriptor == stack) == 1
-            ? null : $"Stack '{stack.StackIdentifier}' does not have a unique installed quickstart provider.";
+            ? null : $"Stack '{stack.Identifier}' does not have a unique installed quickstart provider.";
     }
 }

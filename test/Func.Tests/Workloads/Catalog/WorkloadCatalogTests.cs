@@ -97,7 +97,7 @@ public sealed class WorkloadCatalogTests
         rows.Should().OnlyContain(row => row.PackageId == id && row.Source == _altSource);
         rows.Single(row => row.LatestVersion == V("0.9.0")).Stack.Should().BeNull();
         var stable = rows.Single(row => row.LatestVersion == V("1.0.0"));
-        stable.Stack!.StackIdentifier.Should().Be("comet");
+        stable.Stack!.Identifier.Should().Be("comet");
         stable.Stack.DisplayName.Should().Be("Comet");
         stable.Stack.WorkerRuntime.Should().Be("comet");
         stable.Stack.Description.Should().Be("Comet tooling");

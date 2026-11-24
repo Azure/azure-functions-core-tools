@@ -111,7 +111,7 @@ public sealed class CliHostFactoryTests : IDisposable
         await WorkloadRegistration.RegisterWorkloadsAsync(services, paths, new TestInteractionService(), token);
 
         using var provider = services.BuildServiceProvider();
-        var stacks = provider.GetServices<IProjectStack>().ToDictionary(s => s.Descriptor.StackIdentifier);
+        var stacks = provider.GetServices<IProjectStack>().ToDictionary(s => s.Descriptor.Identifier);
         var workloads = provider.GetServices<WorkloadInfo>().ToDictionary(w => w.PackageId);
         stacks["comet"].Descriptor.Should().BeSameAs(workloads["Contoso.DevKit"].Stack);
         stacks["lunar"].Descriptor.Should().BeSameAs(workloads["Other.Publisher"].Stack);

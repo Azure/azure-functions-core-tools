@@ -21,7 +21,7 @@ public class PowerShellProjectInitializerTests
     [Fact]
     public void Stack_IsPowerShell()
     {
-        new PowerShellProjectInitializer(PowerShellWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("powershell");
+        new PowerShellProjectInitializer(PowerShellWorkloadTests.Stack).Stack.Descriptor.Identifier.Should().Be("powershell");
     }
 
     [Fact]

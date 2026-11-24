@@ -156,7 +156,7 @@ internal class HelpCommand : FuncCliCommand
             .GroupBy<Option, StackDescriptor?>(o => (command as FuncCliCommand)?.GetOptionHelpStack(o), ReferenceEqualityComparer.Instance)
             .OrderBy(group => group.Key is not null)
             .ThenBy(group => group.Key?.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(group => group.Key?.StackIdentifier, StringComparer.OrdinalIgnoreCase);
+            .ThenBy(group => group.Key?.Identifier, StringComparer.OrdinalIgnoreCase);
         foreach (IGrouping<StackDescriptor?, Option> group in optionGroups)
         {
             WriteOptionsSection(group.Key?.DisplayName ?? "Options", group);

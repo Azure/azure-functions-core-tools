@@ -69,7 +69,7 @@ internal sealed class SetupDependencyPlanBuilder(
             if (runtimeFeature.Package is { } package)
             {
                 VersionRange? selectedVersion = package.Installed ? null : new VersionRange(package.Version, true, package.Version, true);
-                dependencies.Add(new SetupDependency(SetupDependencyKind.Stack, package.Stack.StackIdentifier,
+                dependencies.Add(new SetupDependency(SetupDependencyKind.Stack, package.Stack.Identifier,
                     $"{package.Stack.DisplayName} stack", package.PackageId, selectedVersion, RangeText: null, ResolvedPackageId: null));
             }
         }

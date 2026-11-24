@@ -44,7 +44,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        new NodeProjectInitializer(NodeWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("node");
+        new NodeProjectInitializer(NodeWorkloadTests.Stack).Stack.Descriptor.Identifier.Should().Be("node");
     }
 
     [Fact]

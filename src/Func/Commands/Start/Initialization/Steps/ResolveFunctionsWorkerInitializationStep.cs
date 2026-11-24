@@ -241,7 +241,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         }
 
         if (supportedRuntimes.Any(runtime =>
-            string.Equals(runtime, stack.StackIdentifier, StringComparison.OrdinalIgnoreCase)
+            string.Equals(runtime, stack.Identifier, StringComparison.OrdinalIgnoreCase)
             || string.Equals(runtime, runtimeIdentifier, StringComparison.OrdinalIgnoreCase)))
         {
             return;

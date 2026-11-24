@@ -99,7 +99,7 @@ public class NodeProjectFactoryTests : IDisposable
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Stack.Descriptor.StackIdentifier.Should().Be("node");
+        created.Project.Stack.Descriptor.Identifier.Should().Be("node");
         created.Project.Stack.Descriptor.DisplayName.Should().Be("Node.js");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         worker.WorkerRuntime.Should().Be("node");

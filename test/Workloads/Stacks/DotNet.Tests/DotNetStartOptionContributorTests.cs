@@ -19,7 +19,7 @@ public class DotNetStartOptionContributorTests
     [Fact]
     public void Stack_IsDotNet()
     {
-        new DotNetStartOptionContributor(DotNetWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("dotnet");
+        new DotNetStartOptionContributor(DotNetWorkloadTests.Stack).Stack.Descriptor.Identifier.Should().Be("dotnet");
     }
 
     [Fact]

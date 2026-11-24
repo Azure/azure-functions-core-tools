@@ -51,7 +51,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _initializers = (initializers ?? throw new ArgumentNullException(nameof(initializers))).ToList();
 
-        StackOption.Description = BuildOptionDescription("The stack to use", _initializers.Select(i => i.Stack.Descriptor.StackIdentifier));
+        StackOption.Description = BuildOptionDescription("The stack to use", _initializers.Select(i => i.Stack.Descriptor.Identifier));
         LanguageOption.Description = BuildOptionDescription("The programming language", _initializers.SelectMany(i => i.Stack.SupportedLanguages).Select(l => l.LanguageIdentifier));
         AddPathArgument();
         Options.Add(StackOption);
@@ -63,7 +63,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         foreach (IProjectInitializer initializer in _initializers)
         {
             StackDescriptor descriptor = initializer.Stack.Descriptor;
-            registry.SetActiveStack(descriptor.StackIdentifier);
+            registry.SetActiveStack(descriptor.Identifier);
             IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
             RegisterStackOptionHelp(descriptor, options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
                 && option.Name != CommonInitOptions.BundlesChannelOptionName));
@@ -120,7 +120,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             LanguageDescriptor? detected = await DetectProjectLanguageAsync(directory, stack, cancellationToken);
             if (language is not null && detected is not null && detected != language)
             {
-                throw new ProjectStackResolutionException($"--language '{explicitLanguage}' conflicts with detected project language '{detected.LanguageIdentifier}' for stack '{stack.Descriptor.StackIdentifier}'.");
+                throw new ProjectStackResolutionException($"--language '{explicitLanguage}' conflicts with detected project language '{detected.LanguageIdentifier}' for stack '{stack.Descriptor.Identifier}'.");
             }
 
             language ??= detected;
@@ -177,7 +177,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Dictionary<string, IProjectInitializer> eligible = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (IProjectInitializer initializer in _initializers)
         {
-            string id = initializer.Stack.Descriptor.StackIdentifier;
+            string id = initializer.Stack.Descriptor.Identifier;
             if (!eligible.TryAdd(id, initializer))
             {
                 throw new ProjectStackResolutionException($"Multiple installed initializers claim the '{id}' stack.");
@@ -202,12 +202,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         selected = _catalog.ResolveProjectStack(settings, selected);
         if (selected is not null)
         {
-            if (eligible.TryGetValue(selected.Descriptor.StackIdentifier, out IProjectInitializer? initializer))
+            if (eligible.TryGetValue(selected.Descriptor.Identifier, out IProjectInitializer? initializer))
             {
                 return initializer;
             }
 
-            throw new ProjectStackResolutionException($"Stack '{selected.Descriptor.StackIdentifier}' does not provide an initializer for 'func init'.");
+            throw new ProjectStackResolutionException($"Stack '{selected.Descriptor.Identifier}' does not provide an initializer for 'func init'.");
         }
 
         if (eligible.Count == 0)
@@ -218,7 +218,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         if (!settings.IsAdoptable && _initializers is [var sole])
         {
-            RenderHint(WorkloadHintKind.AutoSelectedSoleWorkload, sole.Stack.Descriptor.StackIdentifier);
+            RenderHint(WorkloadHintKind.AutoSelectedSoleWorkload, sole.Stack.Descriptor.Identifier);
             return sole;
         }
 
@@ -238,9 +238,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         List<StackDescriptor> choices = [.. _initializers.Select(i => i.Stack.Descriptor)];
         StackDescriptor picked = await _interaction.PromptForSelectionAsync(
             settings.IsAdoptable ? "Adopting an existing project. Which stack is it?" : "Select a stack:", choices,
-            d => choices.Count(c => c.DisplayName.Equals(d.DisplayName, StringComparison.OrdinalIgnoreCase)) > 1 ? $"{d.DisplayName} ({d.StackIdentifier})" : d.DisplayName,
+            d => choices.Count(c => c.DisplayName.Equals(d.DisplayName, StringComparison.OrdinalIgnoreCase)) > 1 ? $"{d.DisplayName} ({d.Identifier})" : d.DisplayName,
             cancellationToken);
-        return eligible[picked.StackIdentifier];
+        return eligible[picked.Identifier];
     }
 
     private async Task<LanguageDescriptor?> DetectProjectLanguageAsync(WorkingDirectory directory, IProjectStack stack, CancellationToken cancellationToken)
@@ -254,12 +254,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         FunctionsProject project = ((ProjectResolutionResult.Resolved)result).Project;
         if (project.Stack.Descriptor != stack.Descriptor)
         {
-            throw new ProjectStackResolutionException($"Selected stack '{stack.Descriptor.StackIdentifier}' conflicts with detected project stack '{project.Stack.Descriptor.StackIdentifier}'.");
+            throw new ProjectStackResolutionException($"Selected stack '{stack.Descriptor.Identifier}' conflicts with detected project stack '{project.Stack.Descriptor.Identifier}'.");
         }
 
         return project.Language is not { } language ? null
             : stack.SupportedLanguages.SingleOrDefault(l => l == language) ?? throw new ProjectStackResolutionException(
-                $"Detected project language '{language.LanguageIdentifier}' is not supported by stack '{stack.Descriptor.StackIdentifier}'.");
+                $"Detected project language '{language.LanguageIdentifier}' is not supported by stack '{stack.Descriptor.Identifier}'.");
     }
 
     private async Task<LanguageDescriptor> SelectLanguageAsync(IProjectStack stack, CancellationToken cancellationToken)
@@ -271,7 +271,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
         if (!_interaction.IsInteractive)
         {
-            throw new ProjectStackResolutionException($"The '{stack.Descriptor.StackIdentifier}' stack supports multiple languages. Re-run with --language <{string.Join("|", choices.Select(l => l.LanguageIdentifier))}>.");
+            throw new ProjectStackResolutionException($"The '{stack.Descriptor.Identifier}' stack supports multiple languages. Re-run with --language <{string.Join("|", choices.Select(l => l.LanguageIdentifier))}>.");
         }
 
         return await _interaction.PromptForSelectionAsync("Select a language:", choices,
@@ -280,7 +280,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     }
 
     private void RenderHint(WorkloadHintKind kind, string? requested = null)
-        => _hintRenderer.Render(new WorkloadHint(kind, "initialize a project", requested, [.. _initializers.Select(i => i.Stack.Descriptor.StackIdentifier)]));
+        => _hintRenderer.Render(new WorkloadHint(kind, "initialize a project", requested, [.. _initializers.Select(i => i.Stack.Descriptor.Identifier)]));
 
     private void WriteSuccess(string action, IProjectStack stack)
     {

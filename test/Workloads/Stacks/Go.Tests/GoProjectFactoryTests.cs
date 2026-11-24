@@ -93,7 +93,7 @@ public class GoProjectFactoryTests : IDisposable
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Stack.Descriptor.StackIdentifier.Should().Be("go");
+        created.Project.Stack.Descriptor.Identifier.Should().Be("go");
         created.Project.Stack.Descriptor.DisplayName.Should().Be("Go");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         worker.WorkerRuntime.Should().Be("native");

@@ -123,7 +123,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
                 source = r.Source.Source,
                 stack = r.Stack is null ? null : new
                 {
-                    stackIdentifier = r.Stack.StackIdentifier,
+                    stackIdentifier = r.Stack.Identifier,
                     workerRuntime = r.Stack.WorkerRuntime,
                     displayName = r.Stack.DisplayName,
                     description = r.Stack.Description,
@@ -206,7 +206,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         card.WriteField("Package ID", result.PackageId);
         if (result.Stack is { } stack)
         {
-            card.WriteField("Stack ID", stack.StackIdentifier);
+            card.WriteField("Stack ID", stack.Identifier);
         }
 
         card.WriteAliases(result.Aliases);

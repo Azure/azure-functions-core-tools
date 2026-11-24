@@ -44,7 +44,7 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsGo()
     {
-        new GoProjectInitializer(GoWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("go");
+        new GoProjectInitializer(GoWorkloadTests.Stack).Stack.Descriptor.Identifier.Should().Be("go");
     }
 
     [Fact]

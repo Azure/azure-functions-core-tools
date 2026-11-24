@@ -22,7 +22,7 @@ internal static class QuickstartMessages
     internal static string BuildStackOptionDescription(IReadOnlyList<IQuickstartProvider> providers)
     {
         var stacks = providers
-            .Select(p => p.Stack.Descriptor.StackIdentifier)
+            .Select(p => p.Stack.Descriptor.Identifier)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToList();

@@ -56,6 +56,6 @@ internal sealed class StackPackageCatalog(IWorkloadStore store, IWorkloadCatalog
         // version that actually declares this ID, keeping competing owners separate.
         return [.. installed.Concat(available)
             .GroupBy(p => p.PackageId, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(owner => owner.DistinctBy(p => p.Stack.StackIdentifier, StringComparer.OrdinalIgnoreCase))];
+            .SelectMany(owner => owner.DistinctBy(p => p.Stack.Identifier, StringComparer.OrdinalIgnoreCase))];
     }
 }

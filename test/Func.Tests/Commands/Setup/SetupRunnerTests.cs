@@ -874,7 +874,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         result.ExitCode.Should().Be(0);
         _interaction.Lines.Should().Contain(line => line.Contains($"Skipped {runtime} worker", StringComparison.Ordinal));
-        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {SetupTestInventory.Packages.Single(p => p.Stack!.StackIdentifier == runtime).Title} stack", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {SetupTestInventory.Packages.Single(p => p.Stack!.Identifier == runtime).Title} stack", StringComparison.Ordinal));
     }
 
     [Theory]

@@ -101,7 +101,7 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
 </Project>
 ```
 
-`StackIdentifier` is the stable spelling accepted by `func init --stack` and stored in `.func/config.json`. `WorkerRuntime` defaults to this ID. Override it when the host uses a different name: the Go workload declares `<StackIdentifier>go</StackIdentifier>` and `<WorkerRuntime>native</WorkerRuntime>`. `Title` is a human label, never an input alias.
+`<StackIdentifier>` supplies `StackDescriptor.Identifier`, the stable spelling accepted by `func init --stack` and stored in `.func/config.json`. `WorkerRuntime` defaults to this ID. Override it when the host uses a different name: the Go workload declares `<StackIdentifier>go</StackIdentifier>` and `<WorkerRuntime>native</WorkerRuntime>`. `Title` is a human label, never an input alias.
 
 The SDK projects this declaration into NuGet (`stack:<id>`, `alias:<id>`, `worker-runtime:<runtime>`, title and description) and into the package's `workload.json`. The CLI associates it with the **evaluated NuGet package ID**, not a naming convention. For example, a project may declare `<StackIdentifier>comet</StackIdentifier>` and `<PackageId>Contoso.DevKit</PackageId>`. It appears in `func workload search --stack` and installs with `func workload install Contoso.DevKit --exact`. Declaring a stack does not create a `func setup` dependency recipe.
 
@@ -293,7 +293,7 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
 
 ### Contexts
 
-`InitContext` supplies `WorkingDirectory`, `ProjectName`, the resolved `LanguageDescriptor?`, and `Force`. Do not parse the original user input again. Persisted project settings use `StackIdentifier` and, for stacks that distinguish languages, `LanguageIdentifier`. When adopting an existing project, the CLI resolves `FUNCTIONS_WORKER_RUNTIME` against `WorkerRuntime` before writing any CLI config.
+`InitContext` supplies `WorkingDirectory`, `ProjectName`, the resolved `LanguageDescriptor?`, and `Force`. Do not parse the original user input again. Persisted project settings use `StackDescriptor.Identifier` and, for stacks that distinguish languages, `LanguageDescriptor.LanguageIdentifier`. When adopting an existing project, the CLI resolves `FUNCTIONS_WORKER_RUNTIME` against `WorkerRuntime` before writing any CLI config.
 
 Workload-specific option values flow through the `ParseResult`, so the CLI never has to know about your options.
 

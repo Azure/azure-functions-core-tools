@@ -112,7 +112,7 @@ public class PythonProjectFactoryTests : IDisposable
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Stack.Descriptor.StackIdentifier.Should().Be("python");
+        created.Project.Stack.Descriptor.Identifier.Should().Be("python");
         created.Project.Stack.Descriptor.DisplayName.Should().Be("Python");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
         worker.WorkerRuntime.Should().Be("python");

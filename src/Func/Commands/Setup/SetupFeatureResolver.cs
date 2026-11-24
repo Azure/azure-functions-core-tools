@@ -45,7 +45,7 @@ internal sealed class SetupFeatureResolver(
             string source = byRuntime ? ProjectStackSettings.WorkerRuntimeSource : ProjectStackSettings.StackSource;
             StackPackage selected = FindUnique(packages, value, byRuntime)
                 ?? throw new SetupConfigurationException($"No stack matches {source} '{value}'. Run 'func workload search --stack' to discover stacks.");
-            return BuildPlan([selected.Stack.StackIdentifier], packages, allowWorkerOnly: false);
+            return BuildPlan([selected.Stack.Identifier], packages, allowWorkerOnly: false);
         }
 
         if (!options.NonInteractive && !options.AssumeYes && options.OutputMode != SetupOutputMode.Json && _interaction.IsInteractive)
@@ -94,18 +94,18 @@ internal sealed class SetupFeatureResolver(
     {
         List<MultiSelectionChoice> choices = [];
         List<string> installed = [];
-        foreach (IGrouping<string, StackPackage> owners in inventory.GroupBy(p => p.Stack.StackIdentifier, StringComparer.OrdinalIgnoreCase)
+        foreach (IGrouping<string, StackPackage> owners in inventory.GroupBy(p => p.Stack.Identifier, StringComparer.OrdinalIgnoreCase)
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
         {
             StackPackage package = RequireSingleOwner(owners, owners.Key);
-            string label = $"{package.Stack.DisplayName} ({package.Stack.StackIdentifier})";
+            string label = $"{package.Stack.DisplayName} ({package.Stack.Identifier})";
             if (package.Installed)
             {
                 installed.Add(label);
             }
-            else if (SetupDependency.SupportsStack(package.Stack.StackIdentifier))
+            else if (SetupDependency.SupportsStack(package.Stack.Identifier))
             {
-                choices.Add(new MultiSelectionChoice(package.Stack.StackIdentifier, label));
+                choices.Add(new MultiSelectionChoice(package.Stack.Identifier, label));
             }
             else
             {
@@ -188,7 +188,7 @@ internal sealed class SetupFeatureResolver(
 
     private static StackPackage? FindUnique(IReadOnlyList<StackPackage> packages, string value, bool byRuntime)
     {
-        StackPackage[] matches = [.. packages.Where(p => string.Equals(byRuntime ? p.Stack.WorkerRuntime : p.Stack.StackIdentifier,
+        StackPackage[] matches = [.. packages.Where(p => string.Equals(byRuntime ? p.Stack.WorkerRuntime : p.Stack.Identifier,
             value, StringComparison.OrdinalIgnoreCase))];
         return matches.Length == 0 ? null : RequireSingleOwner(matches, value);
     }
@@ -197,11 +197,11 @@ internal sealed class SetupFeatureResolver(
     {
         StackPackage[] matches = [.. packages];
         return matches.Length == 1 ? matches[0]
-            : throw new SetupConfigurationException($"'{value}' is ambiguous. Matching stack packages: {string.Join(", ", matches.Select(p => $"{p.PackageId} ({p.Stack.StackIdentifier})"))}.");
+            : throw new SetupConfigurationException($"'{value}' is ambiguous. Matching stack packages: {string.Join(", ", matches.Select(p => $"{p.PackageId} ({p.Stack.Identifier})"))}.");
     }
 
     private static string NoRecipeMessage(StackPackage package)
-        => $"No full setup recipe is available for stack '{package.Stack.StackIdentifier}'. Install its workload with 'func workload install {package.PackageId} --exact --version {package.Version.ToNormalizedString()}'.";
+        => $"No full setup recipe is available for stack '{package.Stack.Identifier}'. Install its workload with 'func workload install {package.PackageId} --exact --version {package.Version.ToNormalizedString()}'.";
 
     private static bool IsCoreFeature(string name)
         => string.Equals(name, "host", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "runtime", StringComparison.OrdinalIgnoreCase);

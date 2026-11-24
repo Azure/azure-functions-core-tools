@@ -512,7 +512,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     // StackDescriptor equality compares stable identifiers, not a package version's declaration.
     private static bool SameStackDeclaration(StackDescriptor? left, StackDescriptor? right)
-        => left?.StackIdentifier == right?.StackIdentifier && left?.WorkerRuntime == right?.WorkerRuntime
+        => left?.Identifier == right?.Identifier && left?.WorkerRuntime == right?.WorkerRuntime
             && left?.DisplayName == right?.DisplayName && left?.Description == right?.Description;
 
     private static PackageArchiveReader OpenPackage(string nupkgPath)

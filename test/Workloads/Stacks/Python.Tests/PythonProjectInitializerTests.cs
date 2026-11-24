@@ -44,7 +44,7 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsPython()
     {
-        new PythonProjectInitializer(PythonWorkloadTests.Stack).Stack.Descriptor.StackIdentifier.Should().Be("python");
+        new PythonProjectInitializer(PythonWorkloadTests.Stack).Stack.Descriptor.Identifier.Should().Be("python");
     }
 
     [Fact]

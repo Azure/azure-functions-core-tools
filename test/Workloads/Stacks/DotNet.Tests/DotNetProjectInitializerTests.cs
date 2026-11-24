@@ -35,7 +35,7 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsDotNet()
     {
-        CreateInitializer().Stack.Descriptor.StackIdentifier.Should().Be("dotnet");
+        CreateInitializer().Stack.Descriptor.Identifier.Should().Be("dotnet");
     }
 
     [Fact]

@@ -144,7 +144,7 @@ AddPathArgument(); // adds optional [path] argument
 
 ## Stacks
 
-A stack is a workload-owned project target. Its manifest supplies `StackIdentifier`, `WorkerRuntime`, and `DisplayName`; its `IProjectStack` supplies the ordered language descriptors.
+A stack is a workload-owned project target. Its manifest supplies the descriptor's `Identifier`, `WorkerRuntime`, and `DisplayName`; its `IProjectStack` supplies the ordered language descriptors.
 
 - `--stack` / `-s` on `func init` selects a stack by CLI ID. `FUNCTIONS_WORKER_RUNTIME` in `local.settings.json` identifies a stack only by its host runtime.
 - Each workload's project factory recognizes its own project markers. The CLI project resolver applies the persisted stack choice, or the local host runtime when no CLI config exists, before probing the eligible factories.
@@ -384,7 +384,7 @@ If a newer version is found, a notice is printed after the command completes.
 
 **Adopt mode** (host.json present, no `.func/config.json`):
 
-`--stack` accepts a CLI `StackIdentifier`, never a display label or an alternate host spelling.
+`--stack` accepts `StackDescriptor.Identifier`, never a display label or an alternate host spelling.
 `FUNCTIONS_WORKER_RUNTIME` in `local.settings.json`, on the other hand, matches only the descriptor's `WorkerRuntime`.
 For example `native` matches Go; the config stores `"runtime": "go"`. If several stacks share a worker runtime, specify the matching `--stack` ID. An unknown or conflicting value is an error, not a fallback. With no signal, select a stack interactively or supply `--stack`.
 

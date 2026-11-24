@@ -21,5 +21,5 @@ internal abstract class DotNetProject(WorkingDirectory workingDirectory, DotNetP
     public override bool SupportsExtensionBundles => false;
 
     public override FunctionsWorkerReference WorkerReference
-        => FunctionsWorkerReference.FromWorkerInfo(Stack.Descriptor.StackIdentifier, Stack.Descriptor.WorkerRuntime, _workingDirectory.Info.FullName);
+        => FunctionsWorkerReference.FromWorkerInfo(Stack.Descriptor.Identifier, Stack.Descriptor.WorkerRuntime, _workingDirectory.Info.FullName);
 }

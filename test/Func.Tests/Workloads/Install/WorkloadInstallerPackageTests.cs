@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -97,10 +98,14 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         await installer.InstallFromPackageAsync(Package("1.0.0", "Comet", "native"), cancellationToken: token);
         await installer.InstallFromPackageAsync(Package("2.0.0-preview.1", "Comet Next", "comet"), cancellationToken: token);
 
+        using var registry = JsonDocument.Parse(await File.ReadAllTextAsync(Paths.WorkloadRegistryPath, token));
+        registry.RootElement.GetProperty("workloads").EnumerateArray()
+            .Select(entry => entry.GetProperty("stack").GetProperty("stackIdentifier").GetString()).Should().Equal("comet", "comet");
+
         var entries = await new WorkloadStore(Paths).GetWorkloadsAsync(token);
         entries.Should().HaveCount(2).And.OnlyContain(entry => entry.PackageId == "Contoso.DevKit");
         var stable = entries.Single(entry => entry.PackageVersion == "1.0.0");
-        stable.Stack!.StackIdentifier.Should().Be("comet");
+        stable.Stack!.Identifier.Should().Be("comet");
         stable.Stack.WorkerRuntime.Should().Be("native");
         stable.Stack.DisplayName.Should().Be("Comet");
         stable.Stack.Description.Should().Be("Comet tooling");

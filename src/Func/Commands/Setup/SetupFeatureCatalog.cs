@@ -15,7 +15,7 @@ internal static class SetupFeatureCatalog
 
     public static SetupRuntimeFeature? GetStackRecipe(StackPackage package)
     {
-        string id = package.Stack.StackIdentifier;
+        string id = package.Stack.Identifier;
         if (!SetupDependency.SupportsStack(id))
         {
             return null;
@@ -36,7 +36,7 @@ internal static class SetupFeatureCatalog
         ArgumentNullException.ThrowIfNull(entry);
         if (entry.Stack is { } stack)
         {
-            return SetupDependency.SupportsStack(stack.StackIdentifier) ? stack.StackIdentifier : null;
+            return SetupDependency.SupportsStack(stack.Identifier) ? stack.Identifier : null;
         }
 
         string packageId = entry.LogicalPackage?.PackageId ?? entry.PackageId;

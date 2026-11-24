@@ -32,7 +32,7 @@ internal sealed class InstalledProjectStackCatalog
     public IProjectStack? FindStack(string stackIdentifier)
     {
         ArgumentNullException.ThrowIfNull(stackIdentifier);
-        return Stacks.SingleOrDefault(stack => string.Equals(stack.Descriptor.StackIdentifier, stackIdentifier.Trim(), StringComparison.OrdinalIgnoreCase));
+        return Stacks.SingleOrDefault(stack => string.Equals(stack.Descriptor.Identifier, stackIdentifier.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
     public IProjectStack? ResolveProjectStack(ProjectStackSettings settings, IProjectStack? selected = null)
@@ -47,7 +47,7 @@ internal sealed class InstalledProjectStackCatalog
 
             if (selected is not null && selected.Descriptor != persisted.Descriptor)
             {
-                throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.StackIdentifier}' conflicts with {ProjectStackSettings.StackSource} '{settings.StackIdentifier}'.");
+                throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.Identifier}' conflicts with {ProjectStackSettings.StackSource} '{settings.StackIdentifier}'.");
             }
 
             return persisted;
@@ -62,14 +62,14 @@ internal sealed class InstalledProjectStackCatalog
         if (selected is not null)
         {
             return Matches(selected) ? selected
-                : throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.StackIdentifier}' uses worker runtime '{selected.Descriptor.WorkerRuntime}', which conflicts with {ProjectStackSettings.WorkerRuntimeSource} '{runtime}'.");
+                : throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.Identifier}' uses worker runtime '{selected.Descriptor.WorkerRuntime}', which conflicts with {ProjectStackSettings.WorkerRuntimeSource} '{runtime}'.");
         }
 
         return installed.Where(Matches).ToList() switch
         {
             [var match] => match,
             [] => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' does not match an installed stack's worker runtime. Run 'func workload search --stack' to find stack workloads."),
-            var matches => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' matches multiple stacks: {string.Join(", ", matches.Select(s => s.Descriptor.StackIdentifier))}. Specify the matching CLI stack ID with 'func init --stack <id>'."),
+            var matches => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' matches multiple stacks: {string.Join(", ", matches.Select(s => s.Descriptor.Identifier))}. Specify the matching CLI stack ID with 'func init --stack <id>'."),
         };
     }
 
@@ -77,13 +77,13 @@ internal sealed class InstalledProjectStackCatalog
         => stack.SupportedLanguages.Where(language => language.IsMatch(value)).ToList() switch
         {
             [var match] => match,
-            [] => throw new ProjectStackResolutionException($"Language '{value}' from {source} is not supported by the '{stack.Descriptor.StackIdentifier}' stack. Supported IDs: {string.Join(", ", stack.SupportedLanguages.Select(l => l.LanguageIdentifier))}."),
-            var matches => throw new ProjectStackResolutionException($"Language '{value}' from {source} is ambiguous in the '{stack.Descriptor.StackIdentifier}' stack: {string.Join(", ", matches.Select(l => l.LanguageIdentifier))}."),
+            [] => throw new ProjectStackResolutionException($"Language '{value}' from {source} is not supported by the '{stack.Descriptor.Identifier}' stack. Supported IDs: {string.Join(", ", stack.SupportedLanguages.Select(l => l.LanguageIdentifier))}."),
+            var matches => throw new ProjectStackResolutionException($"Language '{value}' from {source} is ambiguous in the '{stack.Descriptor.Identifier}' stack: {string.Join(", ", matches.Select(l => l.LanguageIdentifier))}."),
         };
 
     private static IReadOnlyList<IProjectStack> Validate(List<IProjectStack> installed, IReadOnlyList<WorkloadInfo> packages)
     {
-        foreach (IGrouping<string, WorkloadInfo> group in packages.GroupBy(p => p.Stack!.StackIdentifier, StringComparer.OrdinalIgnoreCase))
+        foreach (IGrouping<string, WorkloadInfo> group in packages.GroupBy(p => p.Stack!.Identifier, StringComparer.OrdinalIgnoreCase))
         {
             string[] owners = [.. group.Select(p => p.PackageId).Distinct(StringComparer.OrdinalIgnoreCase)];
             if (owners.Length > 1)
@@ -97,17 +97,17 @@ internal sealed class InstalledProjectStackCatalog
         {
             ArgumentNullException.ThrowIfNull(stack, "stacks");
             StackDescriptor descriptor = stack.Descriptor;
-            ValidateName(descriptor.StackIdentifier);
+            ValidateName(descriptor.Identifier);
             ValidateName(descriptor.WorkerRuntime);
             ValidateName(descriptor.DisplayName);
-            if (!ids.Add(descriptor.StackIdentifier))
+            if (!ids.Add(descriptor.Identifier))
             {
-                throw new ProjectStackResolutionException($"Multiple installed workloads claim the '{descriptor.StackIdentifier}' stack. Run 'func workload list' and uninstall the conflicting provider.");
+                throw new ProjectStackResolutionException($"Multiple installed workloads claim the '{descriptor.Identifier}' stack. Run 'func workload list' and uninstall the conflicting provider.");
             }
 
             if (stack.SupportedLanguages is not { Count: > 0 } languages)
             {
-                throw new ProjectStackResolutionException($"Stack '{descriptor.StackIdentifier}' must declare at least one supported language.");
+                throw new ProjectStackResolutionException($"Stack '{descriptor.Identifier}' must declare at least one supported language.");
             }
 
             HashSet<string> languageIds = [with(StringComparer.OrdinalIgnoreCase)];
@@ -122,7 +122,7 @@ internal sealed class InstalledProjectStackCatalog
 
                 if (!languageIds.Add(language.LanguageIdentifier))
                 {
-                    throw new ProjectStackResolutionException($"Stack '{descriptor.StackIdentifier}' declares language '{language.LanguageIdentifier}' more than once.");
+                    throw new ProjectStackResolutionException($"Stack '{descriptor.Identifier}' declares language '{language.LanguageIdentifier}' more than once.");
                 }
             }
         }

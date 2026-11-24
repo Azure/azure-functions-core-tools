@@ -54,7 +54,7 @@ public class DotNetProjectFactoryTests : IDisposable
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         DotNetSourceProject sourceProject = created.Project.Should().BeOfType<DotNetSourceProject>().Subject;
         created.Reason.Should().Be($"found {fileName}");
-        sourceProject.Stack.Descriptor.StackIdentifier.Should().Be("dotnet");
+        sourceProject.Stack.Descriptor.Identifier.Should().Be("dotnet");
         sourceProject.Stack.Descriptor.DisplayName.Should().Be(".NET");
         sourceProject.SupportsExtensionBundles.Should().BeFalse();
         sourceProject.ProjectFilePath.Should().Be(Path.Combine(_projectDir.FullName, fileName));

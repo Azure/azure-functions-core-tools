@@ -195,7 +195,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         foreach (IStartHostOptionContributor contributor in _startOptionContributors)
         {
             StackDescriptor descriptor = contributor.Stack.Descriptor;
-            registry.SetActiveStack(descriptor.StackIdentifier);
+            registry.SetActiveStack(descriptor.Identifier);
             IReadOnlyList<Option> options = contributor.GetStartOptions(registry);
             RegisterStackOptionHelp(descriptor, options.Except(builtInOptions));
         }

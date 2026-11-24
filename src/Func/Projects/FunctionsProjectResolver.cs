@@ -36,7 +36,7 @@ internal sealed class FunctionsProjectResolver(
                 // Adoption can proceed without fingerprints, but not when the only recognized project belongs to a different stack.
                 ProjectResolutionResult other = await DetectAsync(_factories.Except(eligible), creationContext, null, cancellationToken);
                 return other is ProjectResolutionResult.Resolved resolved
-                    ? ProjectResolutionResults.NotResolved($"Selected stack '{context.SelectedStack.Descriptor.StackIdentifier}' conflicts with detected project stack '{resolved.Project.Stack.Descriptor.StackIdentifier}' ({resolved.Message}).")
+                    ? ProjectResolutionResults.NotResolved($"Selected stack '{context.SelectedStack.Descriptor.Identifier}' conflicts with detected project stack '{resolved.Project.Stack.Descriptor.Identifier}' ({resolved.Message}).")
                     : other;
             }
 
@@ -68,19 +68,19 @@ internal sealed class FunctionsProjectResolver(
             IProjectStack stack = created.Project.Stack;
             if (registration.Workload.Stack != stack.Descriptor)
             {
-                return ProjectResolutionResults.NotResolved($"Project factory in '{registration.Workload.PackageId}' returned stack '{stack.Descriptor.StackIdentifier}', which is not the package's declared stack.");
+                return ProjectResolutionResults.NotResolved($"Project factory in '{registration.Workload.PackageId}' returned stack '{stack.Descriptor.Identifier}', which is not the package's declared stack.");
             }
 
             if (match is not null)
             {
-                return ProjectResolutionResults.NotResolved($"The directory was recognized by both '{match.Project.Stack.Descriptor.StackIdentifier}' and '{stack.Descriptor.StackIdentifier}'. Specify the project's stack with 'func init --stack <id>'.");
+                return ProjectResolutionResults.NotResolved($"The directory was recognized by both '{match.Project.Stack.Descriptor.Identifier}' and '{stack.Descriptor.Identifier}'. Specify the project's stack with 'func init --stack <id>'.");
             }
 
             if (created.Project.Language is { } detected)
             {
                 if (!stack.SupportedLanguages.Contains(detected))
                 {
-                    return ProjectResolutionResults.NotResolved($"The detected project language '{detected.LanguageIdentifier}' is not supported by stack '{stack.Descriptor.StackIdentifier}'.");
+                    return ProjectResolutionResults.NotResolved($"The detected project language '{detected.LanguageIdentifier}' is not supported by stack '{stack.Descriptor.Identifier}'.");
                 }
 
                 if (configuredLanguage is not null && detected != configuredLanguage)

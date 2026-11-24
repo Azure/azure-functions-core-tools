@@ -40,7 +40,7 @@ internal sealed class ProjectStackConfiguration(IFileSystem fileSystem, ILocalSe
     {
         ArgumentNullException.ThrowIfNull(stack);
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(projectDirectory);
-        JsonObject section = new() { [CliConfigurationNames.StackRuntimeKey] = stack.Descriptor.StackIdentifier };
+        JsonObject section = new() { [CliConfigurationNames.StackRuntimeKey] = stack.Descriptor.Identifier };
         if (language is not null)
         {
             LanguageDescriptor supported = GetDeclaredLanguage(stack, language);
@@ -75,20 +75,20 @@ internal sealed class ProjectStackConfiguration(IFileSystem fileSystem, ILocalSe
         LanguageDescriptor supported = GetDeclaredLanguage(stack, language);
         if (stack.SupportedLanguages.Count < 2)
         {
-            throw new ProjectStackConfigurationException($"Stack '{stack.Descriptor.StackIdentifier}' does not require a persisted language.");
+            throw new ProjectStackConfigurationException($"Stack '{stack.Descriptor.Identifier}' does not require a persisted language.");
         }
 
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(projectDirectory);
         JsonObject? root = ReadRoot(projectDirectory);
         JsonObject? section = root is null ? null : GetStack(root);
         if (section is null
-            || !string.Equals(GetString(section, CliConfigurationNames.StackRuntimeKey), stack.Descriptor.StackIdentifier, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(GetString(section, CliConfigurationNames.StackRuntimeKey), stack.Descriptor.Identifier, StringComparison.OrdinalIgnoreCase)
             || GetString(section, CliConfigurationNames.StackLanguageKey) is not null)
         {
             throw new ProjectStackConfigurationException($"Project config '{path}' changed before its language could be completed. Re-run 'func init'.");
         }
 
-        section[CliConfigurationNames.StackRuntimeKey] = stack.Descriptor.StackIdentifier;
+        section[CliConfigurationNames.StackRuntimeKey] = stack.Descriptor.Identifier;
         section[CliConfigurationNames.StackLanguageKey] = supported.LanguageIdentifier;
         try
         {
@@ -140,5 +140,5 @@ internal sealed class ProjectStackConfiguration(IFileSystem fileSystem, ILocalSe
 
     private static LanguageDescriptor GetDeclaredLanguage(IProjectStack stack, LanguageDescriptor language) =>
         stack.SupportedLanguages.SingleOrDefault(l => l == language) ?? throw new ProjectStackConfigurationException(
-            $"Language '{language.LanguageIdentifier}' is not declared by stack '{stack.Descriptor.StackIdentifier}'.");
+            $"Language '{language.LanguageIdentifier}' is not declared by stack '{stack.Descriptor.Identifier}'.");
 }
