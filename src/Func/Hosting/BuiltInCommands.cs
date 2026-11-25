@@ -40,6 +40,7 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, StartCommand>();
         services.AddSingleton<FuncCliCommand, PackCommand>();
         services.AddSingleton<FuncCliCommand, PublishCommand>();
+        services.AddSingleton<FuncCliCommand, SettingsCommand>();
         services.AddSingleton<FuncCliCommand, UpdateCommand>();
         services.AddSingleton<ProfileListCommand>();
         services.AddSingleton<ProfileShowCommand>();

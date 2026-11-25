@@ -27,7 +27,7 @@ Program.cs
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
   │   ├── Resolve every FuncCliCommand from DI:
-  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, update, pack, publish, version, help, profile, workload
+  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, update, pack, publish, settings, version, help, profile, workload
   │   │     └── ExternalCommand wrappers (each carries the WorkloadInfo for the
   │   │         workload that called RegisterCommand)
   │   ├── Skip workload commands that collide with built-ins or with each
@@ -73,6 +73,7 @@ func
 ├── version (hidden)      Print version info
 ├── pack (hidden)         Stub — directs users to v4 Core Tools
 ├── publish (hidden)      Stub — directs users to Azure CLI / v4 Core Tools
+├── settings (hidden)     Stub — directs users to edit local.settings.json / v4 Core Tools
 └── help (hidden)         Print help
 ```
 
