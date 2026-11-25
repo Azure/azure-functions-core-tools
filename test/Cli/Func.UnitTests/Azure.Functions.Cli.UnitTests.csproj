@@ -26,4 +26,9 @@
     <ProjectReference Include="$(SrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- ArtifactAssembler is an executable, so the one helper under test is compiled into this project. -->
+    <Compile Include="$(SrcRoot)ArtifactAssembler\ZipUnixPermissions.cs" Link="ArtifactAssembler\ZipUnixPermissions.cs" />
+  </ItemGroup>
+
 </Project>
