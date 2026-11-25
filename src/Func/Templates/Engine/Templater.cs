@@ -55,14 +55,17 @@ internal sealed class Templater : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
-        return new TemplateResolutionResult([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
+        return new TemplateResolutionResult(
+            [.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
     }
 
     /// <summary>
     /// Lists project templates for <paramref name="language"/> using the engine's package-manager filters, keeping
     /// the engine's match details for each candidate.
     /// </summary>
-    public async Task<TemplateResolutionResult> ListProjectTemplatesAsync(string language, CancellationToken cancellationToken = default)
+    public async Task<TemplateResolutionResult> ListProjectTemplatesAsync(
+        string language,
+        CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(language);

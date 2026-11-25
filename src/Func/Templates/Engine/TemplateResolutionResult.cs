@@ -30,10 +30,11 @@ internal sealed class TemplateResolutionResult
         ArgumentNullException.ThrowIfNull(candidates);
 
         Templates = [.. candidates.Select(candidate => candidate.Template)];
-        Matches = candidates.ToDictionary<(FuncTemplateInfo Template, ITemplateMatchInfo Match), FuncTemplateInfo, ITemplateMatchInfo>(
-            candidate => candidate.Template,
-            candidate => candidate.Match,
-            ReferenceEqualityComparer.Instance);
+        Matches = candidates
+            .ToDictionary<(FuncTemplateInfo Template, ITemplateMatchInfo Match), FuncTemplateInfo, ITemplateMatchInfo>(
+                candidate => candidate.Template,
+                candidate => candidate.Match,
+                ReferenceEqualityComparer.Instance);
     }
 
     /// <summary>The candidates, in the order the engine returned them. The caller selects among them.</summary>

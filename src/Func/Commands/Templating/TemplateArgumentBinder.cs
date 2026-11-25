@@ -42,7 +42,7 @@ internal static class TemplateArgumentBinder
         ArgumentNullException.ThrowIfNull(tokens);
         ArgumentNullException.ThrowIfNull(reservedOptions);
 
-        var command = new Command("template");
+        Command command = new("template");
         Dictionary<string, ITemplateParameter> parametersByAlias = [with(StringComparer.OrdinalIgnoreCase)];
         Dictionary<Option, ITemplateParameter> parametersByOption = [];
 
@@ -72,7 +72,8 @@ internal static class TemplateArgumentBinder
                 if (reservedOptions.Any(option => HasAlias(option, alias)))
                 {
                     throw new InvalidOperationException(
-                        $"Template '{template.Identity}' has func.host.json option '{alias}' that conflicts with a built-in option.");
+                        $"Template '{template.Identity}' has func.host.json option '{alias}' "
+                        + "that conflicts with a built-in option.");
                 }
             }
 
@@ -123,7 +124,10 @@ internal static class TemplateArgumentBinder
         return values;
     }
 
-    private static void AddValue(Dictionary<string, string> values, ITemplateParameter parameter, OptionResult? optionResult)
+    private static void AddValue(
+        Dictionary<string, string> values,
+        ITemplateParameter parameter,
+        OptionResult? optionResult)
     {
         if (optionResult is null || optionResult.Implicit)
         {
@@ -149,7 +153,11 @@ internal static class TemplateArgumentBinder
         }
     }
 
-    private static string? ReadOptionName(FuncTemplateInfo template, string parameterName, string propertyName, string? name)
+    private static string? ReadOptionName(
+        FuncTemplateInfo template,
+        string parameterName,
+        string propertyName,
+        string? name)
     {
         if (string.IsNullOrEmpty(name))
         {
@@ -160,7 +168,8 @@ internal static class TemplateArgumentBinder
             || !name.All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or '.'))
         {
             throw new InvalidOperationException(
-                $"Template '{template.Identity}' has invalid func.host.json {propertyName} for symbol '{parameterName}'.");
+                $"Template '{template.Identity}' has invalid func.host.json {propertyName} "
+                + $"for symbol '{parameterName}'.");
         }
 
         return name;

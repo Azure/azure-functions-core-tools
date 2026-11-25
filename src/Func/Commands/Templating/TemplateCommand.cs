@@ -46,7 +46,8 @@ internal abstract class TemplateCommand : FuncCliCommand
         ArgumentNullException.ThrowIfNull(parseResult);
         ArgumentNullException.ThrowIfNull(passThroughOptions);
 
-        return [.. GetUnconsumedTokenIndexes(parseResult, passThroughOptions).Select(index => parseResult.Tokens[index].Value)];
+        return [.. GetUnconsumedTokenIndexes(parseResult, passThroughOptions)
+            .Select(index => parseResult.Tokens[index].Value)];
     }
 
     /// <summary>
@@ -75,7 +76,8 @@ internal abstract class TemplateCommand : FuncCliCommand
 
         bool isBooleanOption = parseResult.CommandResult.Command.Options.Any(option =>
             option.ValueType == typeof(bool)
-            && (string.Equals(option.Name, previous.Value, StringComparison.Ordinal) || option.Aliases.Contains(previous.Value)));
+            && (string.Equals(option.Name, previous.Value, StringComparison.Ordinal)
+                || option.Aliases.Contains(previous.Value)));
         return isBooleanOption
             ? $"Invalid value '{value.Value}' for option '{previous.Value}'. Expected 'true' or 'false'."
             : null;

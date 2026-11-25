@@ -28,7 +28,8 @@ internal static class TemplateFixtures
     public const string UntypedTemplateIdentity = "Func.Tests.Untyped";
 
     public static ITemplaterFactory CreateEmptyTemplaterFactory()
-        => CreateTemplaterFactory(Path.Combine(Path.GetTempPath(), "func-init-template-tests", Guid.NewGuid().ToString("N")));
+        => CreateTemplaterFactory(
+            Path.Combine(Path.GetTempPath(), "func-init-template-tests", Guid.NewGuid().ToString("N")));
 
     public static ITemplaterFactory CreateTemplaterFactory(string home)
         => new TemplaterFactory(
@@ -200,7 +201,10 @@ internal static class TemplateFixtures
             ("func.host.json", $$"""
                 {
                   "symbolInfo": {
-                    "TargetFramework": { "longName": "{{targetFrameworkAlias}}", "shortName": "{{targetFrameworkShortName}}" },
+                    "TargetFramework": {
+                      "longName": "{{targetFrameworkAlias}}",
+                      "shortName": "{{targetFrameworkShortName}}"
+                    },
                     "NoHttp": { "longName": "no-http", "shortName": "x" },
                     "NoTelemetry": { "longName": "no-telemetry", "shortName": "y" },
                     "RemovedParameter": { "longName": "stale" }

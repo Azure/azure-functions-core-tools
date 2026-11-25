@@ -45,7 +45,10 @@ public class PathArgumentTests
     [InlineData(new[] { "--bogus" }, new[] { "--bogus" }, null)]
     [InlineData(new[] { "MyApp", "--bogus" }, new[] { "--bogus" }, "MyApp")]
     [InlineData(new[] { "--bogus", "MyApp" }, new[] { "--bogus", "MyApp" }, null)]
-    public void DashPrefix_IsLeftUnmatchedAndSurfacesAsUnrecognized(string[] args, string[] expectedUnmatched, string? expectedPath)
+    public void DashPrefix_IsLeftUnmatchedAndSurfacesAsUnrecognized(
+        string[] args,
+        string[] expectedUnmatched,
+        string? expectedPath)
     {
         var cmd = new TestableCommand();
         var parseResult = cmd.Parse(args);
@@ -61,7 +64,7 @@ public class PathArgumentTests
     [InlineData(new[] { "--no-http", "--target-framework", "net10.0" }, null)]
     public void UnmatchedTokensAllowed_LeavesOptionLikeTokensUnmatchedInOrder(string[] args, string? expectedPath)
     {
-        var cmd = new UnmatchedTokensAllowedCommand();
+        UnmatchedTokensAllowedCommand cmd = new();
         var parseResult = cmd.Parse(args);
 
         parseResult.Errors.Should().BeEmpty();
@@ -81,7 +84,8 @@ public class PathArgumentTests
 
     private sealed class UnmatchedTokensAllowedCommand : FuncCliCommand
     {
-        public UnmatchedTokensAllowedCommand() : base("unmatched", "Command that leaves unmatched tokens to its action.")
+        public UnmatchedTokensAllowedCommand()
+            : base("unmatched", "Command that leaves unmatched tokens to its action.")
         {
             TreatUnmatchedTokensAsErrors = false;
             AddPathArgument();
