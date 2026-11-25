@@ -35,6 +35,14 @@ namespace ArtifactAssembler
                 ZipFile.CreateFromDirectory(dir, zipFilePath, CompressionLevel.Optimal, includeBaseDirectory: false);
                 Console.WriteLine($"Zipped: {dir} -> {zipFilePath}");
 
+                // The zip is created on a Windows agent, so func and gozip would lose their executable bit on Linux and macOS.
+                string dirName = new DirectoryInfo(dir).Name;
+                if (dirName.Contains("linux", StringComparison.OrdinalIgnoreCase) || dirName.Contains("osx", StringComparison.OrdinalIgnoreCase))
+                {
+                    int marked = ZipUnixPermissions.MarkExecutables(zipFilePath, ZipUnixPermissions.IsExecutableEntry);
+                    Console.WriteLine($"Marked {marked} executable entries in: {zipFilePath}");
+                }
+
                 // Verify zip creation and delete original directory to free up space
                 if (File.Exists(zipFilePath))
                 {
