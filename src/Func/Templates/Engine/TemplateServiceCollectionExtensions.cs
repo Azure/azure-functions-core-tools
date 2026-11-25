@@ -54,6 +54,7 @@ internal static class TemplateServiceCollectionExtensions
             services.TryAddSingleton<PostActionDispatcher>();
             services.AddTemplateComponent<PostActionDispatcher, PostActionDispatcher>();
             services.AddTemplateComponent<ITemplatePackageProviderFactory, WorkloadTemplatePackageProviderFactory>();
+            services.AddTemplateComponent<ICorePostActionProcessor, InstructionDisplayPostActionProcessor>();
             return services;
         }
     }
