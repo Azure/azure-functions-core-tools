@@ -32,7 +32,10 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                return CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+                // Not every Linux system has /bin/bash (for example NixOS), so use a POSIX shell instead.
+                // Fall back to resolving "sh" through PATH when /bin/sh is missing as well.
+                var shell = File.Exists("/bin/sh") ? "/bin/sh" : "sh";
+                return CheckExitCode(shell, $"-c \"command -v {command}\"");
             }
         }
 
