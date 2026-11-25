@@ -204,6 +204,7 @@ public sealed class NuGetProtocolSourceClientTests
             .Returns(async ci =>
             {
                 var dest = ci.ArgAt<Stream>(2);
+                ci.ArgAt<SourceCacheContext>(3).NoCache.Should().BeFalse();
                 await dest.WriteAsync(payload);
                 return true;
             });
@@ -242,5 +243,20 @@ public sealed class NuGetProtocolSourceClientTests
     {
         SourceRepository repo = TestRepository.Build(_source, findResource);
         return new NuGetProtocolSourceClient(repo);
+    }
+
+    [Fact]
+    public void ParseV3Hits_ExcludesTemplatePackagesFromWorkloadSearch()
+    {
+        var response = JObject.Parse("""
+            {"data":[
+              {"id":"templates.test","version":"1.0.0","packageTypes":["FuncTemplate"]},
+              {"id":"workloads.test","version":"1.0.0","packageTypes":["FuncCliWorkload"]},
+              {"id":"untyped.test","version":"1.0.0"}
+            ]}
+            """);
+
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source)
+            .Select(r => r.PackageId).Should().Equal("workloads.test", "untyped.test");
     }
 }

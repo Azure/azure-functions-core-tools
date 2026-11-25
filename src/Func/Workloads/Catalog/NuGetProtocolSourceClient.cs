@@ -32,7 +32,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     public PackageSource Source => _repository.PackageSource;
 
-    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CatalogSearchResult>> SearchWorkloadAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
 
@@ -59,11 +59,19 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return versions?.ToList() ?? [];
     }
 
-    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<NuGetVersion>> ListListedVersionsAsync(string packageId, CancellationToken cancellationToken)
     {
-        FindPackageByIdResource findResource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
-        using var cache = new SourceCacheContext();
+        PackageMetadataResource metadata = await GetRequiredResourceAsync<PackageMetadataResource>(cancellationToken);
+        using var cache = new SourceCacheContext { NoCache = true };
 
+        IEnumerable<IPackageSearchMetadata> versions = await metadata.GetMetadataAsync(
+            packageId, includePrerelease: true, includeUnlisted: false, cache, NullLogger.Instance, cancellationToken);
+
+        return versions.Where(version => version.IsListed).Select(version => version.Identity.Version).ToList();
+    }
+
+    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken, bool bypassCache = false)
+    {
         // Spool to a temp file so the caller gets a seekable stream that
         // PackageArchiveReader can consume without keeping NuGet.Protocol's
         // internal buffers alive. The stream is returned to the caller
@@ -74,8 +82,9 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         FileStream fileStream = new(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, bufferSize: 4096, FileOptions.DeleteOnClose);
         try
         {
-            bool copied = await findResource.CopyNupkgToStreamAsync(
-                packageId, version, fileStream, cache, NullLogger.Instance, cancellationToken);
+            FindPackageByIdResource resource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
+            using SourceCacheContext cache = new() { NoCache = bypassCache };
+            bool copied = await resource.CopyNupkgToStreamAsync(packageId, version, fileStream, cache, NullLogger.Instance, cancellationToken);
 
             if (!copied)
             {
@@ -115,7 +124,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         where T : class, INuGetResource
     {
         T? resource = await _repository.GetResourceAsync<T>(cancellationToken);
-        return resource ?? throw new InvalidOperationException(
+        return resource ?? throw new NuGetResourceUnavailableException(
             $"Source '{Source.Source}' does not provide the NuGet resource '{typeof(T).Name}'.");
     }
 
@@ -254,7 +263,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
         foreach (JToken entry in array)
         {
-            string? name = (string?)entry["name"] ?? (entry as JValue)?.Value as string;
+            string? name = entry is JObject objectEntry ? (string?)objectEntry["name"] : (entry as JValue)?.Value as string;
             if (!string.IsNullOrEmpty(name)
                 && string.Equals(name, WorkloadPackageTypes.Workload, StringComparison.OrdinalIgnoreCase))
             {

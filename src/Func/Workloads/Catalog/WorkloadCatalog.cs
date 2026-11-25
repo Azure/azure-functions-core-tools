@@ -26,7 +26,7 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
 
         CatalogSearchQuery effectiveQuery = query with { IncludePrerelease = IncludePrerelease(query.IncludePrerelease) };
 
-        return ResolveClient(effectiveQuery.Source).SearchAsync(effectiveQuery, cancellationToken);
+        return ResolveClient(effectiveQuery.Source).SearchWorkloadAsync(effectiveQuery, cancellationToken);
     }
 
     /// <inheritdoc />

@@ -134,6 +134,7 @@ internal static class CliHostFactory
         builder.Services.AddWorkloadStorage();
         builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
+        builder.Services.AddTemplateCatalog();
         builder.Services.AddWorkloadInstaller();
         builder.Services.AddManagedAzurite();
         builder.Services.AddTemplating();
