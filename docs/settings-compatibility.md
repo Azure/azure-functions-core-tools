@@ -38,3 +38,7 @@ separate work.
   booleans, and store each nested value as its own string setting. v4 converted
   numbers and booleans to strings and failed to load the whole file on nested
   values.
+- **Key Vault references:** values such as
+  `@Microsoft.KeyVault(SecretUri=...)` are not resolved. `func start` warns and
+  passes the reference text to the app unchanged. v4 resolved them with the
+  signed-in Azure identity.

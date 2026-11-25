@@ -163,6 +163,32 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("""["Nested","Flag"]""") && m.Contains("must be strings")));
     }
 
+    [Theory]
+    [InlineData("@Microsoft.KeyVault(SecretUri=https://vault.vault.azure.net/secrets/db/)")]
+    [InlineData("  @microsoft.keyvault(VaultName=vault;SecretName=db)")]
+    public async Task KeyVaultReference_WarnsAndPassesValueThrough(string reference)
+    {
+        SetLocalSettings(new() { ["DbPassword"] = reference });
+        StartInitializationStepContext context = NewContext();
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        context.State.HostRunContext!.EnvironmentVariables["DbPassword"].Should().Be(reference);
+        _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("'DbPassword'") && m.Contains("Key Vault reference")));
+    }
+
+    [Fact]
+    public async Task KeyVaultReference_OverriddenByEnvironment_DoesNotWarnAboutReference()
+    {
+        SetLocalSettings(new() { ["DbPassword"] = "@Microsoft.KeyVault(SecretUri=https://vault.vault.azure.net/secrets/db/)" });
+        _processEnv.Get("DbPassword").Returns("fromShell");
+        StartInitializationStepContext context = NewContext();
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        _interaction.DidNotReceive().WriteWarning(Arg.Is<string>(m => m.Contains("Key Vault reference")));
+    }
+
     [Fact]
     public async Task EmptyKey_IsSkippedAndWarns()
     {

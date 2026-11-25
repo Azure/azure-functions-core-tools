@@ -21,6 +21,8 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 {
     public const string StepId = "prepare_host_run";
 
+    private const string KeyVaultReferencePrefix = "@Microsoft.KeyVault(";
+
     private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider
         ?? throw new ArgumentNullException(nameof(localSettingsProvider));
 
@@ -158,6 +160,13 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             {
                 _interaction.WriteWarning($"Skipping '{name}' from local.settings.json: already set in the current environment.");
                 continue;
+            }
+
+            if (value.TrimStart().StartsWith(KeyVaultReferencePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                _interaction.WriteWarning(
+                    $"Passing '{name}' from local.settings.json unresolved: Key Vault references are not supported. "
+                    + "Set the secret value directly or in the current environment.");
             }
 
             // Empty string is intentionally preserved: callers use it to clear an inherited value.
