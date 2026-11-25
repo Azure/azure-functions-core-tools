@@ -139,6 +139,19 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadError_WarnsAndContinuesStartup()
+    {
+        SetLocalSettingsJson("""{ "Values": { "A": "1" "B": "2" } }""");
+        var project = new FakeProject(_projectDir);
+        StartInitializationStepContext context = NewContext(project);
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        project.PrepareCalled.Should().BeTrue();
+        _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("Ignoring local.settings.json") && m.Contains("LineNumber")));
+    }
+
+    [Fact]
     public async Task EmptyKey_IsSkippedAndWarns()
     {
         SetLocalSettings(new() { [string.Empty] = "anything" });
@@ -326,6 +339,13 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         LocalSettingsSnapshot snapshot = new LocalSettingsProvider().Get(new DirectoryInfo(_projectDir));
         _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(snapshot);
         return path;
+    }
+
+    private void SetLocalSettingsJson(string json)
+    {
+        File.WriteAllText(Path.Combine(_projectDir, CliConfigurationNames.LocalSettingsFileName), json);
+        LocalSettingsSnapshot snapshot = new LocalSettingsProvider().Get(new DirectoryInfo(_projectDir));
+        _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(snapshot);
     }
 
     private void SetLocalSettings(Dictionary<string, string> values)

@@ -26,3 +26,9 @@ remove it if it is no longer needed. This guard does not decrypt, migrate,
 rewrite, or remove local settings, access key stores, or write project
 configuration. Encryption management and broader settings compatibility remain
 separate work.
+
+## Other differences from v4
+
+- **Malformed files:** if `local.settings.json` is not valid JSON, or its root
+  is not a JSON object, `func start` warns, ignores the file, and continues.
+  The warning includes the parser's line and position.

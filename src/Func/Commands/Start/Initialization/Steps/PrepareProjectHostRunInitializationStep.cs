@@ -83,6 +83,11 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         // FUNCTIONS_WORKER_RUNTIME overrides whatever local.settings.json declares so a stale
         // value can't steer the host into a confusing "wrong language" failure deep in startup.
         LocalSettingsSnapshot localSettings = _localSettingsProvider.Get(project.WorkingDirectory.Info);
+        if (localSettings.LoadError is { } loadError)
+        {
+            _interaction.WriteWarning($"Ignoring local.settings.json: {loadError} Fix the file and try again.");
+        }
+
         if (localSettings.IsEncrypted)
         {
             throw new GracefulException(

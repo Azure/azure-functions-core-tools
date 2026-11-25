@@ -39,7 +39,7 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
             using var document = JsonDocument.Parse(stream, _documentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return LocalSettingsSnapshot.Empty;
+                return new LocalSettingsSnapshot { LoadError = "The file must contain a JSON object." };
             }
 
             bool isEncrypted = ReadNullableBoolean(document.RootElement, "IsEncrypted") == true;
@@ -53,7 +53,7 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            return LocalSettingsSnapshot.Empty;
+            return new LocalSettingsSnapshot { LoadError = ex.Message };
         }
     }
 

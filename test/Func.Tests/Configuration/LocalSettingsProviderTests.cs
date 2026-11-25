@@ -50,6 +50,7 @@ public sealed class LocalSettingsProviderTests : IDisposable
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
         snapshot.IsEncrypted.Should().BeFalse();
+        snapshot.LoadError.Should().BeNull();
         snapshot.WorkerRuntime.Should().Be("python");
         snapshot.Values["AzureWebJobsStorage"].Should().Be("UseDevelopmentStorage=true");
         snapshot.Values.ContainsKey("IgnoredNumber").Should().BeFalse();
@@ -134,6 +135,18 @@ public sealed class LocalSettingsProviderTests : IDisposable
 
         snapshot.Values.Should().BeEmpty();
         snapshot.WorkerRuntime.Should().BeNull();
+        snapshot.LoadError.Should().Contain("LineNumber");
+    }
+
+    [Fact]
+    public void Get_RootIsNotObject_ReturnsEmptySnapshotWithLoadError()
+    {
+        WriteSettings("[]");
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.Values.Should().BeEmpty();
+        snapshot.LoadError.Should().Be("The file must contain a JSON object.");
     }
 
     [Fact]

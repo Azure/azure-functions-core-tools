@@ -14,6 +14,8 @@ internal sealed class LocalSettingsSnapshot
 
     public LocalSettingsHostSnapshot? Host { get; init; }
 
+    public string? LoadError { get; init; }
+
     public string? WorkerRuntime =>
         !IsEncrypted
             && Values.TryGetValue(CliConfigurationNames.WorkerRuntimeSettingName, out string? value)
