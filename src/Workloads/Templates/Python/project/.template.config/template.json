@@ -12,6 +12,15 @@
     "type": "project"
   },
   "preferNameDirectory": true,
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "rename": {
+        "funcignore.txt": ".funcignore"
+      }
+    }
+  ],
   "primaryOutputs": [
     { "path": "function_app.py" }
   ]

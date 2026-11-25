@@ -43,6 +43,9 @@ public sealed class PythonTemplateTests : IAsyncLifetime
         result.CreationResult!.PrimaryOutputs.Select(path => path.Path).Should().Equal("function_app.py");
         File.ReadAllText(Path.Combine(output, "function_app.py")).Should().Contain("app.register_functions(module.bp)");
         File.ReadAllText(Path.Combine(output, "requirements.txt")).Should().Contain("azure-functions");
+        string[] ignoredFiles = File.ReadAllLines(Path.Combine(output, ".funcignore"));
+        ignoredFiles.Should().Contain([".git*", "local.settings.json", ".venv/", "venv/"]);
+        File.Exists(Path.Combine(output, "funcignore.txt")).Should().BeFalse();
         File.Exists(Path.Combine(output, ".gitignore")).Should().BeFalse();
         File.Exists(Path.Combine(output, "functions", "__init__.py")).Should().BeTrue();
         using var host = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "host.json")));
