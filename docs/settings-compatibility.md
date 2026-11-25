@@ -45,3 +45,11 @@ separate work.
 - **`Host.LocalHttpAddress`:** ignored with a warning; the Functions Host
   always listens on `localhost`. `LocalHttpPort`, `CORS`, and `CORSCredentials`
   are still supported.
+- **File location:** `func start` reads `local.settings.json` only from the
+  project folder. v4 searched parent folders; v5 does not, and the project
+  itself is not resolved from a subfolder. Run `func start` from the project
+  root or pass its path.
+- **Missing settings:** `func start` reads `AzureWebJobsStorage` only to decide
+  whether to start Azurite. v4 also checked that the storage setting and each
+  binding's connection setting existed before starting the host; v5 leaves
+  those errors to the host.
