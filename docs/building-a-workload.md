@@ -471,6 +471,16 @@ argument accepts the same source-relative patterns as `dotnet new`, either as a
 semicolon-delimited string or a JSON array. If no files match, it restores the
 primary outputs instead; no matching files and no primary outputs is a success.
 
+It also registers the add-reference action (`B17581D1-C5C9-4489-8F0A-004BE667B814`)
+for the same templates, running `dotnet add <target> package <id> [--version <v>]`
+or `dotnet add <target> reference <project>`. When `targetFiles` matches no
+generated files, it follows `dotnet new`: it uses the single project file in the
+nearest directory at or above the output directory, filtered by the literal
+`projectFileExtensions` (compared case-insensitively). Multiple projects in that
+directory are an error. If none are found, existing `targetFiles` paths are used.
+Its project-reference handler resolves references to absolute paths, following
+template renames when the reference matches exactly one generated file.
+
 ### Selecting a Processor
 
 Implement `bool CanProcess(PostActionSelectionContext context)` to declare

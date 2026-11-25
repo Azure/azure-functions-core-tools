@@ -20,10 +20,18 @@ The post-action reporter is currently a no-op, so restore output and detailed
 errors are discarded; the dispatcher still displays the template's manual
 instructions on failure.
 
+The HTTP and timer trigger templates declare the standard add-reference post
+action (`B17581D1-C5C9-4489-8F0A-004BE667B814`) for their extension packages.
+The workload processes it for the same templates by running `dotnet add <target>
+package <id>` (with `--version` when set) or `dotnet add <target> reference
+<project>`. Targets come from `targetFiles` matches; otherwise, as in `dotnet
+new`, the single project file in the nearest directory at or above the output
+directory is used, filtered by the literal `projectFileExtensions`. Multiple
+projects there are an error; with none, existing `targetFiles` paths are used.
+Processing stops at the first failure. Framework references are unsupported.
+
 The post-action dispatcher is not yet wired into `func init` or `func new`.
 This registration and template declaration do not change their current behavior.
-Item-template package-reference actions are separate and are not implemented by
-the restore processor.
 
 ## Target frameworks
 
