@@ -100,8 +100,10 @@ public sealed class TemplaterTests : IDisposable
             result.Matches.Should().ContainKey(template);
             ITemplateMatchInfo match = result.Matches[template];
             match.Info.Should().BeSameAs(template.Template);
-            match.MatchDisposition.Should().Contain(info => info.Name == MatchInfo.BuiltIn.Type && info.Kind == MatchKind.Exact);
-            match.MatchDisposition.Should().Contain(info => info.Name == MatchInfo.BuiltIn.Language && info.Kind == MatchKind.Exact);
+            match.MatchDisposition.Should().Contain(info =>
+                info.Name == MatchInfo.BuiltIn.Type && info.Kind == MatchKind.Exact);
+            match.MatchDisposition.Should().Contain(info =>
+                info.Name == MatchInfo.BuiltIn.Language && info.Kind == MatchKind.Exact);
         });
     }
 

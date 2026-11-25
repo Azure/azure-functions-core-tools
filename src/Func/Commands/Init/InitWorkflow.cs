@@ -18,6 +18,11 @@ namespace Azure.Functions.Cli.Commands.Init;
 /// </summary>
 internal sealed class InitWorkflow
 {
+    private static readonly JsonSerializerOptions _projectConfigReadOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
@@ -36,7 +41,8 @@ internal sealed class InitWorkflow
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _hintRenderer = hintRenderer ?? throw new ArgumentNullException(nameof(hintRenderer));
-        _localSettingsProvider = localSettingsProvider ?? throw new ArgumentNullException(nameof(localSettingsProvider));
+        _localSettingsProvider = localSettingsProvider
+            ?? throw new ArgumentNullException(nameof(localSettingsProvider));
         _projectResolver = projectResolver ?? throw new ArgumentNullException(nameof(projectResolver));
         _bundleSectionReader = bundleSectionReader ?? throw new ArgumentNullException(nameof(bundleSectionReader));
         _bundleScanner = bundleScanner ?? throw new ArgumentNullException(nameof(bundleScanner));
@@ -65,29 +71,17 @@ internal sealed class InitWorkflow
     }
 
     // Reads the existing .func/config.json and returns its stack runtime /
-    // language fields. Returns null when the file can't be parsed; callers
-    // then treat the project as fully initialized and require --force.
+    // language fields. Returns null when the file can't be read or parsed;
+    // callers then treat the project as fully initialized and require --force.
     public static (string? Runtime, string? Language)? TryReadExistingStack(DirectoryInfo workingDirectory)
     {
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
         try
         {
             using FileStream stream = File.OpenRead(path);
-            using var doc = JsonDocument.Parse(stream);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object
-                || !doc.RootElement.TryGetProperty(CliConfigurationNames.StackSectionName, out JsonElement stack)
-                || stack.ValueKind != JsonValueKind.Object)
-            {
-                return (null, null);
-            }
-
-            string? runtime = stack.TryGetProperty(CliConfigurationNames.StackRuntimeKey, out JsonElement r) && r.ValueKind == JsonValueKind.String
-                ? r.GetString()
-                : null;
-            string? lang = stack.TryGetProperty(CliConfigurationNames.StackLanguageKey, out JsonElement l) && l.ValueKind == JsonValueKind.String
-                ? l.GetString()
-                : null;
-            return (runtime, lang);
+            ProjectConfigFile? config =
+                JsonSerializer.Deserialize<ProjectConfigFile>(stream, _projectConfigReadOptions);
+            return (config?.Stack?.Runtime, config?.Stack?.Language);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -95,12 +89,12 @@ internal sealed class InitWorkflow
         }
     }
 
-    // Looks up the project's worker runtime from local.settings.json. The CLI
-    // intentionally does not consult the FUNCTIONS_WORKER_RUNTIME process env
-    // var here: adoption is about the on-disk project shape, and an env var
-    // that happens to be set in the user's shell shouldn't change what we
-    // write into .func/config.json.
-    public string? ResolveProjectRuntime(DirectoryInfo workingDirectory)
+    // Looks up the legacy FUNCTIONS_WORKER_RUNTIME value from local.settings.json
+    // (not the stack in .func/config.json). The CLI intentionally does not
+    // consult the FUNCTIONS_WORKER_RUNTIME process env var here: adoption is
+    // about the on-disk project shape, and an env var that happens to be set in
+    // the user's shell shouldn't change what we write into .func/config.json.
+    public string? ResolveLegacyWorkerRuntime(DirectoryInfo workingDirectory)
     {
         string? raw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
@@ -109,7 +103,9 @@ internal sealed class InitWorkflow
     // Returns null when the resolver can't classify the directory or the
     // resolved project doesn't surface a Language; adoption then writes the
     // stack runtime without a language entry.
-    public async Task<string?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    public async Task<string?> DetectAdoptedLanguageAsync(
+        WorkingDirectory workingDirectory,
+        CancellationToken cancellationToken)
     {
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
             new ProjectResolutionContext(workingDirectory),
@@ -152,10 +148,7 @@ internal sealed class InitWorkflow
             return null;
         }
 
-        var displayToInitializer = Initializers.ToDictionary(
-            i => i.DisplayName,
-            i => i,
-            StringComparer.Ordinal);
+        var displayToInitializer = Initializers.ToDictionary(i => i.DisplayName, i => i, StringComparer.Ordinal);
         string picked = await _interaction.PromptForSelectionAsync(
             "Adopting an existing project. Which stack is it?",
             displayToInitializer.Keys,
@@ -164,7 +157,9 @@ internal sealed class InitWorkflow
         return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 
-    public async Task<IProjectInitializer?> SelectInitializerAsync(string? requestedStack, CancellationToken cancellationToken)
+    public async Task<IProjectInitializer?> SelectInitializerAsync(
+        string? requestedStack,
+        CancellationToken cancellationToken)
     {
         string[] installed = [.. Initializers.Select(i => i.Stack)];
 
@@ -207,11 +202,11 @@ internal sealed class InitWorkflow
 
         // Multiple initializers, interactive: prompt using display names,
         // then map the selection back to its initializer.
-        var displayToInitializer = Initializers.ToDictionary(
-            i => i.DisplayName,
-            i => i,
-            StringComparer.Ordinal);
-        string picked = await _interaction.PromptForSelectionAsync("Select a stack:", displayToInitializer.Keys, cancellationToken);
+        var displayToInitializer = Initializers.ToDictionary(i => i.DisplayName, i => i, StringComparer.Ordinal);
+        string picked = await _interaction.PromptForSelectionAsync(
+            "Select a stack:",
+            displayToInitializer.Keys,
+            cancellationToken);
 
         return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
@@ -234,10 +229,7 @@ internal sealed class InitWorkflow
                 string.Equals(l, requested, StringComparison.OrdinalIgnoreCase));
 
             // If no direct match, try resolving as an alias.
-            if (match is null)
-            {
-                match = ResolveAlias(requested, initializer.SupportedLanguageAliases);
-            }
+            match ??= ResolveAlias(requested, initializer.SupportedLanguageAliases);
 
             if (match is null)
             {
@@ -297,13 +289,12 @@ internal sealed class InitWorkflow
         return true;
     }
 
-    public async Task<int> ReportInitializedAsync(DirectoryInfo projectDirectory, string stack, CancellationToken cancellationToken)
+    public async Task<int> ReportInitializedAsync(
+        DirectoryInfo projectDirectory,
+        string stack,
+        CancellationToken cancellationToken)
     {
-        _interaction.WriteLine(l => l
-            .Success("✓ ")
-            .Muted("Project initialized for ")
-            .Code(stack)
-            .Muted("."));
+        _interaction.WriteLine(l => l.Success("✓ ").Muted("Project initialized for ").Code(stack).Muted("."));
         await WarnIfBundleChannelNotInstalledAsync(projectDirectory, cancellationToken);
         return 0;
     }
@@ -332,7 +323,7 @@ internal sealed class InitWorkflow
         {
             Directory.CreateDirectory(folder);
 
-            var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
+            Dictionary<string, string> stackConfig = [with(StringComparer.Ordinal)];
             if (!string.IsNullOrWhiteSpace(stack))
             {
                 stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
@@ -342,7 +333,7 @@ internal sealed class InitWorkflow
                 stackConfig[CliConfigurationNames.StackLanguageKey] = language;
             }
 
-            var payload = new Dictionary<string, object>(StringComparer.Ordinal);
+            Dictionary<string, object> payload = [with(StringComparer.Ordinal)];
             if (stackConfig.Count > 0)
             {
                 payload[CliConfigurationNames.StackSectionName] = stackConfig;
@@ -425,7 +416,9 @@ internal sealed class InitWorkflow
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
     // Warn when no bundle workload for that channel is installed, pointing at
     // workload search so `func start` doesn't later fail to resolve the bundle.
-    private async Task WarnIfBundleChannelNotInstalledAsync(DirectoryInfo projectDirectory, CancellationToken cancellationToken)
+    private async Task WarnIfBundleChannelNotInstalledAsync(
+        DirectoryInfo projectDirectory,
+        CancellationToken cancellationToken)
     {
         HostJsonBundleSection? bundle = await _bundleSectionReader.ReadAsync(projectDirectory, cancellationToken);
         if (bundle is null
@@ -442,13 +435,16 @@ internal sealed class InitWorkflow
         }
 
         _interaction.WriteWarning(
-            $"This project targets the '{channel.ToDisplayString()}' extension bundle channel, but no matching bundle workload is installed. "
+            $"This project targets the '{channel.ToDisplayString()}' extension bundle channel, "
+            + "but no matching bundle workload is installed. "
             + "Find one with: func workload search bundles --prerelease");
     }
 
     // --force authorizes deletion when input is unavailable, but a prompt
     // still defaults to No whenever confirmation can read an answer.
-    private async Task<bool> ConfirmClearDirectoryAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
+    private async Task<bool> ConfirmClearDirectoryAsync(
+        DirectoryInfo workingDirectory,
+        CancellationToken cancellationToken)
     {
         if (!DirectoryGuard.HasNonGitContent(workingDirectory))
         {
@@ -456,9 +452,11 @@ internal sealed class InitWorkflow
         }
 
         _interaction.WriteWarning(
-            $"--force will delete all files in '{workingDirectory.FullName}' (except a .git directory) before initializing.");
+            $"--force will delete all files in '{workingDirectory.FullName}' (except a .git directory) "
+            + "before initializing.");
 
-        return await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken);
+        return await _interaction.ConfirmAsync(
+            "Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken);
     }
 
     // Wipes everything in the working directory before a --force re-init so
@@ -469,4 +467,7 @@ internal sealed class InitWorkflow
     {
         DirectoryGuard.ClearExceptGit(workingDirectory);
     }
+
+    // Shape of .func/config.json read by TryReadExistingStack; unknown sections are ignored.
+    private sealed record ProjectConfigFile(StackOptions? Stack);
 }

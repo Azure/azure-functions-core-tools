@@ -21,7 +21,8 @@ public sealed class TemplateResolutionResultTests
     [Fact]
     public void Constructor_NullCandidates_Throws()
     {
-        Action act = () => _ = new TemplateResolutionResult((IReadOnlyList<(FuncTemplateInfo, ITemplateMatchInfo)>)null!);
+        Action act = () => _ = new TemplateResolutionResult(
+            (IReadOnlyList<(FuncTemplateInfo, ITemplateMatchInfo)>)null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("candidates");
     }

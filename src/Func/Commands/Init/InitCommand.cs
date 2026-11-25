@@ -61,7 +61,8 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
 
     public Option<bool> ForceOption { get; } = new("--force")
     {
-        Description = "Re-initialize the directory: deletes its contents (except a .git directory) before scaffolding the new project."
+        Description = "Re-initialize the directory: deletes its contents (except a .git directory) " +
+            "before scaffolding the new project."
     };
 
     // Stack options are kept off this command so their typed validation cannot reject a template invocation before
@@ -94,7 +95,13 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
 
         _initializers = initializers.ToList();
         _workflow = new InitWorkflow(
-            interaction, hintRenderer, localSettingsProvider, projectResolver, bundleSectionReader, bundleScanner, _initializers);
+            interaction,
+            hintRenderer,
+            localSettingsProvider,
+            projectResolver,
+            bundleSectionReader,
+            bundleScanner,
+            _initializers);
         _newInit = new NewInitCommand(_workflow, templaterFactory);
         _legacyInit = new LegacyInitCommand(_workflow);
 
@@ -109,7 +116,7 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
 
         // The registry shares canonical instances across workloads; help uses
         // their ownership to distinguish shared options from stack-specific ones.
-        var registry = new InitOptionRegistry(_stackOptionsCommand);
+        InitOptionRegistry registry = new(_stackOptionsCommand);
         foreach (IProjectInitializer initializer in _initializers)
         {
             registry.SetActiveStack(initializer.Stack);
@@ -172,7 +179,8 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         if (state == InitializationState.FullyInitialized && !request.Force)
         {
             _workflow.Interaction.WriteError(
-                $"This directory already contains a Functions project ('{CliConfigurationPathsOptions.ProjectConfigDisplayPath}' is present). " +
+                "This directory already contains a Functions project " +
+                $"('{CliConfigurationPathsOptions.ProjectConfigDisplayPath}' is present). " +
                 "Pass --force to re-initialize.");
             return 1;
         }
@@ -180,18 +188,21 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         // host.json without .func/config.json means a pre-existing Functions
         // project that predates the v5 CLI config. Adopt it without creating
         // content. --force still means "wipe and re-create".
-        if (!request.Force && state is InitializationState.AdoptableExistingProject or InitializationState.PartiallyInitialized)
+        if (!request.Force
+            && state is InitializationState.AdoptableExistingProject or InitializationState.PartiallyInitialized)
         {
             return await _newInit.ReconcileExistingAsync(request, state, existingRuntime, cancellationToken);
         }
 
-        IProjectInitializer? initializer = await _workflow.SelectInitializerAsync(request.RequestedStack, cancellationToken);
+        IProjectInitializer? initializer = await _workflow.SelectInitializerAsync(
+            request.RequestedStack, cancellationToken);
         if (initializer is null)
         {
             return 1;
         }
 
-        (string? language, int? errorCode) = await _workflow.ResolveLanguageAsync(request.Language, initializer, cancellationToken);
+        (string? language, int? errorCode) = await _workflow.ResolveLanguageAsync(
+            request.Language, initializer, cancellationToken);
         if (errorCode is int code)
         {
             return code;

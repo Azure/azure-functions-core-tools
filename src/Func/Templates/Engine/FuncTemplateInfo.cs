@@ -18,7 +18,10 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <param name="template">The underlying template engine metadata.</param>
 /// <param name="hostData">The parsed func host configuration.</param>
 /// <param name="settings">The engine environment that discovered the template, used to instantiate it.</param>
-internal sealed class FuncTemplateInfo(ITemplateInfo template, FuncTemplateHostData hostData, IEngineEnvironmentSettings? settings = null)
+internal sealed class FuncTemplateInfo(
+    ITemplateInfo template,
+    FuncTemplateHostData hostData,
+    IEngineEnvironmentSettings? settings = null)
     : ITemplateInfo
 {
     private readonly IEngineEnvironmentSettings? _settings = settings;
@@ -111,7 +114,9 @@ internal sealed class FuncTemplateInfo(ITemplateInfo template, FuncTemplateHostD
     /// <param name="force">Whether the engine may overwrite existing files.</param>
     /// <param name="dryRun">Whether to compute the creation effects without writing files.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <exception cref="InvalidOperationException">The template was not discovered through a template engine environment.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The template was not discovered through a template engine environment.
+    /// </exception>
     public async Task<ITemplateCreationResult> InstantiateAsync(
         string? name,
         string outputPath,
@@ -124,7 +129,8 @@ internal sealed class FuncTemplateInfo(ITemplateInfo template, FuncTemplateHostD
         ArgumentNullException.ThrowIfNull(parameters);
         if (_settings is null)
         {
-            throw new InvalidOperationException($"Template '{Identity}' cannot be instantiated without a template engine environment.");
+            throw new InvalidOperationException(
+                $"Template '{Identity}' cannot be instantiated without a template engine environment.");
         }
 
         string fallbackName = Path.GetFileName(Path.TrimEndingDirectorySeparator(outputPath));

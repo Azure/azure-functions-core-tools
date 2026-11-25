@@ -28,7 +28,10 @@ public sealed class TemplateArgumentBinderTests : IDisposable
         FuncTemplateInfo template = await GetTemplateAsync();
 
         IReadOnlyDictionary<string, string> values = TemplateArgumentBinder.Bind(
-            template, ["-tfm", "net11.0", "--no-http=false", "--no-telemetry"], [], out IReadOnlyList<string> unrecognized);
+            template,
+            ["-tfm", "net11.0", "--no-http=false", "--no-telemetry"],
+            [],
+            out IReadOnlyList<string> unrecognized);
 
         unrecognized.Should().BeEmpty();
         values.Should().Equal(new Dictionary<string, string>

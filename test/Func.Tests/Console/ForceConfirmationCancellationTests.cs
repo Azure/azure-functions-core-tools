@@ -18,7 +18,7 @@ public class ForceConfirmationCancellationTests
     [Fact]
     public async Task Init_TemplateForceCancellationBeforeClearingPreservesDirectory()
     {
-        using var cancellation = new CancellationTokenSource();
+        using CancellationTokenSource cancellation = new();
         var interaction = Substitute.For<IInteractionService>();
         interaction.ConfirmAsync("Continue?", false, true, Arg.Any<CancellationToken>()).Returns(call =>
         {
@@ -46,7 +46,7 @@ public class ForceConfirmationCancellationTests
             await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
             var bundles = Substitute.For<IInstalledBundleWorkloads>();
             bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
-            var command = new InitCommand(
+            InitCommand command = new(
                 interaction,
                 Substitute.For<IWorkloadHintRenderer>(),
                 Substitute.For<ILocalSettingsProvider>(),
@@ -63,12 +63,14 @@ public class ForceConfirmationCancellationTests
 
             cancellation.IsCancellationRequested.Should().BeTrue();
             Directory.GetFileSystemEntries(directory).Should().Equal(sentinel);
-            (await File.ReadAllTextAsync(sentinel, TestContext.Current.CancellationToken)).Should().Be("original content");
+            (await File.ReadAllTextAsync(sentinel, TestContext.Current.CancellationToken))
+                .Should().Be("original content");
             File.Exists(Path.Combine(directory, "Program.cs")).Should().BeFalse();
             File.Exists(Path.Combine(directory, ".func", "config.json")).Should().BeFalse();
             await initializer.DidNotReceive().InitializeAsync(
                 Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
-            await initializer.DidNotReceive().ConfigureProjectAsync(Arg.Any<InitContext>(), Arg.Any<CancellationToken>());
+            await initializer.DidNotReceive().ConfigureProjectAsync(
+                Arg.Any<InitContext>(), Arg.Any<CancellationToken>());
             await interaction.Received(1).ConfirmAsync("Continue?", false, true, Arg.Any<CancellationToken>());
         }
         finally

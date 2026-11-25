@@ -18,13 +18,14 @@ namespace Azure.Functions.Cli.Commands.Init;
 /// </summary>
 /// <remarks>
 /// Project content is owned by the template, which also owns the meaning of every option after the project path. The
-/// selected stack contributes only non-scaffolding setup through <see cref="IProjectInitializer.ConfigureProjectAsync"/>,
-/// and stack init options are never parsed in this flow.
+/// selected stack contributes only non-scaffolding setup through
+/// <see cref="IProjectInitializer.ConfigureProjectAsync"/>, and stack init options are never parsed in this flow.
 /// </remarks>
 internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory templaterFactory)
 {
     private readonly InitWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
-    private readonly ITemplaterFactory _templaterFactory = templaterFactory ?? throw new ArgumentNullException(nameof(templaterFactory));
+    private readonly ITemplaterFactory _templaterFactory = templaterFactory
+        ?? throw new ArgumentNullException(nameof(templaterFactory));
 
     /// <summary>
     /// Adopts a project that predates <c>.func/config.json</c>, or completes a config missing its language, without
@@ -54,7 +55,9 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
         // Where the project's stack runtime comes from: heal trusts what's
         // already in .func/config.json; adopt reads local.settings.json
         // (FUNCTIONS_WORKER_RUNTIME).
-        string? projectRuntime = heal ? existingRuntime : _workflow.ResolveProjectRuntime(request.WorkingDirectory.Info);
+        string? projectRuntime = heal
+            ? existingRuntime
+            : _workflow.ResolveLegacyWorkerRuntime(request.WorkingDirectory.Info);
         string? requestedStack = request.RequestedStack;
 
         // Resolve both signals to a concrete initializer (or null) using
@@ -133,7 +136,8 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
         // error if it wasn't.
         if (heal || !string.IsNullOrWhiteSpace(language))
         {
-            (string? resolved, int? errorCode) = await _workflow.ResolveLanguageAsync(language, initializer, cancellationToken);
+            (string? resolved, int? errorCode) = await _workflow.ResolveLanguageAsync(
+                language, initializer, cancellationToken);
             if (errorCode is int code)
             {
                 return code;
@@ -155,7 +159,8 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
             return 0;
         }
 
-        _workflow.WriteCliConfigurationFile(request.WorkingDirectory.Info, initializer.Stack, persistedLanguage, request.Force);
+        _workflow.WriteCliConfigurationFile(
+            request.WorkingDirectory.Info, initializer.Stack, persistedLanguage, request.Force);
         _workflow.Interaction.WriteBlankLine();
         _workflow.Interaction.WriteLine(l => l
             .Success("✓ ")
@@ -189,7 +194,8 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
         {
             candidates = (await templater.ListProjectTemplatesAsync(language, cancellationToken)).Templates;
         }
-        catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception ex)
+            when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
         {
             _workflow.Interaction.WriteError(ex.Message);
             return 1;
@@ -218,7 +224,10 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
         try
         {
             parameters = TemplateArgumentBinder.Bind(
-                template, request.UnmatchedTokens, request.ReservedOptions, out IReadOnlyList<string> unrecognizedTokens);
+                template,
+                request.UnmatchedTokens,
+                request.ReservedOptions,
+                out IReadOnlyList<string> unrecognizedTokens);
             if (unrecognizedTokens.Count > 0)
             {
                 return _workflow.RejectUnmatchedTokens(unrecognizedTokens);
@@ -230,7 +239,7 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
             return 1;
         }
 
-        var context = new InitContext(request.WorkingDirectory, request.ProjectName, language, request.Force);
+        InitContext context = new(request.WorkingDirectory, request.ProjectName, language, request.Force);
         string outputPath = request.WorkingDirectory.Info.FullName;
         ITemplateCreationResult preflight = await template.InstantiateAsync(
             context.ProjectName, outputPath, parameters, context.Force, dryRun: true, cancellationToken);
@@ -270,7 +279,8 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
         // success is reported.
 
         _workflow.Interaction.WriteBlankLine();
-        return await _workflow.ReportInitializedAsync(request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
+        return await _workflow.ReportInitializedAsync(
+            request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
     }
 
     private int RejectExistingProjectTokens(InitRequest request)
@@ -302,7 +312,8 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
                 + "Use --force to replace the directory contents.";
         }
 
-        return $"Failed to initialize the project from template '{template.Identity}': {result.ErrorMessage ?? result.Status.ToString()}";
+        return $"Failed to initialize the project from template '{template.Identity}': "
+            + (result.ErrorMessage ?? result.Status.ToString());
     }
 
     private static bool HasExistingFileChanges(ITemplateCreationResult result)

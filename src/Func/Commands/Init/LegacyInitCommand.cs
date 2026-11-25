@@ -48,7 +48,7 @@ internal sealed class LegacyInitCommand(InitWorkflow workflow)
             return 1;
         }
 
-        var context = new InitContext(request.WorkingDirectory, request.ProjectName, language, request.Force);
+        InitContext context = new(request.WorkingDirectory, request.ProjectName, language, request.Force);
         request.WorkingDirectory.CreateIfNotExists();
         if (!await _workflow.PrepareDestinationAsync(context, cancellationToken))
         {
@@ -64,6 +64,7 @@ internal sealed class LegacyInitCommand(InitWorkflow workflow)
 
         await initializer.InitializeAsync(context, stackParse, cancellationToken);
 
-        return await _workflow.ReportInitializedAsync(request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
+        return await _workflow.ReportInitializedAsync(
+            request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
     }
 }
