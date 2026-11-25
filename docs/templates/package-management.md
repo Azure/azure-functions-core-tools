@@ -89,11 +89,13 @@ Reject invalid package IDs and versions before changing installed state.
 version or prerelease-inclusive latest-version resolution.
 
 Version resolution stays in `TemplateCatalog` over the resolved feed. The CLI
-downloads that exact version to a temporary directory and verifies the archive
-in-process before changing installed state. NuGet verifies the content integrity
-of a signed archive. Unsigned template packages are accepted, and the official
-workload publisher allowlist does not apply. This requires no .NET SDK. If a
-package has no stable release, install fails with an error suggesting
+refreshes version metadata rather than using the local NuGet cache. Package
+downloads use the cache, but retry once without it if the version is missing.
+The CLI downloads that exact version to a temporary directory and verifies the
+archive in-process before changing installed state. NuGet verifies the content
+integrity of a signed archive. Unsigned template packages are accepted, and the
+official workload publisher allowlist does not apply. This requires no .NET
+SDK. If a package has no stable release, install fails with an error suggesting
 `--prerelease`; there is no warning followed by an implicit preview install. Use
 `--prerelease` to select the latest preview, or `--version` to request a
 specific preview.

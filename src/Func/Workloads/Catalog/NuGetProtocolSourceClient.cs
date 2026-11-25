@@ -62,7 +62,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     public async Task<IReadOnlyList<NuGetVersion>> ListListedVersionsAsync(string packageId, CancellationToken cancellationToken)
     {
         PackageMetadataResource metadata = await GetRequiredResourceAsync<PackageMetadataResource>(cancellationToken);
-        using var cache = new SourceCacheContext();
+        using var cache = new SourceCacheContext { NoCache = true };
 
         IEnumerable<IPackageSearchMetadata> versions = await metadata.GetMetadataAsync(
             packageId, includePrerelease: true, includeUnlisted: false, cache, NullLogger.Instance, cancellationToken);
@@ -70,7 +70,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return versions.Where(version => version.IsListed).Select(version => version.Identity.Version).ToList();
     }
 
-    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken, bool bypassCache = false)
     {
         // Spool to a temp file so the caller gets a seekable stream that
         // PackageArchiveReader can consume without keeping NuGet.Protocol's
@@ -83,7 +83,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         try
         {
             FindPackageByIdResource resource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
-            using SourceCacheContext cache = new();
+            using SourceCacheContext cache = new() { NoCache = bypassCache };
             bool copied = await resource.CopyNupkgToStreamAsync(packageId, version, fileStream, cache, NullLogger.Instance, cancellationToken);
 
             if (!copied)

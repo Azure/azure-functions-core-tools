@@ -72,7 +72,7 @@ public sealed class TemplateCatalogTests
         var result = await catalog.ResolveVersionAsync("test.templates", null, "https://feed.test/index.json", prerelease, CancellationToken.None);
 
         result.ToNormalizedString().Should().Be(expected);
-        await versions.Received(1).GetMetadataAsync("test.templates", true, false, Arg.Any<SourceCacheContext>(),
+        await versions.Received(1).GetMetadataAsync("test.templates", true, false, Arg.Is<SourceCacheContext>(cache => cache.NoCache),
             Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>());
     }
 
@@ -94,6 +94,7 @@ public sealed class TemplateCatalogTests
                 "test.templates", version, Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
                 Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(async call =>
                 {
+                    call.ArgAt<SourceCacheContext>(3).NoCache.Should().BeFalse();
                     await call.ArgAt<Stream>(2).WriteAsync(payload, call.ArgAt<CancellationToken>(5));
                     return true;
                 });
@@ -123,6 +124,93 @@ public sealed class TemplateCatalogTests
         Func<Task> act = () => catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), null, CancellationToken.None);
 
         await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*Template package*not found*");
+        await resource.Received(2).CopyNupkgToStreamAsync(Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(),
+            Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Install_StaleVersionIndexRetriesWithoutCache(bool exactVersion)
+    {
+        byte[] payload = [1, 2, 3];
+        var version = NuGetVersion.Parse("2.0.0");
+        var metadata = Metadata(("2.0.0", true));
+        var resource = Substitute.For<FindPackageByIdResource>();
+        List<bool> cacheModes = [];
+        resource.CopyNupkgToStreamAsync(
+            "test.templates", version, Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(async call =>
+            {
+                bool noCache = call.ArgAt<SourceCacheContext>(3).NoCache;
+                cacheModes.Add(noCache);
+                if (!noCache)
+                {
+                    return false;
+                }
+
+                await call.ArgAt<Stream>(2).WriteAsync(payload, call.ArgAt<CancellationToken>(5));
+                return true;
+            });
+        List<string> sources = [];
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), source =>
+        {
+            sources.Add(source.Source);
+            return new NuGetProtocolSourceClient(TestRepository.Build(source, metadata, resource));
+        });
+
+        var resolved = await catalog.ResolveVersionAsync("test.templates", exactVersion ? "2.0.0" : null,
+            "https://feed.test/index.json", false, TestContext.Current.CancellationToken);
+        await using Stream archive = await catalog.OpenPackageAsync(
+            "test.templates", resolved, "https://feed.test/index.json", TestContext.Current.CancellationToken);
+
+        using var bytes = new MemoryStream();
+        await archive.CopyToAsync(bytes, TestContext.Current.CancellationToken);
+        bytes.ToArray().Should().Equal(payload);
+        cacheModes.Should().Equal(false, true);
+        sources.Should().HaveCount(exactVersion ? 2 : 3).And.OnlyContain(source => source == "https://feed.test/index.json");
+        await metadata.Received(exactVersion ? 0 : 1).GetMetadataAsync(
+            "test.templates", true, false, Arg.Is<SourceCacheContext>(cache => cache.NoCache),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OpenPackage_RetryFeedFailureIsNotReportedAsMissing()
+    {
+        var resource = Substitute.For<FindPackageByIdResource>();
+        resource.CopyNupkgToStreamAsync(Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false), Task.FromException<bool>(new FatalProtocolException("feed unavailable")));
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)));
+
+        Func<Task> act = () => catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), null, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*Cannot read template feed*");
+    }
+
+    [Fact]
+    public async Task OpenPackage_CancellationAfterCacheMissDoesNotRetry()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var resource = Substitute.For<FindPackageByIdResource>();
+        resource.CopyNupkgToStreamAsync(Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(call =>
+            {
+                cancellation.Cancel();
+                return false;
+            });
+        int clients = 0;
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()), source =>
+        {
+            clients++;
+            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource));
+        });
+
+        Func<Task> act = () => catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), null, cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        clients.Should().Be(1);
     }
 
     [Theory]

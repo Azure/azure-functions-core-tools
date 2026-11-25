@@ -66,8 +66,18 @@ internal class TemplateCatalog(
         PackageSource feed = GetSource(source);
         try
         {
-            return await FromSourceAsync(
-                () => _clients(feed).OpenPackageAsync(packageId, version, cancellationToken), feed.Source, cancellationToken);
+            try
+            {
+                return await FromSourceAsync(
+                    () => _clients(feed).OpenPackageAsync(packageId, version, cancellationToken), feed.Source, cancellationToken);
+            }
+            catch (WorkloadPackageNotFoundException)
+            {
+                // A stale flat-container index can hide a newly published version.
+                return await FromSourceAsync(
+                    () => _clients(feed).OpenPackageAsync(packageId, version, cancellationToken, bypassCache: true),
+                    feed.Source, cancellationToken);
+            }
         }
         catch (WorkloadPackageNotFoundException ex)
         {

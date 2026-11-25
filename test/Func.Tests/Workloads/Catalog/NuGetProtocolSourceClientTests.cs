@@ -204,6 +204,7 @@ public sealed class NuGetProtocolSourceClientTests
             .Returns(async ci =>
             {
                 var dest = ci.ArgAt<Stream>(2);
+                ci.ArgAt<SourceCacheContext>(3).NoCache.Should().BeFalse();
                 await dest.WriteAsync(payload);
                 return true;
             });
