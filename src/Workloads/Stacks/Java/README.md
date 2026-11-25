@@ -29,8 +29,9 @@ artifact and Functions app; `--package-name` sets the Java package and Maven
 group ID (default `com.function`). Trigger templates accept the same package
 option, so use the project's package when adding functions. Package names are
 normalized for Java. Function and class names use upper camel case; generated
-classes use a `Function` prefix. Names that normalize to the same value refer
-to the same function, so choose a unique name. The starter function is named
+classes use a `Function` prefix. Function names are case-insensitive, and names
+that normalize to the same value refer to the same function, so choose a unique
+name. The starter function is named
 `HelloWorldSample`.
 
 The project template supports omitting the sample HTTP function or extension

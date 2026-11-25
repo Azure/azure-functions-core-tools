@@ -144,6 +144,10 @@ public sealed class JavaTemplateTests : IAsyncLifetime
     [InlineData("My Sample.App", "my-sample-app")]
     [InlineData("!!!", "functions-app")]
     [InlineData("A", "a-app")]
+    [InlineData("CON", "con-app")]
+    [InlineData("Com1", "com1-app")]
+    [InlineData("lpt9", "lpt9-app")]
+    [InlineData("console", "console")]
     public async Task Project_Name_IsNormalizedForMavenAndFunctionsApp(string name, string expected)
     {
         ITemplateInfo template = await GetTemplateAsync("func-java");

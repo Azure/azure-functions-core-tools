@@ -76,7 +76,8 @@
           { "regex": "^(.{60}).*$", "replacement": "$1" },
           { "regex": "-+$", "replacement": "" },
           { "regex": "^$", "replacement": "functions-app" },
-          { "regex": "^([a-z0-9])$", "replacement": "$1-app" }
+          { "regex": "^([a-z0-9])$", "replacement": "$1-app" },
+          { "regex": "^(con|prn|aux|nul|com[1-9]|lpt[1-9])$", "replacement": "$1-app" }
         ]
       }
     },

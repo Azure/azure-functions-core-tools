@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$templateRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..\src\Workloads\Templates\Java')).Path
+$templateRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../../../src/Workloads/Templates/Java')).Path
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "func-java-templates-$([guid]::NewGuid().ToString('N'))"
 $hive = Join-Path $root 'hive'
 $project = Join-Path $root 'project'
@@ -20,7 +20,7 @@ try {
     Invoke-Checked 'dotnet' @('new', 'install', $templateRoot, '--debug:custom-hive', $hive)
     Invoke-Checked 'dotnet' @('new', 'func-java', '--name', 'Sample.App', '--output', $project,
         '--PackageName', $packageName, '--debug:custom-hive', $hive)
-    $starterSource = Join-Path $project 'src\main\java\com\example\functions\FunctionHelloWorldSample.java'
+    $starterSource = Join-Path $project 'src/main/java/com/example/functions/FunctionHelloWorldSample.java'
     $originalStarter = Get-Content -Raw -LiteralPath $starterSource
     $conflictOutput = & dotnet new httptrigger --name HelloWorldSample --output $project --PackageName $packageName --debug:custom-hive $hive 2>&1
     if ($LASTEXITCODE -eq 0 -or (Get-Content -Raw -LiteralPath $starterSource) -ne $originalStarter) {
@@ -32,7 +32,7 @@ try {
         '--PackageName', $packageName, '--AuthLevel', 'anonymous', '--debug:custom-hive', $hive)
     Invoke-Checked 'dotnet' @('new', 'httptrigger', '--name', 'Get-Orders', '--output', $project,
         '--PackageName', $packageName, '--debug:custom-hive', $hive)
-    $ordersSource = Join-Path $project 'src\main\java\com\example\functions\FunctionGetOrders.java'
+    $ordersSource = Join-Path $project 'src/main/java/com/example/functions/FunctionGetOrders.java'
     $originalOrders = Get-Content -Raw -LiteralPath $ordersSource
     $conflictOutput = & dotnet new httptrigger --name GetOrders --output $project --PackageName $packageName --debug:custom-hive $hive 2>&1
     if ($LASTEXITCODE -eq 0 -or (Get-Content -Raw -LiteralPath $ordersSource) -ne $originalOrders) {
@@ -58,7 +58,7 @@ try {
         Pop-Location
     }
 
-    $staged = Join-Path $project 'target\azure-functions\sample-app'
+    $staged = Join-Path $project 'target/azure-functions/sample-app'
     if (-not (Test-Path -LiteralPath (Join-Path $staged 'host.json'))) {
         throw 'The Functions host.json was not staged at the app root.'
     }
@@ -75,14 +75,14 @@ try {
         FunctionLib = "$packageName.FunctionFunctionLib.run"
     }
     foreach ($name in $expectedEntries.Keys) {
-        $metadata = Get-Content -Raw -LiteralPath (Join-Path $staged "$name\function.json") | ConvertFrom-Json
+        $metadata = Get-Content -Raw -LiteralPath (Join-Path $staged "$name/function.json") | ConvertFrom-Json
         if ($metadata.entryPoint -ne $expectedEntries[$name]) {
             throw "Unexpected entry point for '$name': $($metadata.entryPoint)"
         }
     }
 
-    $http = Get-Content -Raw -LiteralPath (Join-Path $staged 'Orders\function.json') | ConvertFrom-Json
-    $timer = Get-Content -Raw -LiteralPath (Join-Path $staged 'Cleanup\function.json') | ConvertFrom-Json
+    $http = Get-Content -Raw -LiteralPath (Join-Path $staged 'Orders/function.json') | ConvertFrom-Json
+    $timer = Get-Content -Raw -LiteralPath (Join-Path $staged 'Cleanup/function.json') | ConvertFrom-Json
     if (($http.bindings | Where-Object type -EQ 'httpTrigger').authLevel -ne 'ANONYMOUS') {
         throw 'The generated HTTP authorization level was not packaged.'
     }
