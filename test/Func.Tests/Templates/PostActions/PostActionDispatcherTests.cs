@@ -180,6 +180,21 @@ public sealed class PostActionDispatcherTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessAsync_NonRunScriptActionWithExecutableArgument_DoesNotShowCommand()
+    {
+        IPostAction action = CreateAction(Guid.NewGuid(), instructions: "Complete this action manually.");
+        action.Args.Returns(new Dictionary<string, string> { ["executable"] = "not-a-script-action" });
+        ITemplateCreationResult result = CreateResult([action]);
+
+        PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
+
+        status.Should().Be(PostActionExecutionStatus.Failure);
+        _interaction.Received().WriteLine("Manual instructions: Complete this action manually.");
+        _interaction.DidNotReceive().WriteLine(Arg.Is<string>(text => text.StartsWith("Actual command:", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task ProcessAsync_FailureWithoutContinueOnError_StopsLaterActions()
     {
         ITemplateCreationResult result = CreateResult([CreateAction(Guid.NewGuid()), CreateAction(_knownActionId)]);

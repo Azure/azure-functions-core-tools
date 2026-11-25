@@ -33,16 +33,45 @@ internal static class TemplateEngineExtensions
             ArgumentNullException.ThrowIfNull(template);
             ArgumentNullException.ThrowIfNull(creationResult);
 
-            if (!templater.Settings.Components.TryGetComponent(
-                PostActionDispatcher.ComponentId, out PostActionDispatcher? dispatcher)
-                || dispatcher is null)
-            {
-                throw new InvalidOperationException(
-                    "The template post-action dispatcher is not registered. Register templating services with AddTemplating.");
-            }
-
-            return dispatcher.ProcessAsync(templater, template, creationResult, isDryRun, cancellationToken);
+            return GetPostActionDispatcher(templater).ProcessAsync(templater, template, creationResult, isDryRun, cancellationToken);
         }
+
+        /// <summary>
+        /// Resolves the registered dispatcher and processes the creation result's post actions in declared order.
+        /// </summary>
+        /// <param name="template">The exact template that produced the creation result.</param>
+        /// <param name="creationResult">The result of template creation or its dry run.</param>
+        /// <param name="isDryRun">Whether to list actions without executing them.</param>
+        /// <param name="allowRunScripts">Whether 'Run script' actions may execute.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The post-action execution status.</returns>
+        public Task<PostActionExecutionStatus> ProcessPostActionsAsync(
+            ITemplateInfo template,
+            ITemplateCreationResult creationResult,
+            bool isDryRun,
+            AllowRunScripts allowRunScripts,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(templater);
+            ArgumentNullException.ThrowIfNull(template);
+            ArgumentNullException.ThrowIfNull(creationResult);
+
+            return GetPostActionDispatcher(templater)
+                .ProcessAsync(templater, template, creationResult, isDryRun, allowRunScripts, cancellationToken);
+        }
+    }
+
+    private static PostActionDispatcher GetPostActionDispatcher(Templater templater)
+    {
+        if (!templater.Settings.Components.TryGetComponent(
+            PostActionDispatcher.ComponentId, out PostActionDispatcher? dispatcher)
+            || dispatcher is null)
+        {
+            throw new InvalidOperationException(
+                "The template post-action dispatcher is not registered. Register templating services with AddTemplating.");
+        }
+
+        return dispatcher;
     }
 
     extension(IEngineEnvironmentSettings settings)
