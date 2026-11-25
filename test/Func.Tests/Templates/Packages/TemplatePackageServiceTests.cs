@@ -206,7 +206,8 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
     private async Task AssertCliPackageAsync(string home, string version, byte[] archive)
     {
-        var factory = new TemplaterFactory(new CliConfigurationPathsOptions(home), []);
+        var factory = new TemplaterFactory(new CliConfigurationPathsOptions(home),
+            new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()));
         using Templater templater = factory.Create(Context());
         var package = (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Should().ContainSingle().Subject;
         package.Version.Should().Be(version);

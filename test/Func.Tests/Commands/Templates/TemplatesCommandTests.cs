@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.Text.Json;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Templates;
 using Azure.Functions.Cli.Common;
@@ -14,7 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Commands.Templates;
 
@@ -31,65 +29,7 @@ public sealed class TemplatesCommandTests
 
         services.Where(d => d.ServiceType == typeof(FuncCliCommand)).Should()
             .Contain(d => d.ImplementationType == typeof(TemplatesCommand))
-            .And.NotContain(d => d.ImplementationType == typeof(TemplatesSearchCommand)
-                || d.ImplementationType == typeof(TemplatesInstallCommand) || d.ImplementationType == typeof(TemplatesUninstallCommand));
-    }
-
-    [Fact]
-    public async Task Search_EmitsOnlyApprovedJsonFieldsWithoutChannelExpansion()
-    {
-        _catalog.SearchAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool?>(), Arg.Any<CancellationToken>())
-            .Returns([new CatalogSearchResult("test.templates", NuGetVersion.Parse("1.0.0"), "Test", "Description",
-                ["not-exposed"], new NuGet.Configuration.PackageSource("https://feed.test/index.json"))]);
-        var command = new TemplatesSearchCommand(_catalog, _interaction);
-
-        int exitCode = await InvokeAsync(command, "hello", "--source", "https://feed.test/index.json", "--format", "json");
-
-        exitCode.Should().Be(0);
-        using var json = JsonDocument.Parse(_interaction.Lines.Single()["JSON: ".Length..]);
-        json.RootElement[0].EnumerateObject().Select(p => p.Name)
-            .Should().BeEquivalentTo("packageId", "latestVersion", "title", "description");
-        await _catalog.Received(1).SearchAsync("hello", "https://feed.test/index.json", null, Arg.Any<CancellationToken>());
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("plain")]
-    public async Task Search_PlainFormatRendersCards(string? format)
-    {
-        _catalog.SearchAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool?>(), Arg.Any<CancellationToken>())
-            .Returns([new CatalogSearchResult("test.templates", NuGetVersion.Parse("1.0.0"), "Test", "Description",
-                [], new NuGet.Configuration.PackageSource("https://feed.test/index.json"))]);
-        var command = new TemplatesSearchCommand(_catalog, _interaction);
-
-        int exitCode = await InvokeAsync(command, format is null ? [] : ["--format", format]);
-
-        exitCode.Should().Be(0);
-        _interaction.Lines.Should().Contain(l => l.Contains("Package ID: ") && l.Contains("test.templates"))
-            .And.NotContain(l => l.StartsWith("JSON: "));
-    }
-
-    [Fact]
-    public async Task Search_InvalidFormatFailsBeforeQueryingCatalog()
-    {
-        var command = new TemplatesSearchCommand(_catalog, _interaction);
-
-        Func<Task> act = () => InvokeAsync(command, "--format", "xml");
-
-        (await act.Should().ThrowAsync<GracefulException>()).Which.Message.Should().Contain("plain, json");
-        await _catalog.DidNotReceive().SearchAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool?>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Search_InvalidSourcePreservesInnerException()
-    {
-        var failure = new ArgumentException("Use an HTTP(S) feed.");
-        _catalog.SearchAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool?>(), Arg.Any<CancellationToken>()).ThrowsAsync(failure);
-        var command = new TemplatesSearchCommand(_catalog, _interaction);
-
-        Func<Task> act = () => InvokeAsync(command);
-
-        (await act.Should().ThrowAsync<GracefulException>()).Which.InnerException.Should().BeSameAs(failure);
+            .And.NotContain(d => d.ImplementationType == typeof(TemplatesInstallCommand) || d.ImplementationType == typeof(TemplatesUninstallCommand));
     }
 
     [Fact]
@@ -125,14 +65,11 @@ public sealed class TemplatesCommandTests
     public void Parent_ContainsOnlyApprovedSubcommandsWithoutProjectPath()
     {
         var packages = CreatePackages();
-        var parent = new TemplatesCommand(new TemplatesSearchCommand(_catalog, _interaction),
-            new TemplatesInstallCommand(packages, _interaction), new TemplatesUninstallCommand(packages, _interaction));
+        var parent = new TemplatesCommand(new TemplatesInstallCommand(packages, _interaction), new TemplatesUninstallCommand(packages, _interaction));
 
-        parent.Subcommands.Select(c => c.Name).Should().Equal("search", "install", "uninstall");
+        parent.Subcommands.Select(c => c.Name).Should().Equal("install", "uninstall");
         parent.Arguments.Should().BeEmpty();
         parent.Subcommands.SelectMany(c => c.Options).Should().NotContain(o => o.Name == "--stack" || o.Name == "--skip");
-        parent.Subcommands.Single(c => c.Name == "search").Options.Should().Contain(o => o.Name == "--format")
-            .And.NotContain(o => o.Name == "--json");
     }
 
     private TemplatePackageService CreatePackages()

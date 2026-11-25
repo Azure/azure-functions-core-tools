@@ -37,7 +37,6 @@ internal static class BuiltInCommands
 
         services.AddSingleton<FuncCliCommand, InitCommand>();
         services.AddSingleton<FuncCliCommand, NewCommand>();
-        services.AddSingleton<TemplatesSearchCommand>();
         services.AddSingleton<TemplatesInstallCommand>();
         services.AddSingleton<TemplatesUninstallCommand>();
         services.AddSingleton<FuncCliCommand, TemplatesCommand>();

@@ -90,10 +90,8 @@ public sealed class FirstRunCoordinatorTests
     }
 
     [Theory]
-    [InlineData("templates search", false)]
     [InlineData("templates install test.templates", false)]
     [InlineData("templates uninstall test.templates", false)]
-    [InlineData("templates search", true)]
     [InlineData("templates install test.templates", true)]
     [InlineData("templates uninstall test.templates", true)]
     public async Task Templates_SkipFirstRunStateSetupAndPrompts(string invocation, bool markerPresent)

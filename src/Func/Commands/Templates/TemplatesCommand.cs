@@ -10,13 +10,11 @@ namespace Azure.Functions.Cli.Commands.Templates;
 /// </summary>
 internal sealed class TemplatesCommand : FuncCliCommand, IBuiltInCommand
 {
-    public TemplatesCommand(TemplatesSearchCommand search, TemplatesInstallCommand install, TemplatesUninstallCommand uninstall)
-        : base("templates", "Search, install, and uninstall template packages.")
+    public TemplatesCommand(TemplatesInstallCommand install, TemplatesUninstallCommand uninstall)
+        : base("templates", "Install and uninstall template packages.")
     {
-        ArgumentNullException.ThrowIfNull(search);
         ArgumentNullException.ThrowIfNull(install);
         ArgumentNullException.ThrowIfNull(uninstall);
-        Subcommands.Add(search);
         Subcommands.Add(install);
         Subcommands.Add(uninstall);
     }
