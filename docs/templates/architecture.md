@@ -165,7 +165,8 @@ Render into command-scoped private temporary output within defined asset and exp
 `PostActionDispatcher` (`src/Func/Templates/PostActions/`) processes a creation result's post actions in declared order. It is not yet wired into `func init` or `func new`.
 
 - Call `templater.ProcessPostActionsAsync(selectedTemplate, creationResult, isDryRun, cancellationToken)` to resolve the dispatcher from the template engine components and run it. Supply the exact selected template, not a rediscovered sibling or ambient project context. `AddTemplating()` registers the dispatcher with dependency injection and the engine.
-- Core actions resolve through the engine by `actionId`. Core processors implement the internal `ICorePostActionProcessor` and use `services.AddTemplateComponent<ICorePostActionProcessor, T>()`. No concrete core processors are registered yet.
+- Core actions resolve through the engine by `actionId`. Core processors implement the internal `ICorePostActionProcessor` and use `services.AddTemplateComponent<ICorePostActionProcessor, T>()`. `AddTemplating()` registers these core processors:
+  - Instruction display (`AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C`), ported from the .NET SDK, prints the action's description, manual instructions, and, when the `executable` argument is set, `Actual command: <executable> <args>`. It always succeeds, so the dispatcher's failure fallback never prints the instructions twice.
 - `IFuncTemplateComponentProvider.Get()` assembles the engine's full component list. Its DI implementation, `FuncTemplateComponentsProvider`, combines built-in engine components, `ICoreTemplateComponent` registrations, and supported workload bridges. `TemplaterFactory` consumes the provider rather than assembling components itself. Workload registrations retain a CLI-owned `ITemplateComponent`; unsupported contracts are ignored when building bridges.
 - Workloads implement the public `IPostActionProcessor : ITemplateComponent` from `Abstractions` and call `builder.AddTemplateComponent<T>()` or the instance overload. The generic overload uses singleton activation through DI; the instance overload leaves disposal with the caller. The CLI adapter projects immutable CLI-owned context types, with no engine types crossing workload assembly load contexts.
 - Workload processors retain their registering workload's identity for diagnostics, but do not need to register or own an `IProjectStack`. Each implements synchronous, side-effect-free `CanProcess(PostActionSelectionContext)`. The CLI-owned immutable context exposes the selected template's trimmed `Stack` and `Language` tags, preserving casing. Processors explicitly choose supported values and aliases; installed stack services are not consulted.
@@ -176,7 +177,7 @@ Render into command-scoped private temporary output within defined asset and exp
 - Dry runs list the actions that would run without evaluating predicates or executing processors.
 - No core run-script processor (`3A7C4B45-1F5D-4A30-959A-51B88E82B5D2`) is implemented. Without a matching workload processor it falls back to manual instructions; its allow, deny, or prompt policy is still to be designed.
 
-See [workload authoring](../building-a-workload.md#template-post-actions) for registration, context, and lifetime details. This API adds no concrete processors or command wiring.
+See [workload authoring](../building-a-workload.md#template-post-actions) for registration, context, and lifetime details. Post actions have no command wiring yet.
 
 <a id="non-force-init"></a>
 
