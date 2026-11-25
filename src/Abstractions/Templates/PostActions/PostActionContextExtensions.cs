@@ -48,6 +48,26 @@ public static class PostActionContextExtensions
 
             return results;
         }
+
+        /// <summary>
+        /// Resolves the named argument's paths against the output directory without matching them to generated files.
+        /// </summary>
+        /// <param name="argumentName">The argument containing paths.</param>
+        /// <returns>Absolute paths in argument order, or an empty list when the argument is absent or blank.</returns>
+        /// <exception cref="ArgumentNullException">The context or <paramref name="argumentName"/> is null.</exception>
+        /// <exception cref="ArgumentException"><paramref name="argumentName"/> is empty or whitespace.</exception>
+        public IReadOnlyList<string> GetConfiguredPaths(string argumentName)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentException.ThrowIfNullOrWhiteSpace(argumentName);
+            if (!context.Arguments.TryGetValue(argumentName, out string? files) || string.IsNullOrWhiteSpace(files))
+            {
+                return [];
+            }
+
+            string outputDirectory = Path.GetFullPath(context.OutputBasePath);
+            return [.. ParsePaths(files).Select(path => Path.GetFullPath(path, outputDirectory))];
+        }
     }
 
     private static string[] ParsePaths(string files)

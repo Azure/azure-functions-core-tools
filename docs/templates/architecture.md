@@ -171,8 +171,19 @@ Render into command-scoped private temporary output within defined asset and exp
 - `PostActionContext.FileMatcher` resolves source-relative template globs to generated target paths, using a snapshot of engine file changes. It is null when source paths are unavailable.
 - `PostActionContext` extension methods provide reusable argument parsing, source matching, and output-relative path resolution.
 - `RestorePostAction` provides the standard restore action ID, target selection, fallback, and per-target execution; workloads implement applicability and restoration.
+- `AddReferencePostAction<TReference>` provides the standard add-reference action ID, argument validation,
+  `targetFiles` selection, a virtual discovery fallback, and stop-on-first-failure processing. Workloads derive
+  their own `PostActionReference` subtype to receive additional post-action arguments as typed properties, then
+  register reference-type/handler pairs during construction using `RegisterReferenceHandlers`. The base class
+  defines no reference types. Matching is case-insensitive, and unregistered types report an unsupported-reference
+  error. Type-specific reporting and project-reference rename resolution belong to the workload handlers.
 - `PostActionContext.Reporter` uses the shared `IFunctionsReporter` contract and `FunctionsReportSeverity` enum, also used for project host-run reporting. The CLI currently supplies a no-op reporter to workload post actions; their status and output are discarded until a real reporter is implemented.
-- Workload processors retain their registering workload's identity for diagnostics, but do not need to register or own an `IProjectStack`. Each implements synchronous, side-effect-free `CanProcess(PostActionSelectionContext)`. The CLI-owned immutable context exposes the selected template's trimmed `Stack` and `Language` tags, preserving casing. Processors explicitly choose supported values and aliases; installed stack services are not consulted.
+- Workload processors retain their registering workload's identity for diagnostics, but do not need to register or
+  own an `IProjectStack`. Each implements synchronous, side-effect-free `CanProcess(PostActionSelectionContext)`.
+  The CLI-owned immutable context exposes the selected template's trimmed `Stack` and `Language` tags, preserving
+  casing. Processors explicitly choose supported values and aliases; installed stack services are not consulted.
+  Processors that own an `IProjectStack` can use `context.IsCompatibleWith(stack)` to match its stack ID, languages,
+  and aliases.
 - Core processors always take precedence, regardless of registration order, without evaluating workload predicates for a shadowed ID. Workload processors sharing an otherwise-unclaimed ID are grouped behind one engine adapter. The adapter evaluates every candidate's predicate before executing any processor.
 - Exactly one workload registration must accept the context. Missing/blank tags are passed as empty strings for workload predicates to reject; no eligible processor and ambiguous matches fail with a diagnostic and manual instructions rather than a registration-order fallback. Conflicts identify the contributing workloads and processor types; repeated registration of the same eligible instance also conflicts. Predicate overlap is detected at dispatch, not registration. A heterogeneous template without one matching stack/language pair does not select an arbitrary workload. This precedence policy is not a security sandbox against workloads modifying the shared service collection.
 - A `false` execution result reports failure without trying another processor after potential side effects. Unexpected predicate and execution exceptions propagate, as does cancellation.

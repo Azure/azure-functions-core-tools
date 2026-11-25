@@ -42,6 +42,30 @@ public sealed class PostActionContextExtensionsTests
             .GetParameters().Single(parameter => parameter.Name == "argumentName").IsOptional.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("App.csproj;..\\Other.csproj")]
+    [InlineData("[\"App.csproj\", \"..\\\\Other.csproj\"]")]
+    public void GetConfiguredPaths_ResolvesAgainstOutputWithoutMatching(string paths)
+    {
+        PostActionContext context = Context(new Dictionary<string, string>
+        {
+            ["targetFiles"] = paths.Replace('\\', Path.DirectorySeparatorChar),
+        });
+
+        IReadOnlyList<string> result = context.GetConfiguredPaths("targetFiles");
+
+        result.Should().HaveCount(2);
+        result[0].Should().Be(Path.Combine(_outputDirectory, "App.csproj"));
+        result[1].Should().Be(Path.GetFullPath(Path.Combine(_outputDirectory, "..", "Other.csproj")));
+        _matcher.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetConfiguredPaths_MissingArgument_ReturnsEmpty()
+    {
+        Context(new Dictionary<string, string>()).GetConfiguredPaths("targetFiles").Should().BeEmpty();
+    }
+
     [Fact]
     public void FileHelpers_NullContextOrInvalidArguments_Throw()
     {
@@ -50,6 +74,9 @@ public sealed class PostActionContextExtensionsTests
         FluentActions.Invoking(() => PostActionContextExtensions.GetConfiguredFiles(null!, "files")).Should().Throw<ArgumentNullException>();
         FluentActions.Invoking(() => context.GetConfiguredFiles(null!)).Should().Throw<ArgumentNullException>();
         FluentActions.Invoking(() => context.GetConfiguredFiles(" ")).Should().Throw<ArgumentException>();
+        FluentActions.Invoking(() => PostActionContextExtensions.GetConfiguredPaths(null!, "files"))
+            .Should().Throw<ArgumentNullException>();
+        FluentActions.Invoking(() => context.GetConfiguredPaths(" ")).Should().Throw<ArgumentException>();
     }
 
     private PostActionContext Context(IReadOnlyDictionary<string, string> arguments)
