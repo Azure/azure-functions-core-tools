@@ -184,7 +184,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
             </configuration>
             """);
         string home = Path.Combine(_root, "cli-home");
-        Dictionary<string, string> environment = new() { [TemplateCatalogOptionsSetup.SourceEnvironmentVariable] = feed.Source };
+        Dictionary<string, string> environment = new() { ["FUNC_CLI_TEMPLATES_SOURCE"] = feed.Source };
 
         (await RunCliAsync(home, ["templates", "install", "test.templates"], environment)).ExitCode.Should().Be(0);
         await AssertCliPackageAsync(home, "1.0.0", stable);
@@ -638,7 +638,15 @@ public sealed class TemplatePackageServiceTests : IDisposable
                 if (path == "/index.json")
                 {
                     return Encoding.UTF8.GetBytes(
-                        $$"""{"version":"3.0.0","resources":[{"@id":"{{_address}}flat/","@type":"PackageBaseAddress/3.0.0"}]}""");
+                        $$"""{"version":"3.0.0","resources":[{"@id":"{{_address}}flat/","@type":"PackageBaseAddress/3.0.0"},{"@id":"{{_address}}registration/","@type":"RegistrationsBaseUrl/3.6.0"}]}""");
+                }
+
+                if (path == $"/registration/{PackageId}/index.json")
+                {
+                    string items = string.Join(",", _packages.Keys.Select(version =>
+                        $$"""{"catalogEntry":{"id":"{{PackageId}}","version":"{{version}}","listed":true},"packageContent":"{{_address}}flat/{{PackageId}}/{{version}}/{{PackageId}}.{{version}}.nupkg"}"""));
+                    return Encoding.UTF8.GetBytes(
+                        $$"""{"count":1,"items":[{"count":{{_packages.Count}},"lower":"0.0.0","upper":"999.0.0","items":[{{items}}]}]}""");
                 }
 
                 if (path == $"/flat/{PackageId}/index.json")
