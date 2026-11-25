@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "HTTP" ],
+  "identity": "Azure.Functions.Cli.Python.HttpTrigger.Python",
+  "name": "Azure Functions HTTP trigger (Python)",
+  "description": "An HTTP trigger using the Python v2 programming model.",
+  "shortName": "httptrigger",
+  "tags": {
+    "language": "Python",
+    "stack": "python",
+    "type": "item"
+  },
+  "symbols": {
+    "FunctionName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonName",
+      "replaces": "FunctionName",
+      "fileRename": "FunctionName"
+    },
+    "AuthorizationLevel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "The HTTP authorization level.",
+      "defaultValue": "function",
+      "choices": [
+        { "choice": "anonymous", "description": "Allow anonymous requests." },
+        { "choice": "function", "description": "Require a function key." },
+        { "choice": "admin", "description": "Require the host master key." }
+      ]
+    },
+    "AuthorizationLevelCode": {
+      "type": "derived",
+      "valueSource": "AuthorizationLevel",
+      "valueTransform": "upperCaseInvariant",
+      "replaces": "FUNCTION"
+    }
+  },
+  "forms": {
+    "pythonName": {
+      "identifier": "replace",
+      "pattern": "[^a-zA-Z0-9_]",
+      "replacement": "_"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "functions/function_FunctionName.py" }
+  ]
+}
