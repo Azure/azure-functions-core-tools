@@ -626,6 +626,44 @@ public sealed class WorkloadPostActionProcessorTests : IDisposable
         context.Language.Should().Be(language.Trim());
     }
 
+    /// <summary>
+    /// Verifies stack compatibility matching by stack ID, canonical language, and alias.
+    /// </summary>
+    /// <param name="stack">The selected template stack tag.</param>
+    /// <param name="language">The selected template language tag.</param>
+    /// <param name="expected">The expected compatibility.</param>
+    [Theory]
+    [InlineData("dotnet", "C#", true)]
+    [InlineData(" DOTNET ", " csharp ", true)]
+    [InlineData("dotnet", "VB", true)]
+    [InlineData("dotnet-isolated", "C#", false)]
+    [InlineData("dotnet", "Python", false)]
+    [InlineData("", "C#", false)]
+    [InlineData("dotnet", "", false)]
+    public void SelectionContext_IsCompatibleWith_MatchesStackAndLanguage(string stack, string language, bool expected)
+    {
+        IProjectStack projectStack = Substitute.For<IProjectStack>();
+        projectStack.Stack.Returns("dotnet");
+        projectStack.SupportedLanguages.Returns(["C#", "VB"]);
+        projectStack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["C#"] = ["csharp"],
+        });
+
+        new PostActionSelectionContext(stack, language).IsCompatibleWith(projectStack).Should().Be(expected);
+    }
+
+    /// <summary>
+    /// Verifies that compatibility checks reject a null stack.
+    /// </summary>
+    [Fact]
+    public void SelectionContext_IsCompatibleWith_NullStack_Throws()
+    {
+        Action act = () => new PostActionSelectionContext("dotnet", "C#").IsCompatibleWith(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
     private ServiceCollection Services()
     {
         ServiceCollection services = new();

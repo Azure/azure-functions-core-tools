@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.ComponentModel;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.PostActions;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
@@ -20,46 +18,12 @@ internal sealed class DotNetRestorePostActionProcessor(IDotnetCliRunner dotnetCl
     public override bool CanProcess(PostActionSelectionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return string.Equals(context.Stack, _stack.Stack, StringComparison.OrdinalIgnoreCase)
-            && _stack.SupportedLanguageAliases.Any(language =>
-                string.Equals(context.Language, language.Key, StringComparison.OrdinalIgnoreCase)
-                || language.Value.Contains(context.Language, StringComparer.OrdinalIgnoreCase));
+        return context.IsCompatibleWith(_stack);
     }
 
     /// <inheritdoc />
-    protected override async Task<bool> RestoreAsync(
+    protected override Task<bool> RestoreAsync(
         PostActionContext context, string targetPath, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _dotnetCli.RunStreamingAsync(
-                ["restore", targetPath, "-tlp:verbosity=quiet", "--no-logo"],
-                Path.GetFullPath(context.OutputBasePath),
-                line => context.Reporter.WriteLog(line),
-                line => context.Reporter.WriteLog(line, FunctionsReportSeverity.Error),
-                cancellationToken);
-        }
-        catch (DotnetCliException ex)
-        {
-            context.Reporter.WriteLog(ex.Message, FunctionsReportSeverity.Error);
-            return false;
-        }
-        catch (GracefulException ex)
-        {
-            context.Reporter.WriteLog(ex.Message, FunctionsReportSeverity.Error);
-            return false;
-        }
-        catch (Win32Exception ex)
-        {
-            context.Reporter.WriteLog($"Could not start 'dotnet restore': {ex.Message}", FunctionsReportSeverity.Error);
-            return false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            context.Reporter.WriteLog($"Could not start 'dotnet restore': {ex.Message}", FunctionsReportSeverity.Error);
-            return false;
-        }
-
-        return true;
-    }
+        => _dotnetCli.TryRunPostActionAsync(
+            context, ["restore", targetPath, "-tlp:verbosity=quiet", "--no-logo"], "dotnet restore", cancellationToken);
 }
