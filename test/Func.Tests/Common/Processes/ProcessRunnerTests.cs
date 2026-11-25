@@ -59,6 +59,44 @@ public class ProcessRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_ArgumentString_PassesRawArguments()
+    {
+        (string fileName, string arguments) = OperatingSystem.IsWindows()
+            ? ("cmd.exe", "/c echo raw-arguments")
+            : ("/bin/sh", "-c \"echo raw-arguments\"");
+
+        ProcessOutcome outcome = await _runner.RunAsync(
+            new ProcessRunRequest(fileName, [], WorkingDirectory: null, _defaultTimeout) { ArgumentString = arguments },
+            CancellationToken.None);
+
+        outcome.ExitCode.Should().Be(0);
+        outcome.StandardOutput.Should().Contain("raw-arguments");
+    }
+
+    [Fact]
+    public async Task RunAsync_StreamNotRedirected_ReturnsEmptyCapture()
+    {
+        (string fileName, string[] args) = ShellInvocation("echo not-captured 1>&2");
+
+        ProcessOutcome outcome = await _runner.RunAsync(
+            new ProcessRunRequest(fileName, args, WorkingDirectory: null, _defaultTimeout) { RedirectStandardError = false },
+            CancellationToken.None);
+
+        outcome.ExitCode.Should().Be(0);
+        outcome.StandardError.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ArgumentStringAndArguments_Throws()
+    {
+        Func<Task> act = () => _runner.RunAsync(
+            new ProcessRunRequest("must-not-start", ["one"], WorkingDirectory: null, _defaultTimeout) { ArgumentString = "two" },
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
     public async Task RunAsync_BogusExecutable_ReturnsExecutableNotFound()
     {
         ProcessOutcome outcome = await _runner.RunAsync(
