@@ -2,14 +2,14 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Threading.Channels;
-using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
 /// Bridges synchronous project reports into the asynchronous initialization renderer.
 /// </summary>
-internal sealed class FunctionsProjectHostRunReporter : IFunctionsProjectHostRunReporter, IAsyncDisposable
+internal sealed class FunctionsProjectHostRunReporter : IFunctionsReporter, IAsyncDisposable
 {
     private readonly StartInitializationStepContext _context;
     private readonly CancellationToken _cancellationToken;
@@ -38,7 +38,7 @@ internal sealed class FunctionsProjectHostRunReporter : IFunctionsProjectHostRun
         Enqueue(ct => _context.ReportStatusAsync(message, ct));
     }
 
-    public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+    public void WriteLog(string line, FunctionsReportSeverity severity = FunctionsReportSeverity.Info)
     {
         if (line is null)
         {

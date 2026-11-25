@@ -9,7 +9,7 @@ using Microsoft.TemplateEngine.Edge.Template;
 namespace Azure.Functions.Cli.Templates.PostActions;
 
 /// <summary>
-/// Runs a template's post actions through the <see cref="IPostActionProcessor"/> components registered with the
+/// Runs a template's post actions through the <see cref="ICorePostActionProcessor"/> components registered with the
 /// template engine, falling back to the template's manual instructions when an action can't be processed.
 /// </summary>
 internal sealed class PostActionDispatcher(IInteractionService interaction) : IIdentifiedComponent
@@ -27,6 +27,7 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
     /// Processes the post actions of <paramref name="creationResult"/> in declared order.
     /// </summary>
     /// <param name="templater">The templater that instantiated the template.</param>
+    /// <param name="template">The exact template that produced the creation result.</param>
     /// <param name="creationResult">The result of the template instantiation or dry run.</param>
     /// <param name="isDryRun"><c>true</c> to only list the actions that would run.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
@@ -36,11 +37,13 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
     /// </returns>
     public async Task<PostActionExecutionStatus> ProcessAsync(
         Templater templater,
+        ITemplateInfo template,
         ITemplateCreationResult creationResult,
         bool isDryRun,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(templater);
+        ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(creationResult);
         ICreationEffects creationEffects = creationResult.CreationEffects
             ?? throw new ArgumentException("Creation effects are required.", nameof(creationResult));
@@ -79,11 +82,10 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
                 continue;
             }
 
-            // TODO: special-case run-script (RunScriptActionId) once a processor exists: honor the user's
-            // allow/deny/prompt choice for running scripts, reporting Cancelled when not allowed. Until then it
-            // has no processor and falls through to the manual instructions below.
+            // TODO: apply the user's allow/deny/prompt choice before dispatching RunScriptActionId,
+            // reporting Cancelled when denied. Script permission policy is not implemented yet.
             PostActionExecutionStatus actionStatus = PostActionExecutionStatus.Success;
-            if (!environment.Components.TryGetComponent(action.ActionId, out IPostActionProcessor? processor) || processor is null)
+            if (!environment.Components.TryGetComponent(action.ActionId, out ICorePostActionProcessor? processor) || processor is null)
             {
                 _interaction.WriteError($"Post action '{action.ActionId}' is not supported.");
                 WriteDescription(action);
@@ -92,7 +94,7 @@ internal sealed class PostActionDispatcher(IInteractionService interaction) : II
             }
             else
             {
-                PostActionContext context = new(environment, action, creationEffects, result!, creationResult.OutputBaseDirectory);
+                EnginePostActionContext context = new(environment, action, creationEffects, result!, creationResult.OutputBaseDirectory, template);
                 if (!await processor.ProcessAsync(context, cancellationToken))
                 {
                     _interaction.WriteError("Post action failed.");

@@ -4,6 +4,9 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.PostActions;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -208,6 +211,154 @@ public class DefaultFunctionsCliBuilderTests
     private sealed class GenericTestPayload(string value)
     {
         public string Value { get; } = value;
+    }
+
+    [Fact]
+    public async Task AddTemplateComponent_Instance_RetainsOwnerAndReusesSingleton()
+    {
+        ServiceCollection services = new();
+        var workload = TestWorkloads.CreateInfo();
+        var builder = new DefaultFunctionsCliBuilder(services, workload);
+        var processor = Substitute.For<IPostActionProcessor>();
+
+        builder.AddTemplateComponent(processor);
+
+        await using var provider = services.BuildServiceProvider();
+        var registration = provider.GetServices<WorkloadTemplateComponentRegistration>().Single();
+        registration.Workload.Should().BeSameAs(workload);
+        registration.Component.Should().BeSameAs(processor);
+        provider.GetServices<WorkloadTemplateComponentRegistration>().Single().Should().BeSameAs(registration);
+    }
+
+    [Fact]
+    public void AddTemplateComponent_Null_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
+
+        FluentActions.Invoking(() => builder.AddTemplateComponent(null!))
+            .Should().ThrowExactly<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task AddTemplateComponent_UnsupportedKind_RetainsInstanceAndGenericRegistrations()
+    {
+        ServiceCollection services = new();
+        var workload = TestWorkloads.CreateInfo();
+        var builder = new DefaultFunctionsCliBuilder(services, workload);
+        var component = Substitute.For<ITemplateComponent>();
+
+        builder.AddTemplateComponent(component);
+        builder.AddTemplateComponent<UnsupportedComponent>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registrations = provider.GetServices<WorkloadTemplateComponentRegistration>().ToArray();
+        registrations.Should().HaveCount(2).And.AllSatisfy(registration => registration.Workload.Should().BeSameAs(workload));
+        registrations[0].Component.Should().BeSameAs(component);
+        registrations[1].Component.Should().BeOfType<UnsupportedComponent>();
+    }
+
+    [Fact]
+    public void AddTemplateComponent_AbstractType_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
+
+        FluentActions.Invoking(builder.AddTemplateComponent<AbstractProcessor>)
+            .Should().ThrowExactly<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddTemplateComponent_WithoutWorkload_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
+
+        FluentActions.Invoking(() => builder.AddTemplateComponent(Substitute.For<IPostActionProcessor>()))
+            .Should().ThrowExactly<InvalidOperationException>();
+        FluentActions.Invoking(builder.AddTemplateComponent<DisposableProcessor>)
+            .Should().ThrowExactly<InvalidOperationException>();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task AddTemplateComponent_Generic_ResolvesDependenciesAndDisposesOnlyOwnedInstances(
+        bool registerInDi, bool instanceRegistration)
+    {
+        ServiceCollection services = new();
+        DisposalCounter counter = new();
+        services.AddSingleton(counter);
+        var builder = new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo());
+        DisposableProcessor external = new(counter);
+        if (registerInDi)
+        {
+            services.AddSingleton<DisposableProcessor>();
+        }
+
+        if (instanceRegistration)
+        {
+            builder.AddTemplateComponent(external);
+        }
+        else
+        {
+            builder.AddTemplateComponent<DisposableProcessor>();
+        }
+
+        await using (var provider = services.BuildServiceProvider())
+        {
+            var registration = provider.GetServices<WorkloadTemplateComponentRegistration>().Single();
+            registration.Component.Should().BeOfType<DisposableProcessor>();
+            provider.GetServices<WorkloadTemplateComponentRegistration>().Single().Should().BeSameAs(registration);
+            if (registerInDi)
+            {
+                registration.Component.Should().BeSameAs(provider.GetRequiredService<DisposableProcessor>());
+            }
+
+            if (instanceRegistration)
+            {
+                registration.Component.Should().BeSameAs(external);
+            }
+        }
+
+        counter.AsyncDisposals.Should().Be(instanceRegistration ? 0 : 1);
+        counter.SyncDisposals.Should().Be(0);
+    }
+
+    private sealed class UnsupportedComponent : ITemplateComponent
+    {
+        public Guid Id => Guid.Empty;
+    }
+
+    private abstract class AbstractProcessor : IPostActionProcessor
+    {
+        public abstract Guid Id { get; }
+
+        public abstract bool CanProcess(PostActionSelectionContext context);
+
+        public abstract Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken);
+    }
+
+    private sealed class DisposalCounter
+    {
+        public int AsyncDisposals { get; set; }
+
+        public int SyncDisposals { get; set; }
+    }
+
+    private sealed class DisposableProcessor(DisposalCounter counter) : IPostActionProcessor, IAsyncDisposable, IDisposable
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public bool CanProcess(PostActionSelectionContext context) => true;
+
+        public Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public ValueTask DisposeAsync()
+        {
+            counter.AsyncDisposals++;
+            return ValueTask.CompletedTask;
+        }
+
+        public void Dispose() => counter.SyncDisposals++;
     }
 
     private sealed class GenericTestCommand(GenericTestPayload payload) : FuncCommand

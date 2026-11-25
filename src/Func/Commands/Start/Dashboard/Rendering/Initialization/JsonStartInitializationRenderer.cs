@@ -4,8 +4,8 @@
 using System.Buffers;
 using System.Globalization;
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Events;
-using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 
@@ -153,7 +153,7 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
     private static string FormatDisplayKind(StartInitializationDisplayKind kind)
         => kind.ToString().ToLowerInvariant();
 
-    private static string FormatSeverity(FunctionsProjectReportSeverity severity)
+    private static string FormatSeverity(FunctionsReportSeverity severity)
         => severity.ToString().ToLowerInvariant();
 
     private static void WriteProfile(Utf8JsonWriter writer, StartInitializationProfileInfo profile)

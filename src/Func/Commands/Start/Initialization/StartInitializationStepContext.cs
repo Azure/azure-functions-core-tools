@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
-using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -51,7 +51,7 @@ internal sealed class StartInitializationStepContext(
         await _renderer.OnEventAsync(progressEvent, cancellationToken);
     }
 
-    public async Task ReportLogAsync(string line, FunctionsProjectReportSeverity severity, CancellationToken cancellationToken)
+    public async Task ReportLogAsync(string line, FunctionsReportSeverity severity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(line);
 

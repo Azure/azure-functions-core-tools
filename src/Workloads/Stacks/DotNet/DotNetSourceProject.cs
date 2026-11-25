@@ -44,7 +44,7 @@ internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirect
         context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, context.Reporter, cancellationToken);
     }
 
-    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
+    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, IFunctionsReporter reporter, CancellationToken cancellationToken)
     {
         // Keep structured target results separate from console output so builds can stream diagnostics
         // while output-path lookups remain silent on success.
@@ -55,7 +55,7 @@ internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirect
         HashSet<string> seenDiagnostics = [];
         bool msbuildCrashed = false;
 
-        void WriteBuildLog(string line, FunctionsProjectReportSeverity severity)
+        void WriteBuildLog(string line, FunctionsReportSeverity severity)
         {
             // stdout and stderr callbacks can run concurrently.
             lock (diagnosticGate)
@@ -97,8 +97,8 @@ internal sealed partial class DotNetSourceProject(WorkingDirectory workingDirect
                     await _dotnetCli.RunStreamingAsync(
                         arguments,
                         projectDir,
-                        line => WriteBuildLog(line, FunctionsProjectReportSeverity.Info),
-                        line => WriteBuildLog(line, FunctionsProjectReportSeverity.Error),
+                        line => WriteBuildLog(line, FunctionsReportSeverity.Info),
+                        line => WriteBuildLog(line, FunctionsReportSeverity.Error),
                         cancellationToken);
                 }
             }

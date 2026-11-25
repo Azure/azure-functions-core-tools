@@ -18,7 +18,8 @@ public sealed class PostActionDispatcherTests : IDisposable
 
     private readonly string _root;
     private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
-    private readonly IPostActionProcessor _processor = Substitute.For<IPostActionProcessor>();
+    private readonly ICorePostActionProcessor _processor = Substitute.For<ICorePostActionProcessor>();
+    private readonly ITemplateInfo _template = Substitute.For<ITemplateInfo>();
     private readonly Templater _templater;
     private readonly PostActionDispatcher _dispatcher;
 
@@ -27,11 +28,14 @@ public sealed class PostActionDispatcherTests : IDisposable
         _root = Path.Combine(Path.GetTempPath(), "func-post-action-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
         _processor.Id.Returns(_knownActionId);
-        _processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(true);
+        _processor.ProcessAsync(Arg.Any<EnginePostActionContext>(), Arg.Any<CancellationToken>()).Returns(true);
+        ICoreTemplateComponent component = Substitute.For<ICoreTemplateComponent>();
+        component.InterfaceType.Returns(typeof(ICorePostActionProcessor));
+        component.Instance.Returns(_processor);
         _templater = new(
             new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)),
             Path.Combine(_root, "hive"),
-            [new Component(_processor)]);
+            [component]);
         _dispatcher = new(_interaction);
     }
 
@@ -62,7 +66,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         ITemplateCreationResult result = CreateResult([]);
         result.CreationResult.Returns((ICreationResult?)null);
 
-        Func<Task> act = () => _dispatcher.ProcessAsync(_templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+        Func<Task> act = () => _dispatcher.ProcessAsync(_templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<ArgumentException>();
     }
@@ -73,7 +77,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         ITemplateCreationResult result = CreateResult([]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Success);
         _interaction.ReceivedCalls().Should().BeEmpty();
@@ -86,7 +90,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         ITemplateCreationResult result = CreateResult([], dryRunActions: [action]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: true, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: true, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Success);
         _interaction.Received().WriteLine("Action would have been taken automatically:");
@@ -101,15 +105,16 @@ public sealed class PostActionDispatcherTests : IDisposable
         ITemplateCreationResult result = CreateResult([action]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Success);
         await _processor.Received(1).ProcessAsync(
-            Arg.Is<PostActionContext>(context =>
+            Arg.Is<EnginePostActionContext>(context =>
                 context.Action == action
                 && context.Environment == _templater.Settings
                 && context.CreationEffects == result.CreationEffects
                 && context.CreationResult == result.CreationResult
+                && context.Template == _template
                 && context.OutputBasePath == _root),
             TestContext.Current.CancellationToken);
         _interaction.DidNotReceiveWithAnyArgs().WriteError(default!);
@@ -118,12 +123,12 @@ public sealed class PostActionDispatcherTests : IDisposable
     [Fact]
     public async Task ProcessAsync_ProcessorFails_ReturnsFailureAndShowsInstructions()
     {
-        _processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(false);
+        _processor.ProcessAsync(Arg.Any<EnginePostActionContext>(), Arg.Any<CancellationToken>()).Returns(false);
         ITemplateCreationResult result = CreateResult(
             [CreateAction(_knownActionId, description: "Restore packages", instructions: "Do it by hand.")]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         _interaction.Received().WriteError("Post action failed.");
@@ -134,11 +139,11 @@ public sealed class PostActionDispatcherTests : IDisposable
     [Fact]
     public async Task ProcessAsync_ProcessorFailsWithoutInstructions_ShowsDescription()
     {
-        _processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(false);
+        _processor.ProcessAsync(Arg.Any<EnginePostActionContext>(), Arg.Any<CancellationToken>()).Returns(false);
         ITemplateCreationResult result = CreateResult([CreateAction(_knownActionId, description: "Restore packages")]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         _interaction.Received().WriteError("Post action failed.");
@@ -154,7 +159,7 @@ public sealed class PostActionDispatcherTests : IDisposable
             [CreateAction(unknown, description: "Add a package", instructions: "Add the package yourself.")]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         _interaction.Received().WriteError($"Post action '{unknown}' is not supported.");
@@ -168,7 +173,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         ITemplateCreationResult result = CreateResult([CreateAction(Guid.NewGuid())]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         _interaction.DidNotReceive().WriteLine(Arg.Is<string>(text => text.StartsWith("Manual instructions", StringComparison.Ordinal)));
@@ -180,7 +185,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         ITemplateCreationResult result = CreateResult([CreateAction(Guid.NewGuid()), CreateAction(_knownActionId)]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
@@ -193,7 +198,7 @@ public sealed class PostActionDispatcherTests : IDisposable
             [CreateAction(Guid.NewGuid(), continueOnError: true), CreateAction(_knownActionId)]);
 
         PostActionExecutionStatus status = await _dispatcher.ProcessAsync(
-            _templater, result, isDryRun: false, TestContext.Current.CancellationToken);
+            _templater, _template, result, isDryRun: false, TestContext.Current.CancellationToken);
 
         status.Should().Be(PostActionExecutionStatus.Failure);
         await _processor.ReceivedWithAnyArgs(1).ProcessAsync(default!, TestContext.Current.CancellationToken);
@@ -206,7 +211,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         using CancellationTokenSource cts = new();
         await cts.CancelAsync();
 
-        Func<Task> act = () => _dispatcher.ProcessAsync(_templater, result, isDryRun: false, cts.Token);
+        Func<Task> act = () => _dispatcher.ProcessAsync(_templater, _template, result, isDryRun: false, cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default!, TestContext.Current.CancellationToken);
@@ -224,16 +229,16 @@ public sealed class PostActionDispatcherTests : IDisposable
         services.AddSingleton(Substitute.For<IWorkloadTemplateSource>());
         services.AddTemplating();
         services.AddSingleton(_processor);
-        services.AddTemplateComponent<IPostActionProcessor, IPostActionProcessor>();
+        services.AddTemplateComponent<ICorePostActionProcessor, ICorePostActionProcessor>();
         await using ServiceProvider provider = services.BuildServiceProvider();
         using Templater templater = new(
-            _templater.Context, Path.Combine(_root, "extension-hive"), provider.GetServices<ITemplateComponent>());
-        _processor.ProcessAsync(Arg.Any<PostActionContext>(), Arg.Any<CancellationToken>()).Returns(processorSucceeds);
+            _templater.Context, Path.Combine(_root, "extension-hive"), provider.GetRequiredService<IFuncTemplateComponentProvider>().Get());
+        _processor.ProcessAsync(Arg.Any<EnginePostActionContext>(), Arg.Any<CancellationToken>()).Returns(processorSucceeds);
         IPostAction action = CreateAction(_knownActionId, description: "Restore packages");
         ITemplateCreationResult result = CreateResult([action], dryRunActions: [action]);
 
         PostActionExecutionStatus status = await templater.ProcessPostActionsAsync(
-            result, isDryRun, TestContext.Current.CancellationToken);
+            _template, result, isDryRun, TestContext.Current.CancellationToken);
 
         status.Should().Be(expectedSuccess ? PostActionExecutionStatus.Success : PostActionExecutionStatus.Failure);
         if (isDryRun)
@@ -244,7 +249,7 @@ public sealed class PostActionDispatcherTests : IDisposable
         else
         {
             await _processor.Received(1).ProcessAsync(
-                Arg.Is<PostActionContext>(context => context.Environment == templater.Settings && context.Action == action),
+                Arg.Is<EnginePostActionContext>(context => context.Environment == templater.Settings && context.Action == action),
                 TestContext.Current.CancellationToken);
         }
     }
@@ -253,7 +258,7 @@ public sealed class PostActionDispatcherTests : IDisposable
     public void ProcessPostActionsAsync_MissingDispatcher_Throws()
     {
         Action act = () => _templater.ProcessPostActionsAsync(
-            CreateResult([]), isDryRun: false, TestContext.Current.CancellationToken);
+            _template, CreateResult([]), isDryRun: false, TestContext.Current.CancellationToken);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*AddTemplating*");
     }
@@ -262,7 +267,7 @@ public sealed class PostActionDispatcherTests : IDisposable
     public void ProcessPostActionsAsync_NullTemplater_Throws()
     {
         Action act = () => ((Templater)null!).ProcessPostActionsAsync(
-            CreateResult([]), isDryRun: false, TestContext.Current.CancellationToken);
+            _template, CreateResult([]), isDryRun: false, TestContext.Current.CancellationToken);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("templater");
     }
@@ -271,9 +276,18 @@ public sealed class PostActionDispatcherTests : IDisposable
     public void ProcessPostActionsAsync_NullCreationResult_Throws()
     {
         Action act = () => _templater.ProcessPostActionsAsync(
-            null!, isDryRun: false, TestContext.Current.CancellationToken);
+            _template, null!, isDryRun: false, TestContext.Current.CancellationToken);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("creationResult");
+    }
+
+    [Fact]
+    public void ProcessPostActionsAsync_NullTemplate_Throws()
+    {
+        Action act = () => _templater.ProcessPostActionsAsync(
+            null!, CreateResult([]), isDryRun: false, TestContext.Current.CancellationToken);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("template");
     }
 
     private static IPostAction CreateAction(
@@ -302,12 +316,5 @@ public sealed class PostActionDispatcherTests : IDisposable
         result.CreationEffects.Returns(effects);
         result.OutputBaseDirectory.Returns(_root);
         return result;
-    }
-
-    private sealed class Component(IPostActionProcessor processor) : ITemplateComponent
-    {
-        public Type InterfaceType => typeof(IPostActionProcessor);
-
-        public IIdentifiedComponent Instance => processor;
     }
 }

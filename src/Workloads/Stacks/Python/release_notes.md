@@ -5,6 +5,7 @@
 - Retarget the stack workload to `net11.0` for the .NET 11-based Azure Functions CLI; generated Python applications are unchanged.
 - Reject Python 3.9 virtual environments when running a Functions app. (#5959)
 - Add a workload template root with placeholder scaffolding for future Python templates. (#5960)
+- Bundle Python v2 project, HTTP trigger, and timer trigger templates in the stack workload. (#5996)
 - **Compatibility:** Requires Azure Functions CLI 5.0.0-preview.7 or later for the .NET 11 runtime and contracts.
 
 ## 1.0.0-preview.2

@@ -77,8 +77,8 @@ public class DotNetSourceProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
-        reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Info && entry.Line == "Build succeeded.");
-        reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");
+        reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsReportSeverity.Info && entry.Line == "Build succeeded.");
+        reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsReportSeverity.Error && entry.Line == "warning XYZ: heads up");
         await _dotnetCli.Received(1).RunStreamingAsync(
             Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:Build")),
             _projectDir.FullName,
@@ -243,8 +243,8 @@ public class DotNetSourceProjectTests : IDisposable
         ex.Message.Should().NotContain("KeyNotFoundException");
         ex.Message.Should().NotContain("more error");
         reporter.Logs.Should().Equal(
-            outputLines.Select(line => (line, FunctionsProjectReportSeverity.Info))
-                .Concat(errorLines.Select(line => (line, FunctionsProjectReportSeverity.Error))));
+            outputLines.Select(line => (line, FunctionsReportSeverity.Info))
+                .Concat(errorLines.Select(line => (line, FunctionsReportSeverity.Error))));
     }
 
     [Theory]
@@ -504,12 +504,12 @@ public class DotNetSourceProjectTests : IDisposable
         return arg[prefix.Length..];
     }
 
-    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    private sealed class CapturingReporter : IFunctionsReporter
     {
-        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly List<(string Line, FunctionsReportSeverity Severity)> _logs = [];
         private readonly object _gate = new();
 
-        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        public IReadOnlyList<(string Line, FunctionsReportSeverity Severity)> Logs
         {
             get
             {
@@ -524,7 +524,7 @@ public class DotNetSourceProjectTests : IDisposable
         {
         }
 
-        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        public void WriteLog(string line, FunctionsReportSeverity severity = FunctionsReportSeverity.Info)
         {
             lock (_gate)
             {

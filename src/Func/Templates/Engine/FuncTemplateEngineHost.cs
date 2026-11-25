@@ -11,12 +11,14 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 /// <param name="context">The template engine context for the current command.</param>
 /// <param name="components">The template components to expose to the engine.</param>
-internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable<ITemplateComponent> components)
+internal class FuncTemplateEngineHost(
+    TemplateEngineContext context, IReadOnlyList<ICoreTemplateComponent> components)
     : DefaultTemplateEngineHost(
         Identifier,
         AssemblyCliVersionProvider.Instance.Version,
         CreateDefaults(context),
-        FuncTemplateComponents.Get(components))
+        [.. (components ?? throw new ArgumentNullException(nameof(components)))
+            .Select(component => (component.InterfaceType, component.Instance))])
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a

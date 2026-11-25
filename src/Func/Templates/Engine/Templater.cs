@@ -16,7 +16,14 @@ internal sealed class Templater : IDisposable
     private readonly TemplatePackageManager _packageManager;
     private bool _disposed;
 
-    public Templater(TemplateEngineContext context, string settingsLocation, IEnumerable<ITemplateComponent> components)
+    /// <summary>
+    /// Initializes a templater for a command-scoped engine environment.
+    /// </summary>
+    /// <param name="context">The current command context.</param>
+    /// <param name="settingsLocation">The engine settings directory.</param>
+    /// <param name="components">The components to register with the engine.</param>
+    public Templater(
+        TemplateEngineContext context, string settingsLocation, IReadOnlyList<ICoreTemplateComponent> components)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
