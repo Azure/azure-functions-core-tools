@@ -12,8 +12,9 @@ The project template declares the standard NuGet restore post action
 for `dotnet` templates tagged with C# or F# (including `csharp`/`fsharp`
 aliases, case-insensitively). The optional `files` argument accepts source-file
 glob patterns as a semicolon-delimited string or JSON array, following
-`dotnet new`. Matched files restore in pattern and file-change order, including
-duplicates; otherwise primary outputs are used. No targets is a success.
+`dotnet new`. Unique matched targets restore in pattern and file-change order;
+otherwise primary outputs are used. Targets resolving outside the output directory
+are rejected before any restore. No targets is a success.
 Every target is attempted even after a restore failure; cancellation propagates.
 The post-action reporter is currently a no-op, so restore output and detailed
 errors are discarded; the dispatcher still displays the template's manual

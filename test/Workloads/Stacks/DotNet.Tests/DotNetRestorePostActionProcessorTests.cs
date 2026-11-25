@@ -32,11 +32,15 @@ public sealed class DotNetRestorePostActionProcessorTests
     }
 
     [Fact]
-    public async Task ProcessAsync_MixedPrimaryOutputs_RestoresEveryOutputInOrderAndStreamsOutput()
+    public async Task ProcessAsync_MixedPrimaryOutputs_RestoresUniqueOutputsInOrderAndStreamsOutput()
     {
         string csharp = Path.Combine("nested folder", "My App.csproj");
         string fsharp = Path.Combine("nested folder", "Library.FSPROJ");
-        string[] outputs = ["Program.cs", csharp, Path.Combine("nested folder", ".", "My App.csproj"), fsharp, "host.json"];
+        string[] outputs =
+        [
+            "Program.cs", csharp, Path.Combine(_outputDirectory, csharp),
+            Path.Combine("nested folder", ".", "My App.csproj"), fsharp, "host.json",
+        ];
         using CancellationTokenSource cancellation = new();
         List<string> restored = [];
         _runner.RunStreamingAsync(
@@ -62,12 +66,11 @@ public sealed class DotNetRestorePostActionProcessorTests
         restored.Should().Equal(
             Path.Combine(_outputDirectory, "Program.cs"),
             Path.Combine(_outputDirectory, csharp),
-            Path.Combine(_outputDirectory, csharp),
             Path.Combine(_outputDirectory, fsharp),
             Path.Combine(_outputDirectory, "host.json"));
-        _reporter.Received(5).WriteLog("Restored [project].", FunctionsReportSeverity.Info);
-        _reporter.Received(5).WriteLog("NU1301: source unavailable", FunctionsReportSeverity.Error);
-        _reporter.Received(5).ReportStatus(Arg.Is<string>(message => message.Contains("Restoring dependencies")));
+        _reporter.Received(4).WriteLog("Restored [project].", FunctionsReportSeverity.Info);
+        _reporter.Received(4).WriteLog("NU1301: source unavailable", FunctionsReportSeverity.Error);
+        _reporter.Received(4).ReportStatus(Arg.Is<string>(message => message.Contains("Restoring dependencies")));
     }
 
     [Theory]
@@ -126,7 +129,7 @@ public sealed class DotNetRestorePostActionProcessorTests
     }
 
     [Fact]
-    public async Task ProcessAsync_JsonArray_DoesNotSplitElementsAndPreservesDuplicates()
+    public async Task ProcessAsync_JsonArray_DoesNotSplitElementsAndRestoresUniqueTargets()
     {
         IPostActionFileMatcher matcher = Substitute.For<IPostActionFileMatcher>();
         matcher.MatchTargetPaths("*.csproj;*.fsproj").Returns(["shared.csproj"]);
@@ -139,9 +142,7 @@ public sealed class DotNetRestorePostActionProcessorTests
         bool result = await CreateProcessor().ProcessAsync(context, TestContext.Current.CancellationToken);
 
         result.Should().BeTrue();
-        restored.Should().Equal(
-            Path.Combine(_outputDirectory, "shared.csproj"),
-            Path.Combine(_outputDirectory, "shared.csproj"));
+        restored.Should().Equal(Path.Combine(_outputDirectory, "shared.csproj"));
         matcher.Received(2).MatchTargetPaths("*.csproj;*.fsproj");
     }
 
@@ -195,17 +196,19 @@ public sealed class DotNetRestorePostActionProcessorTests
         _runner.ReceivedCalls().Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task ProcessAsync_AbsoluteAndParentPrimaryOutputs_ResolvesLikeDotnetNew()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProcessAsync_PrimaryOutputOutsideOutputDirectory_ThrowsWithoutLaunching(bool rooted)
     {
-        string parent = Path.Combine("..", "Other.csproj");
-        string rooted = Path.Combine(Path.GetTempPath(), "Rooted.csproj");
-        List<string> restored = RecordTargets();
+        string outside = rooted
+            ? Path.Combine(Path.GetTempPath(), "Rooted.csproj")
+            : Path.Combine("..", "Other.csproj");
+        Func<Task> act = () => CreateProcessor().ProcessAsync(
+            Context(["App.csproj", outside]), TestContext.Current.CancellationToken);
 
-        bool result = await CreateProcessor().ProcessAsync(Context([parent, rooted]), TestContext.Current.CancellationToken);
-
-        result.Should().BeTrue();
-        restored.Should().Equal(Path.GetFullPath(parent, _outputDirectory), Path.GetFullPath(rooted, _outputDirectory));
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*resolves outside directory*");
+        _runner.ReceivedCalls().Should().BeEmpty();
     }
 
     [Theory]
