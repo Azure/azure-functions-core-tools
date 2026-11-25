@@ -42,6 +42,23 @@ public sealed class FuncTemplateComponentsProviderTests
     }
 
     [Fact]
+    public async Task AddTemplating_RegistersRunScriptPostActionProcessor()
+    {
+        ServiceCollection services = new();
+        services.AddSingleton(Substitute.For<IInteractionService>());
+        services.AddSingleton(Substitute.For<IWorkloadTemplateSource>());
+        services.AddTemplating();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+
+        IEnumerable<ICoreTemplateComponent> components = provider.GetRequiredService<IFuncTemplateComponentProvider>().Get();
+
+        components.Should().ContainSingle(component =>
+            component.InterfaceType == typeof(ICorePostActionProcessor)
+            && component.Instance is ProcessStartPostActionProcessor
+            && ((ICorePostActionProcessor)component.Instance).Id == PostActionDispatcher.RunScriptActionId);
+    }
+
+    [Fact]
     public void Get_NoCustomComponents_IncludesEdgeComponents()
     {
         IReadOnlyList<ICoreTemplateComponent> components =
