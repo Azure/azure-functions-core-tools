@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Templates.Packages;
 /// </summary>
 internal sealed class TemplatePackageValidator
 {
-    public IReadOnlyList<string> Validate(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    public TemplatePackageContents Validate(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(archive);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
@@ -58,7 +58,7 @@ internal sealed class TemplatePackageValidator
         if (packageIdentities.Except(identities, StringComparer.Ordinal).Any()
             || identities.Except(discoveredIdentities, StringComparer.Ordinal).Any())
         {
-            throw new TemplatePackageException("The installed template cache did not expose the validated package.");
+            throw new TemplatePackageException("Template discovery did not expose the validated package.");
         }
 
         foreach (ITemplateInfo template in package)
@@ -76,7 +76,22 @@ internal sealed class TemplatePackageValidator
         }
     }
 
-    private IReadOnlyList<string> ValidateCore(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    public void VerifyScanned(IEnumerable<IScanTemplateInfo> templates, TemplatePackageContents contents)
+    {
+        ArgumentNullException.ThrowIfNull(templates);
+        ArgumentNullException.ThrowIfNull(contents);
+        IScanTemplateInfo[] scanned = [.. templates];
+        string[] paths = [.. scanned.Where(template => template.IsValid).Select(template => NormalizePath(template.ConfigPlace))];
+        if (scanned.Any(template => !template.IsValid)
+            || contents.TemplatePaths.Except(paths, StringComparer.Ordinal).Any())
+        {
+            throw new TemplatePackageException("The template package contains invalid or undiscoverable template declarations.");
+        }
+    }
+
+    private static string NormalizePath(string path) => path.Replace('\\', '/').TrimStart('/');
+
+    private TemplatePackageContents ValidateCore(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
     {
         using PackageArchiveReader reader = new(archive, leaveStreamOpen: true);
         cancellationToken.ThrowIfCancellationRequested();
@@ -95,9 +110,11 @@ internal sealed class TemplatePackageValidator
         }
 
         List<string> identities = [];
+        List<string> templatePaths = [];
         foreach (string path in reader.GetFiles().Where(p => p.EndsWith(".template.config/template.json", StringComparison.OrdinalIgnoreCase)))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            templatePaths.Add(NormalizePath(path));
             using Stream content = reader.GetStream(path);
             using var declaration = JsonDocument.Parse(content, new JsonDocumentOptions
             {
@@ -127,6 +144,8 @@ internal sealed class TemplatePackageValidator
             throw new TemplatePackageException("The archive must contain at least one template identity.");
         }
 
-        return [.. identities.Distinct(StringComparer.Ordinal)];
+        return new([.. identities.Distinct(StringComparer.Ordinal)], templatePaths);
     }
 }
+
+internal sealed record TemplatePackageContents(IReadOnlyList<string> Identities, IReadOnlyList<string> TemplatePaths);

@@ -105,7 +105,9 @@ package ID and version, the `FuncTemplate` package type, and no workload
 package type. Require valid `func.host.json` metadata and at least one
 template identity. A standard `Template` package type alone is not sufficient
 for this initial catalog. Leave archive path safety and template-format
-validation to NuGet and Microsoft.TemplateEngine.
+validation to NuGet and Microsoft.TemplateEngine. Scan the staged archive in a
+temporary, isolated engine hive before changing the shared hive, so templates
+from other packages cannot mask invalid declarations with the same identity.
 
 Pass the validated local `.nupkg` to Microsoft.TemplateEngine's built-in
 managed NuGet provider. The engine owns package registration, storage and

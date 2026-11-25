@@ -17,4 +17,9 @@ internal interface ITemplaterFactory
     /// Creates a templater bound to <paramref name="context"/>. The caller disposes it when the command is finished.
     /// </summary>
     public Templater Create(TemplateEngineContext context);
+
+    /// <summary>
+    /// Creates a templater with an isolated settings directory and no external package providers.
+    /// </summary>
+    public Templater CreateIsolated(TemplateEngineContext context, string settingsLocation);
 }

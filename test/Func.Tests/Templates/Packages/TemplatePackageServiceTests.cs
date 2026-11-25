@@ -271,10 +271,40 @@ public sealed class TemplatePackageServiceTests : IDisposable
         Func<Task> act = () => InstallAsync("2.0.0");
 
         await act.Should().ThrowAsync<TemplatePackageException>();
-        _factory.Installations.Should().Be(includeTemplates ? installations + 2 : installations);
-        _factory.Uninstallations.Should().Be(includeTemplates ? 2 : 0);
+        _factory.Installations.Should().Be(installations);
+        _factory.Uninstallations.Should().Be(0);
         AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Install_InvalidSharedIdentityFailsBeforeMutatingHive(bool replacement)
+    {
+        await InstallAsync("1.0.0");
+        if (replacement)
+        {
+            _catalog.Archive = MakeArchive(packageId: "other.templates", includeOnlyItemTemplate: true);
+            await _service.InstallAsync("other.templates", "1.0.0", null, false, TestContext.Current.CancellationToken);
+        }
+
+        int installations = _factory.Installations;
+        int uninstallations = _factory.Uninstallations;
+        _catalog.Archive = MakeArchive(replacement ? "2.0.0" : "1.0.0", invalidTemplate: true,
+            packageId: "other.templates", includeOnlyItemTemplate: true);
+
+        Func<Task> act = () => _service.InstallAsync("other.templates", replacement ? "2.0.0" : "1.0.0",
+            null, false, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<TemplatePackageException>();
+        _factory.Installations.Should().Be(installations);
+        _factory.Uninstallations.Should().Be(uninstallations);
+        using var templater = _factory.Create(Context());
+        var packages = await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken);
+        packages.Should().Contain(package => package.Identifier == "test.templates" && package.Version == "1.0.0");
+        packages.Count(package => package.Identifier == "other.templates").Should().Be(replacement ? 1 : 0);
+        AssertTemporaryFilesRemoved();
     }
 
     [Fact]
@@ -290,6 +320,54 @@ public sealed class TemplatePackageServiceTests : IDisposable
         _factory.Uninstallations.Should().Be(0);
         AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
+    }
+
+    [Fact]
+    public async Task Install_InvalidDuplicateIdentityInsideArchiveFailsBeforeMutation()
+    {
+        using var buffer = new MemoryStream();
+        buffer.Write(MakeArchive(includeOnlyItemTemplate: true));
+        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Update, leaveOpen: true))
+        {
+            using var writer = new StreamWriter(zip.CreateEntry("invalid/.template.config/template.json").Open());
+            writer.Write($$"""{"identity":"{{TemplateFixtures.ItemTemplateIdentity}}"}""");
+        }
+
+        _catalog.Archive = buffer.ToArray();
+        Func<Task> act = () => InstallAsync("1.0.0");
+
+        await act.Should().ThrowAsync<TemplatePackageException>();
+        Directory.Exists(_factory.HivePath).Should().BeFalse();
+        _factory.Installations.Should().Be(0);
+        AssertTemporaryFilesRemoved();
+    }
+
+    [Fact]
+    public async Task Install_ValidDuplicateIdentitiesInsideArchiveRemainSupported()
+    {
+        using var buffer = new MemoryStream();
+        buffer.Write(MakeArchive(includeOnlyItemTemplate: true));
+        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Update, leaveOpen: true))
+        {
+            string declaration;
+            using (var reader = new StreamReader(zip.GetEntry("item/.template.config/template.json")!.Open()))
+            {
+                declaration = reader.ReadToEnd();
+            }
+
+            using var writer = new StreamWriter(zip.CreateEntry("duplicate/.template.config/template.json").Open());
+            writer.Write(declaration);
+        }
+
+        _catalog.Archive = buffer.ToArray();
+
+        await InstallAsync("1.0.0");
+
+        using var templater = _factory.Create(Context());
+        (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Should().ContainSingle();
+        (await templater.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().ContainSingle()
+            .Which.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+        AssertTemporaryFilesRemoved();
     }
 
     [Fact]
@@ -481,6 +559,31 @@ public sealed class TemplatePackageServiceTests : IDisposable
         await AssertInstalledVersionAsync("1.0.0");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancellationDuringSecondLookupDoesNotRecoverUnchangedPackage(bool uninstall)
+    {
+        await InstallAsync("1.0.0");
+        _catalog.Archive = MakeArchive("2.0.0");
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        _factory.LookupCount = 0;
+        _factory.CancelLookup = cancellation;
+        int installations = _factory.Installations;
+        int uninstallations = _factory.Uninstallations;
+
+        Func<Task> act = uninstall
+            ? () => _service.UninstallAsync("test.templates", cancellation.Token)
+            : () => _service.InstallAsync("test.templates", "2.0.0", null, false, cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _factory.CancelLookup.Should().BeNull();
+        _factory.Installations.Should().Be(installations);
+        _factory.Uninstallations.Should().Be(uninstallations);
+        await AssertInstalledVersionAsync("1.0.0");
+        AssertTemporaryFilesRemoved();
+    }
+
     [Fact]
     public async Task Install_BackupFailureNeverMutatesPreviousInstallation()
     {
@@ -582,7 +685,8 @@ public sealed class TemplatePackageServiceTests : IDisposable
         string directory = TemplateFixtures.WriteBasicPackage(_root, hostJson);
         if (invalidTemplate)
         {
-            File.WriteAllText(Path.Combine(directory, "item", ".template.config", "template.json"), """{"identity":"Invalid"}""");
+            File.WriteAllText(Path.Combine(directory, "item", ".template.config", "template.json"),
+                $$"""{"identity":"{{TemplateFixtures.ItemTemplateIdentity}}"}""");
         }
         else if (itemNameOverride is not null)
         {
@@ -657,11 +761,31 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
         internal CancellationTokenSource? CancelCache { get; set; }
 
+        internal CancellationTokenSource? CancelLookup { get; set; }
+
+        internal int LookupCount { get; set; }
+
         public Templater Create(TemplateEngineContext context) => new FaultTemplater(context, HivePath, this);
+
+        public Templater CreateIsolated(TemplateEngineContext context, string settingsLocation)
+            => new(context, settingsLocation, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get());
 
         private sealed class FaultTemplater(TemplateEngineContext context, string hive, TestFactory factory)
             : Templater(context, hive, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get())
         {
+            internal override async Task<IReadOnlyList<IManagedTemplatePackage>> GetManagedPackagesAsync(CancellationToken cancellationToken)
+            {
+                factory.LookupCount++;
+                if (factory.LookupCount == 2 && factory.CancelLookup is { } cancellation)
+                {
+                    factory.CancelLookup = null;
+                    await cancellation.CancelAsync();
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                return await base.GetManagedPackagesAsync(cancellationToken);
+            }
+
             internal override async Task<InstallResult> InstallAsync(InstallRequest request, CancellationToken cancellationToken)
             {
                 factory.Installations++;

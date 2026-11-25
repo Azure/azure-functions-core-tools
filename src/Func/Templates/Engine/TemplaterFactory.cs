@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Configuration;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -31,5 +32,15 @@ internal sealed class TemplaterFactory(
     {
         ArgumentNullException.ThrowIfNull(context);
         return new Templater(context, HivePath, _componentProvider.Get());
+    }
+
+    public Templater CreateIsolated(TemplateEngineContext context, string settingsLocation)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
+        HashSet<Guid> builtInIds = [.. Microsoft.TemplateEngine.Edge.Components.AllComponents.Select(component => component.Instance.Id)];
+        ICoreTemplateComponent[] components = [.. _componentProvider.Get()
+            .Where(component => component.Instance is not ITemplatePackageProviderFactory || builtInIds.Contains(component.Instance.Id))];
+        return new Templater(context, settingsLocation, components);
     }
 }

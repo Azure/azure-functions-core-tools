@@ -57,7 +57,7 @@ internal class Templater : IDisposable
         return new([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
     }
 
-    internal Task<IReadOnlyList<IManagedTemplatePackage>> GetManagedPackagesAsync(CancellationToken cancellationToken)
+    internal virtual Task<IReadOnlyList<IManagedTemplatePackage>> GetManagedPackagesAsync(CancellationToken cancellationToken)
         => _packageManager.GetManagedTemplatePackagesAsync(true, cancellationToken);
 
     internal virtual Task<IReadOnlyList<ITemplateInfo>> GetTemplatesAsync(CancellationToken cancellationToken)

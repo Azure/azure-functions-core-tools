@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
+using Microsoft.TemplateEngine.Edge.Settings;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Templates.Packages;
@@ -59,7 +60,8 @@ internal class TemplatePackageService(
         await using Stream staged = _fileSystem.OpenReadIfExists(packagePath)
             ?? throw new TemplatePackageException("The downloaded template package could not be staged.");
         await _verifier.VerifyAsync(staged, cancellationToken);
-        IReadOnlyList<string> identities = _validator.Validate(staged, packageId, resolvedVersion, cancellationToken);
+        TemplatePackageContents contents = _validator.Validate(staged, packageId, resolvedVersion, cancellationToken);
+        await ValidateDiscoveryAsync(packagePath, Path.Combine(download.Path, "staged-hive"), contents, cancellationToken);
         string? backupPath = null;
         IReadOnlyList<string> previousIdentities = [];
         NuGetVersion? previousVersion = null;
@@ -71,28 +73,33 @@ internal class TemplatePackageService(
             await using (Stream backup = _fileSystem.OpenReadIfExists(backupPath)
                 ?? throw new TemplatePackageException("The previous template package could not be backed up."))
             {
-                previousIdentities = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+                TemplatePackageContents previousContents = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+                previousIdentities = previousContents.Identities;
+                await ValidateDiscoveryAsync(backupPath, Path.Combine(download.Path, "backup-hive"), previousContents, cancellationToken);
             }
         }
 
         inspection?.Dispose();
         cancellationToken.ThrowIfCancellationRequested();
         bool completed = false;
+        bool mutationStarted = false;
         try
         {
             using Templater templater = CreateTemplater();
             IManagedTemplatePackage? installed = await FindInstalledAsync(templater, packageId, cancellationToken);
             if (installed is not null)
             {
+                mutationStarted = true;
                 await RemoveAsync(templater, installed, cancellationToken);
             }
 
-            await InstallArchiveAsync(templater, packagePath, packageId, resolvedVersion, identities, cancellationToken);
+            mutationStarted = true;
+            await InstallArchiveAsync(templater, packagePath, packageId, resolvedVersion, contents.Identities, cancellationToken);
             completed = true;
         }
         finally
         {
-            if (!completed)
+            if (mutationStarted && !completed)
             {
                 // Recovery must finish even when the operation's token was canceled.
                 await RecoverAsync(packageId, backupPath, previousVersion, previousIdentities, CancellationToken.None);
@@ -130,17 +137,21 @@ internal class TemplatePackageService(
         await using (Stream backup = _fileSystem.OpenReadIfExists(backupPath)
             ?? throw new TemplatePackageException("The previous template package could not be backed up."))
         {
-            identities = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+            TemplatePackageContents contents = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+            identities = contents.Identities;
+            await ValidateDiscoveryAsync(backupPath, Path.Combine(recovery.Path, "backup-hive"), contents, cancellationToken);
         }
 
         inspection.Dispose();
         cancellationToken.ThrowIfCancellationRequested();
         bool completed = false;
+        bool mutationStarted = false;
         try
         {
             using Templater templater = CreateTemplater();
             IManagedTemplatePackage current = await FindInstalledAsync(templater, packageId, cancellationToken)
                 ?? throw new TemplatePackageException($"Template package '{packageId}' is no longer installed.");
+            mutationStarted = true;
             await RemoveAsync(templater, current, cancellationToken);
             await templater.RefreshAsync(cancellationToken);
             if (await FindInstalledAsync(templater, packageId, cancellationToken) is not null)
@@ -154,7 +165,7 @@ internal class TemplatePackageService(
         }
         finally
         {
-            if (!completed)
+            if (mutationStarted && !completed)
             {
                 await RecoverAsync(packageId, backupPath, previousVersion, identities, CancellationToken.None);
             }
@@ -166,6 +177,14 @@ internal class TemplatePackageService(
     private TemplateEngineContext Context => new(WorkingDirectory.FromExplicit(HiveParent));
 
     private Templater CreateTemplater() => _factory.Create(Context);
+
+    private async Task ValidateDiscoveryAsync(string path, string settingsLocation, TemplatePackageContents contents, CancellationToken cancellationToken)
+    {
+        using Templater templater = _factory.CreateIsolated(Context, settingsLocation);
+        Scanner scanner = new(templater.Settings);
+        using ScanResult result = await scanner.ScanAsync(path, logValidationResults: false, returnInvalidTemplates: true, cancellationToken);
+        _validator.VerifyScanned(result.Templates, contents);
+    }
 
     private async Task InstallArchiveAsync(
         Templater templater, string path, string packageId, NuGetVersion version, IReadOnlyList<string> identities, CancellationToken cancellationToken)
