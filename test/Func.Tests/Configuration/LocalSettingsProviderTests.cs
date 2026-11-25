@@ -42,7 +42,8 @@ public sealed class LocalSettingsProviderTests : IDisposable
               "Host": {
                 "LocalHttpPort": 7072,
                 "CORS": "http://localhost,http://example",
-                "CORSCredentials": true
+                "CORSCredentials": true,
+                "LocalHttpAddress": "0.0.0.0"
               }
             }
             """);
@@ -59,6 +60,7 @@ public sealed class LocalSettingsProviderTests : IDisposable
         snapshot.Host!.LocalHttpPort.Should().Be(7072);
         snapshot.Host.Cors.Should().Be("http://localhost,http://example");
         snapshot.Host.CorsCredentials.Should().BeTrue();
+        snapshot.Host.HasLocalHttpAddress.Should().BeTrue();
     }
 
     [Theory]
@@ -182,6 +184,16 @@ public sealed class LocalSettingsProviderTests : IDisposable
 
         snapshot.Values.Should().BeEmpty();
         snapshot.LoadError.Should().Be("The file must contain a JSON object.");
+    }
+
+    [Fact]
+    public void Get_UndecodableLocalHttpAddress_IsRecordedWithoutReadingValue()
+    {
+        WriteSettings("""{ "Host": { "LocalHttpAddress": "\uD800" } }""");
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.Host!.HasLocalHttpAddress.Should().BeTrue();
     }
 
     [Fact]

@@ -190,6 +190,17 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     }
 
     [Fact]
+    public async Task LocalHttpAddress_WarnsThatItIsIgnored()
+    {
+        SetLocalSettingsJson("""{ "Host": { "LocalHttpAddress": "0.0.0.0" } }""");
+        StartInitializationStepContext context = NewContext();
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("Host.LocalHttpAddress")));
+    }
+
+    [Fact]
     public async Task EmptyKey_IsSkippedAndWarns()
     {
         SetLocalSettings(new() { [string.Empty] = "anything" });

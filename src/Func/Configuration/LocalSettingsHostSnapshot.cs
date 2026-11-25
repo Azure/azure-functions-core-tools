@@ -10,4 +10,6 @@ internal sealed class LocalSettingsHostSnapshot
     public string? Cors { get; init; }
 
     public bool? CorsCredentials { get; init; }
+
+    public bool HasLocalHttpAddress { get; init; }
 }

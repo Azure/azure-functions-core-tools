@@ -42,3 +42,6 @@ separate work.
   `@Microsoft.KeyVault(SecretUri=...)` are not resolved. `func start` warns and
   passes the reference text to the app unchanged. v4 resolved them with the
   signed-in Azure identity.
+- **`Host.LocalHttpAddress`:** ignored with a warning; the Functions Host
+  always listens on `localhost`. `LocalHttpPort`, `CORS`, and `CORSCredentials`
+  are still supported.

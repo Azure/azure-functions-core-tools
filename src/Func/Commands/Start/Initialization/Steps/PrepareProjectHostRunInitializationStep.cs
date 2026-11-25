@@ -99,6 +99,10 @@ internal sealed class PrepareProjectHostRunInitializationStep(
                 isUserError: true);
         }
 
+        if (localSettings.Host?.HasLocalHttpAddress == true)
+        {
+            _interaction.WriteWarning("Ignoring Host.LocalHttpAddress in local.settings.json: the Functions Host always listens on localhost.");
+        }
 
         if (localSettings.SkippedNonStringValueNames.Count > 0)
         {

@@ -109,6 +109,7 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
             LocalHttpPort = ReadNullableInt32(host, "LocalHttpPort"),
             Cors = ReadNullableString(host, "CORS"),
             CorsCredentials = ReadNullableBoolean(host, "CORSCredentials"),
+            HasLocalHttpAddress = host.TryGetProperty("LocalHttpAddress", out _),
         };
     }
 
