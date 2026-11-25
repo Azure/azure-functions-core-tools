@@ -429,7 +429,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
 
         int exitCode = await root.Parse([command, _tempDir, "--format", "plain", "--port", "0", "--no-build", "--no-azurite"])
-            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            .InvokeAsync(
+                new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+                TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         await _initializationRunner.Received(1).RunAsync(
@@ -498,7 +500,9 @@ public class StartCommandTests : IDisposable
         var root = new RootCommand { cmd };
 
         int exitCode = await root.Parse([command, _tempDir, "--format", "plain", "--port", "0", "--address", address])
-            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            .InvokeAsync(
+                new InvocationConfiguration { EnableDefaultExceptionHandler = false },
+                TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
         await _initializationRunner.Received(1).RunAsync(
