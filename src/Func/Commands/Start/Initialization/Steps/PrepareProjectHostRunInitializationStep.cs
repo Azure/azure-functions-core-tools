@@ -97,6 +97,15 @@ internal sealed class PrepareProjectHostRunInitializationStep(
                 isUserError: true);
         }
 
+
+        if (localSettings.SkippedNonStringValueNames.Count > 0)
+        {
+            string names = string.Join(",", localSettings.SkippedNonStringValueNames.Select(name => $"\"{name}\""));
+            _interaction.WriteWarning(
+                $"Skipping the following keys [{names}] from local.settings.json: values must be strings. "
+                + "Quote numbers and booleans, and store each nested value as its own string setting.");
+        }
+
         var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         MergeLocalSettingsValues(localSettings.Values, environmentVariables);
 

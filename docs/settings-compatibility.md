@@ -32,3 +32,9 @@ separate work.
 - **Malformed files:** if `local.settings.json` is not valid JSON, or its root
   is not a JSON object, `func start` warns, ignores the file, and continues.
   The warning includes the parser's line and position.
+- **Non-string values:** `Values` entries must be strings, as they become
+  environment variables. Numbers, booleans, `null`, nested objects, and arrays
+  are skipped with a single warning that lists their keys. Quote numbers and
+  booleans, and store each nested value as its own string setting. v4 converted
+  numbers and booleans to strings and failed to load the whole file on nested
+  values.

@@ -16,6 +16,8 @@ internal sealed class LocalSettingsSnapshot
 
     public string? LoadError { get; init; }
 
+    public IReadOnlyList<string> SkippedNonStringValueNames { get; init; } = [];
+
     public string? WorkerRuntime =>
         !IsEncrypted
             && Values.TryGetValue(CliConfigurationNames.WorkerRuntimeSettingName, out string? value)

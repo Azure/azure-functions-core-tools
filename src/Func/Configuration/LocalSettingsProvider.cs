@@ -43,11 +43,13 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
             }
 
             bool isEncrypted = ReadNullableBoolean(document.RootElement, "IsEncrypted") == true;
+            IReadOnlyDictionary<string, string> values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : ReadValues(document.RootElement);
 
             return new LocalSettingsSnapshot
             {
                 IsEncrypted = isEncrypted,
-                Values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : ReadValues(document.RootElement),
+                Values = values,
+                SkippedNonStringValueNames = isEncrypted ? [] : ReadSkippedValueNames(document.RootElement, values),
                 Host = ReadHost(document.RootElement),
             };
         }
@@ -75,6 +77,23 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<string> ReadSkippedValueNames(JsonElement root, IReadOnlyDictionary<string, string> loadedValues)
+    {
+        if (!root.TryGetProperty(CliConfigurationNames.LocalSettingsValuesSectionName, out JsonElement values)
+            || values.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+
+        return
+        [
+            .. values.EnumerateObject()
+                .Where(p => p.Value.ValueKind != JsonValueKind.String && !loadedValues.ContainsKey(p.Name))
+                .Select(p => p.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase),
+        ];
     }
 
     private static LocalSettingsHostSnapshot? ReadHost(JsonElement root)

@@ -54,6 +54,7 @@ public sealed class LocalSettingsProviderTests : IDisposable
         snapshot.WorkerRuntime.Should().Be("python");
         snapshot.Values["AzureWebJobsStorage"].Should().Be("UseDevelopmentStorage=true");
         snapshot.Values.ContainsKey("IgnoredNumber").Should().BeFalse();
+        snapshot.SkippedNonStringValueNames.Should().Equal("IgnoredNumber");
         snapshot.Host.Should().NotBeNull();
         snapshot.Host!.LocalHttpPort.Should().Be(7072);
         snapshot.Host.Cors.Should().Be("http://localhost,http://example");
@@ -109,6 +110,40 @@ public sealed class LocalSettingsProviderTests : IDisposable
         snapshot.IsEncrypted.Should().BeTrue();
         snapshot.Values.Should().BeEmpty();
         snapshot.WorkerRuntime.Should().BeNull();
+        snapshot.SkippedNonStringValueNames.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Get_NonStringValues_AreSkippedAndRecorded()
+    {
+        WriteSettings(
+            """
+            {
+              "Values": {
+                "Kept": "value",
+                "Nested": { "Child": "x" },
+                "List": ["a"],
+                "Flag": true,
+                "Missing": null
+              }
+            }
+            """);
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.Values.Keys.Should().Equal("Kept");
+        snapshot.SkippedNonStringValueNames.Should().Equal("Nested", "List", "Flag", "Missing");
+    }
+
+    [Fact]
+    public void Get_DuplicateValueNames_RecordsOnlyUnloadedNamesOnce()
+    {
+        WriteSettings("""{ "Values": { "Mixed": 1, "Mixed": "loaded", "Repeated": 1, "repeated": true } }""");
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.Values["Mixed"].Should().Be("loaded");
+        snapshot.SkippedNonStringValueNames.Should().Equal("Repeated");
     }
 
     [Fact]

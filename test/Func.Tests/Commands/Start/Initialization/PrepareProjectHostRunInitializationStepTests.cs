@@ -152,6 +152,18 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     }
 
     [Fact]
+    public async Task NonStringValues_WarnOnceListingKeysAndContinueStartup()
+    {
+        SetLocalSettingsJson("""{ "Values": { "Kept": "value", "Nested": { "Child": "x" }, "Flag": true } }""");
+        StartInitializationStepContext context = NewContext();
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        context.State.HostRunContext!.EnvironmentVariables["Kept"].Should().Be("value");
+        _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("""["Nested","Flag"]""") && m.Contains("must be strings")));
+    }
+
+    [Fact]
     public async Task EmptyKey_IsSkippedAndWarns()
     {
         SetLocalSettings(new() { [string.Empty] = "anything" });
