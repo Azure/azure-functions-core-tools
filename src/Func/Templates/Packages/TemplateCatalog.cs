@@ -21,7 +21,7 @@ internal class TemplateCatalog(
     private readonly Func<PackageSource, NuGetProtocolSourceClient> _clients = clients ?? throw new ArgumentNullException(nameof(clients));
 
     /// <summary>
-    /// Resolves an exact version, preferring the latest stable release unless prereleases are requested.
+    /// Resolves an exact version, preferring the latest listed stable release unless prereleases are requested.
     /// </summary>
     /// <exception cref="ArgumentException">The source is not an HTTP(S) feed URI.</exception>
     /// <exception cref="TemplatePackageException">The package ID, version, or requested combination is invalid or unavailable.</exception>
@@ -47,7 +47,7 @@ internal class TemplateCatalog(
         }
 
         IReadOnlyList<NuGetVersion> versions = await FromSourceAsync(
-            () => _clients(feed).ListVersionsAsync(packageId, cancellationToken), feed.Source, cancellationToken);
+            () => _clients(feed).ListListedVersionsAsync(packageId, cancellationToken), feed.Source, cancellationToken);
 
         return versions.Where(v => prerelease || !v.IsPrerelease).Max()
             ?? throw new TemplatePackageException($"No matching version of '{packageId}' was found on '{feed.Source}'. Check --source or use --prerelease.");
@@ -122,7 +122,7 @@ internal class TemplateCatalog(
         {
             throw new TemplatePackageException($"Cannot reach template feed '{source}'. Check --source and connectivity.", ex);
         }
-        catch (InvalidOperationException ex)
+        catch (NuGetResourceUnavailableException ex)
         {
             throw new TemplatePackageException($"Template feed '{source}' does not provide the required V3 service. Check --source.", ex);
         }

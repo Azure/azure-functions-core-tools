@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Templates.Packages;
 internal sealed class TemplateCatalogOptionsSetup(IProcessEnvironment environment)
     : IConfigureOptions<TemplateCatalogOptions>
 {
-    internal const string SourceEnvironmentVariable = "FUNC_CLI_TEMPLATES_SOURCE";
+    private const string SourceEnvironmentVariable = "FUNC_CLI_TEMPLATES_SOURCE";
 
     private readonly IProcessEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
 

@@ -80,10 +80,10 @@ workstream. The stub must be implemented before enabling the search command.
 
 ## Install
 
-Without `--version`, resolve the latest stable version by default;
-`--prerelease` permits prerelease versions. An explicit `--version` pins an
-exact NuGet version, including four-component versions such as `1.2.3.4` and
-an explicitly requested prerelease version. Version ranges are not accepted.
+Without `--version`, resolve the latest listed stable version by default;
+`--prerelease` permits listed prerelease versions. An explicit `--version` pins
+an exact NuGet version, including unlisted or prerelease versions and
+four-component versions such as `1.2.3.4`. Version ranges are not accepted.
 Reject invalid package IDs and versions before changing installed state.
 `--version` and `--prerelease` are mutually exclusive: choose either an exact
 version or prerelease-inclusive latest-version resolution.

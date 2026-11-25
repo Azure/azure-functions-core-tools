@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Tests.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using NuGet.Packaging.Core;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 
@@ -64,15 +65,15 @@ public sealed class TemplateCatalogTests
     [InlineData(true, "2.0.0-preview.1")]
     public async Task ResolveVersion_PrefersStableUnlessRequested(bool prerelease, string expected)
     {
-        var versions = Substitute.For<FindPackageByIdResource>();
-        versions.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
-            Arg.Any<CancellationToken>()).Returns([NuGetVersion.Parse("1.0.0"), NuGetVersion.Parse("2.0.0-preview.1")]);
+        var versions = Metadata(("1.0.0", true), ("2.0.0-preview.1", true), ("3.0.0", false), ("4.0.0-preview.1", false));
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
             source => new NuGetProtocolSourceClient(TestRepository.Build(source, versions)));
 
         var result = await catalog.ResolveVersionAsync("test.templates", null, "https://feed.test/index.json", prerelease, CancellationToken.None);
 
         result.ToNormalizedString().Should().Be(expected);
+        await versions.Received(1).GetMetadataAsync("test.templates", true, false, Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -88,8 +89,7 @@ public sealed class TemplateCatalogTests
         {
             requestedSources.Add(source.Source);
             var resource = Substitute.For<FindPackageByIdResource>();
-            resource.GetAllVersionsAsync("test.templates", Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
-                Arg.Any<CancellationToken>()).Returns([version]);
+            var metadata = Metadata(("2.0.0", true));
             resource.CopyNupkgToStreamAsync(
                 "test.templates", version, Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
                 Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(async call =>
@@ -97,7 +97,7 @@ public sealed class TemplateCatalogTests
                     await call.ArgAt<Stream>(2).WriteAsync(payload, call.ArgAt<CancellationToken>(5));
                     return true;
                 });
-            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource));
+            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource, metadata));
         });
 
         var resolved = await catalog.ResolveVersionAsync("test.templates", null, explicitSource, false, TestContext.Current.CancellationToken);
@@ -153,9 +153,7 @@ public sealed class TemplateCatalogTests
     [Fact]
     public async Task ResolveVersion_DefaultRejectsAPrereleaseOnlyFeed()
     {
-        var resource = Substitute.For<FindPackageByIdResource>();
-        resource.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
-            Arg.Any<CancellationToken>()).Returns([NuGetVersion.Parse("1.0.0-preview.1")]);
+        var resource = Metadata(("1.0.0-preview.1", true));
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
             source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)));
 
@@ -171,15 +169,17 @@ public sealed class TemplateCatalogTests
     {
         int requests = 0;
         var resource = Substitute.For<FindPackageByIdResource>();
-        resource.GetAllVersionsAsync(Arg.Any<string>(), Arg.Any<SourceCacheContext>(), Arg.Any<NuGet.Common.ILogger>(),
-            Arg.Any<CancellationToken>()).Returns(Task.FromException<IEnumerable<NuGetVersion>>(new FatalProtocolException("feed unavailable")));
+        var metadata = Substitute.For<PackageMetadataResource>();
+        metadata.GetMetadataAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IEnumerable<IPackageSearchMetadata>>(new FatalProtocolException("feed unavailable")));
         resource.CopyNupkgToStreamAsync(Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(), Arg.Any<SourceCacheContext>(),
             Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<bool>(new FatalProtocolException("feed unavailable")));
         var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { Source = "https://env.test/index.json" }), source =>
         {
             requests++;
             source.Source.Should().Be("https://explicit.test/index.json");
-            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource));
+            return new NuGetProtocolSourceClient(TestRepository.Build(source, resource, metadata));
         });
 
         Func<Task> act = () => download
@@ -219,5 +219,64 @@ public sealed class TemplateCatalogTests
         await resolve.Should().ThrowAsync<ArgumentException>();
         await exact.Should().ThrowAsync<ArgumentException>();
         await download.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task ResolveVersion_OnlyUnlistedVersionsReportsNoMatch()
+    {
+        var metadata = Metadata(("1.0.0", false), ("2.0.0-preview.1", false));
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source, metadata)));
+
+        Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", null, null, true, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*No matching version*");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CatalogOperations_MissingResourceReportsFeedFailure(bool download)
+    {
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source)));
+
+        Func<Task> act = () => download
+            ? catalog.OpenPackageAsync("test.templates", NuGetVersion.Parse("1.0.0"), null, TestContext.Current.CancellationToken)
+            : catalog.ResolveVersionAsync("test.templates", null, null, false, TestContext.Current.CancellationToken);
+
+        var exception = await act.Should().ThrowAsync<TemplatePackageException>();
+        exception.WithMessage("*required V3 service*").WithInnerException<NuGetResourceUnavailableException>();
+    }
+
+    [Fact]
+    public async Task ResolveVersion_UnexpectedInvalidOperationIsNotMisreportedAsMissingResource()
+    {
+        var resource = Substitute.For<PackageMetadataResource>();
+        var failure = new InvalidOperationException("unexpected failure");
+        resource.GetMetadataAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IEnumerable<IPackageSearchMetadata>>(failure));
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
+            source => new NuGetProtocolSourceClient(TestRepository.Build(source, resource)));
+
+        Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", null, null, false, TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(failure);
+    }
+
+    private static PackageMetadataResource Metadata(params (string Version, bool Listed)[] versions)
+    {
+        var resource = Substitute.For<PackageMetadataResource>();
+        var results = versions.Select(version =>
+        {
+            var metadata = Substitute.For<IPackageSearchMetadata>();
+            metadata.Identity.Returns(new PackageIdentity("test.templates", NuGetVersion.Parse(version.Version)));
+            metadata.IsListed.Returns(version.Listed);
+            return metadata;
+        }).ToList();
+        resource.GetMetadataAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>()).Returns(results);
+        return resource;
     }
 }

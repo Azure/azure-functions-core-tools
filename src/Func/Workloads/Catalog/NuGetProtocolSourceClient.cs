@@ -59,6 +59,17 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return versions?.ToList() ?? [];
     }
 
+    public async Task<IReadOnlyList<NuGetVersion>> ListListedVersionsAsync(string packageId, CancellationToken cancellationToken)
+    {
+        PackageMetadataResource metadata = await GetRequiredResourceAsync<PackageMetadataResource>(cancellationToken);
+        using var cache = new SourceCacheContext();
+
+        IEnumerable<IPackageSearchMetadata> versions = await metadata.GetMetadataAsync(
+            packageId, includePrerelease: true, includeUnlisted: false, cache, NullLogger.Instance, cancellationToken);
+
+        return versions.Where(version => version.IsListed).Select(version => version.Identity.Version).ToList();
+    }
+
     public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken)
     {
         // Spool to a temp file so the caller gets a seekable stream that
@@ -113,7 +124,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         where T : class, INuGetResource
     {
         T? resource = await _repository.GetResourceAsync<T>(cancellationToken);
-        return resource ?? throw new InvalidOperationException(
+        return resource ?? throw new NuGetResourceUnavailableException(
             $"Source '{Source.Source}' does not provide the NuGet resource '{typeof(T).Name}'.");
     }
 
