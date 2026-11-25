@@ -110,7 +110,7 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         }
 
         await using var host = new TemplateTestHost(packageRoot);
-        ITemplateInfo template = await host.GetTemplateAsync("func-dotnet", TestContext.Current.CancellationToken);
+        ITemplateInfo template = await host.GetTemplateAsync("func-dotnet", cancellationToken: TestContext.Current.CancellationToken);
 
         ITemplateCreationResult result = await host.InstantiateAsync(
             template, "Sample.App", new Dictionary<string, string?> { ["NoHttp"] = "true" },
