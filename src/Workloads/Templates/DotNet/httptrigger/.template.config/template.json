@@ -19,6 +19,21 @@
       "defaultValue": "Company.Function",
       "description": "The namespace for the function.",
       "replaces": "FunctionNamespace"
+    },
+    "AuthorizationLevel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "Function",
+      "description": "The authorization level for the HTTP trigger.",
+      "choices": [
+        { "choice": "Anonymous", "description": "No key is required." },
+        { "choice": "Function", "description": "A function or host key is required." },
+        { "choice": "Admin", "description": "The master key is required." }
+      ],
+      "replaces": "Function",
+      "onlyIf": [
+        { "after": "AuthorizationLevel." }
+      ]
     }
   },
   "primaryOutputs": [

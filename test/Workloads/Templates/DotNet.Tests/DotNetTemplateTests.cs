@@ -82,6 +82,50 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task Project_DefaultExclusions_OmitBuildAndUserFiles()
+    {
+        string source = Path.Combine(AppContext.BaseDirectory, "content", "templates", "project");
+        string packageRoot = Path.Combine(_host.Root, "templates");
+        string projectRoot = Path.Combine(packageRoot, "project");
+        foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            string destination = Path.Combine(projectRoot, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination);
+        }
+
+        string[] excludedFiles =
+        [
+            Path.Combine("bin", "artifact.dll"),
+            Path.Combine("obj", "generated.txt"),
+            "settings.user",
+            "packages.lock.json",
+        ];
+        foreach (string relativePath in excludedFiles)
+        {
+            string path = Path.Combine(projectRoot, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "excluded");
+        }
+
+        await using var host = new TemplateTestHost(packageRoot);
+        ITemplateInfo template = await host.GetTemplateAsync("func-dotnet", TestContext.Current.CancellationToken);
+
+        ITemplateCreationResult result = await host.InstantiateAsync(
+            template, "Sample.App", new Dictionary<string, string?> { ["NoHttp"] = "true" },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+        foreach (string relativePath in excludedFiles)
+        {
+            File.Exists(Path.Combine(result.OutputBaseDirectory!, relativePath)).Should().BeFalse();
+        }
+
+        Directory.Exists(Path.Combine(result.OutputBaseDirectory!, ".template.config")).Should().BeFalse();
+        File.Exists(Path.Combine(result.OutputBaseDirectory!, "HelloWorld.cs")).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("net11.0", CreationResultStatus.Success)]
     [InlineData("net9.0", CreationResultStatus.InvalidParamValues)]
@@ -129,6 +173,61 @@ public sealed class DotNetTemplateTests : IAsyncLifetime
         action.Args["version"].Should().NotBeNullOrWhiteSpace();
         action.ManualInstructions.Should().Contain(package);
         action.ContinueOnError.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null, "Function")]
+    [InlineData("anonymous", "Anonymous")]
+    [InlineData("function", "Function")]
+    [InlineData("admin", "Admin")]
+    [InlineData("AnOnYmOuS", "Anonymous")]
+    public async Task HttpTrigger_AuthorizationLevel_GeneratesSelectedLevel(string? authLevel, string expected)
+    {
+        ITemplateInfo template = await GetTemplateAsync("httptrigger", "item");
+        Dictionary<string, string?> parameters = new() { ["namespace"] = "Example.Functions" };
+        if (authLevel is not null)
+        {
+            parameters["AuthorizationLevel"] = authLevel;
+        }
+
+        ITemplateCreationResult result = await GenerateAsync(template, "MyFunction", parameters);
+
+        result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(result.OutputBaseDirectory!, "MyFunction.cs"));
+        source.Should().ContainAll(
+            "using Microsoft.Azure.Functions.Worker;",
+            "namespace Example.Functions;",
+            "public sealed class MyFunction",
+            "[Function(nameof(MyFunction))]",
+            $"[HttpTrigger(AuthorizationLevel.{expected}, \"get\", \"post\")]");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    [InlineData("invalid")]
+    [InlineData("System")]
+    public async Task HttpTrigger_AuthorizationLevel_RejectsUnsupportedLevel(string? authLevel)
+    {
+        ITemplateInfo template = await GetTemplateAsync("httptrigger", "item");
+
+        ITemplateCreationResult result = await GenerateAsync(template, "MyFunction", new() { ["AuthorizationLevel"] = authLevel });
+
+        result.Status.Should().Be(CreationResultStatus.InvalidParamValues);
+        File.Exists(Path.Combine(_host.OutputDirectory, "MyFunction.cs")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task HttpTrigger_AuthorizationLevel_DeclaresHostAliases()
+    {
+        ITemplateInfo template = await GetTemplateAsync("httptrigger", "item");
+
+        template.HostConfigPlace.Should().EndWith("func.host.json");
+        string hostPath = Path.Combine(AppContext.BaseDirectory, "content", "templates", "httptrigger", ".template.config", "func.host.json");
+        using var host = JsonDocument.Parse(File.ReadAllText(hostPath));
+        JsonElement symbol = host.RootElement.GetProperty("symbolInfo").GetProperty("AuthorizationLevel");
+        symbol.GetProperty("longName").GetString().Should().Be("auth-level");
+        symbol.GetProperty("shortName").GetString().Should().Be("a");
     }
 
     private async Task<ITemplateInfo> GetTemplateAsync(string shortName, string type)
