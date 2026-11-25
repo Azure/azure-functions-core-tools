@@ -108,14 +108,15 @@ public class PythonProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, string.Empty);
 
-        ProjectCreationResult result = await new PythonProjectFactory(PythonWorkloadTests.Stack).TryCreateProjectAsync(
+        var stack = new PythonProjectStack(new("comet", "comet-host", "Comet"));
+        ProjectCreationResult result = await new PythonProjectFactory(stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Stack.Descriptor.Identifier.Should().Be("python");
-        created.Project.Stack.Descriptor.DisplayName.Should().Be("Python");
+        created.Project.Stack.Should().BeSameAs(stack);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        worker.WorkerRuntime.Should().Be("python");
+        await _workerResolver.Received(1).ResolveWorkerAsync(new FunctionsWorkerId("python"), Arg.Any<CancellationToken>());
+        worker.WorkerRuntime.Should().Be("comet-host");
         created.Reason.Should().NotBeNull();
     }
 

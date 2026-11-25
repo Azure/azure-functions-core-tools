@@ -27,7 +27,7 @@ internal sealed class NodeFunctionsProject : FunctionsProject
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
         Language = language ?? throw new ArgumentNullException(nameof(language));
         Stack = stack ?? throw new ArgumentNullException(nameof(stack));
-        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.Identifier, stack.Descriptor.WorkerRuntime);
+        _workerReference = FunctionsWorkerReference.FromWorkload("node", stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seam so tests can stub npm invocations without spawning real

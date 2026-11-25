@@ -12,14 +12,14 @@ internal sealed class InstalledProjectStackCatalog
 {
     private readonly Lazy<IReadOnlyList<IProjectStack>> _stacks;
 
-    public InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks, IEnumerable<WorkloadInfo> workloads)
+    public InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks, IEnumerable<WorkloadInfo> workloads, ProjectStackRegistrationOwners? owners = null)
     {
         ArgumentNullException.ThrowIfNull(stacks);
         ArgumentNullException.ThrowIfNull(workloads);
         List<IProjectStack> installed = [.. stacks];
         List<WorkloadInfo> packages = [.. workloads.Where(w => w.Stack is not null)];
         // A conflict must not prevent unrelated commands (including workload uninstall) from running.
-        _stacks = new(() => Validate(installed, packages));
+        _stacks = new(() => Validate(installed, packages, owners));
     }
 
     internal InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks) : this(stacks, [])
@@ -42,7 +42,7 @@ internal sealed class InstalledProjectStackCatalog
             var matches => throw new ProjectStackResolutionException($"Language '{value}' from {source} is ambiguous in the '{stack.Descriptor.Identifier}' stack: {string.Join(", ", matches.Select(l => l.LanguageIdentifier))}."),
         };
 
-    private static IReadOnlyList<IProjectStack> Validate(List<IProjectStack> installed, IReadOnlyList<WorkloadInfo> packages)
+    private static IReadOnlyList<IProjectStack> Validate(List<IProjectStack> installed, IReadOnlyList<WorkloadInfo> packages, ProjectStackRegistrationOwners? registrationOwners)
     {
         foreach (IGrouping<string, WorkloadInfo> group in packages.GroupBy(p => p.Stack!.Identifier, StringComparer.OrdinalIgnoreCase))
         {
@@ -53,11 +53,22 @@ internal sealed class InstalledProjectStackCatalog
             }
         }
 
-        HashSet<string> ids = [with(StringComparer.OrdinalIgnoreCase)];
-        foreach (IProjectStack stack in installed)
+        if (registrationOwners is not null && registrationOwners.Packages.Count != installed.Count)
         {
+            throw new ProjectStackResolutionException("Cannot match the installed project stacks to their service registrations.");
+        }
+
+        HashSet<string> ids = [with(StringComparer.OrdinalIgnoreCase)];
+        for (int i = 0; i < installed.Count; i++)
+        {
+            IProjectStack stack = installed[i];
             ArgumentNullException.ThrowIfNull(stack, "stacks");
             StackDescriptor descriptor = stack.Descriptor;
+            if (registrationOwners?.Packages[i] is { } owner)
+            {
+                ValidateOwner(descriptor, owner);
+            }
+
             ValidateName(descriptor.Identifier);
             ValidateName(descriptor.WorkerRuntime);
             ValidateName(descriptor.DisplayName);
@@ -91,6 +102,24 @@ internal sealed class InstalledProjectStackCatalog
         return installed.AsReadOnly();
     }
 
+    private static void ValidateOwner(StackDescriptor descriptor, RuntimeWorkloadInfo owner)
+    {
+        if (owner.Stack is not { } declared)
+        {
+            throw new ProjectStackResolutionException($"Workload '{owner.PackageId}@{owner.PackageVersion}' registered stack '{descriptor.Identifier}', but its manifest does not declare a stack.");
+        }
+
+        // Equality identifies a stack across versions; a registration must preserve this version's canonical spelling and presentation.
+        string? mismatch = descriptor.Identifier != declared.Identifier ? nameof(StackDescriptor.Identifier)
+            : descriptor.WorkerRuntime != declared.WorkerRuntime ? nameof(StackDescriptor.WorkerRuntime)
+            : descriptor.DisplayName != declared.DisplayName ? nameof(StackDescriptor.DisplayName)
+            : descriptor.Description != declared.Description ? nameof(StackDescriptor.Description) : null;
+        if (mismatch is not null)
+        {
+            throw new ProjectStackResolutionException($"Workload '{owner.PackageId}@{owner.PackageVersion}' registered stack '{descriptor.Identifier}', but {mismatch} differs from its manifest. Use the installed descriptor for '{declared.Identifier}'.");
+        }
+    }
+
     private static void ValidateName(string name)
     {
         if (string.IsNullOrWhiteSpace(name) || !string.Equals(name, name.Trim(), StringComparison.Ordinal))
@@ -99,5 +128,7 @@ internal sealed class InstalledProjectStackCatalog
         }
     }
 }
+
+internal sealed record ProjectStackRegistrationOwners(IReadOnlyList<RuntimeWorkloadInfo?> Packages);
 
 internal sealed class ProjectStackResolutionException(string message) : InvalidOperationException(message);

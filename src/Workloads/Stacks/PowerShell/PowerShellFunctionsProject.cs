@@ -22,7 +22,7 @@ internal sealed class PowerShellFunctionsProject : FunctionsProject
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
         Stack = stack ?? throw new ArgumentNullException(nameof(stack));
-        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.Identifier, stack.Descriptor.WorkerRuntime);
+        _workerReference = FunctionsWorkerReference.FromWorkload("powershell", stack.Descriptor.WorkerRuntime);
     }
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;

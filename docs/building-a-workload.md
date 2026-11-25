@@ -234,7 +234,9 @@ internal sealed class NodeProjectStack(StackDescriptor descriptor) : IProjectSta
 }
 ```
 
-The loader passes the descriptor from this package version's registry entry directly to the entry-point constructor. Share the resulting stack with this workload's initializers, project factories, and start option contributors. Do not register an unkeyed `StackDescriptor` in the shared service collection: it cannot distinguish between installed owners.
+The loader passes the descriptor from this package version's registry entry directly to the entry-point constructor. Share the resulting stack with this workload's initializers, project factories, and start option contributors. Lookups match CLI IDs case-insensitively, but an `IProjectStack` registration must preserve its package version's exact ID, runtime, display name, and description. A command-only package does not need to register a stack. Do not register an unkeyed `StackDescriptor` in the shared service collection: it cannot distinguish between installed owners.
+
+For a packaged worker, the first argument to `FunctionsWorkerReference.FromWorkload` identifies the **worker to install or resolve**, not the CLI stack. For example, a stack that uses the Go worker calls `FromWorkload("go", stack.Descriptor.WorkerRuntime)` even if its CLI identifier is `comet`. The host receives the runtime from the descriptor.
 
 Language descriptors are ordered. Give each a stable CLI ID, a display label, and explicit input aliases. `IsMatch` trims and matches the ID and aliases case-insensitively, not the label. For C#, declare `new("csharp", "C#", "c#")`; both `--language CSharp` and `--language c#` select the same descriptor. Commands emit `csharp`, not a lowercased display label. Shared languages are resolved within the selected stack.
 

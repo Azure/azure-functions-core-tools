@@ -127,15 +127,16 @@ public class PowerShellProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
+        var stack = new PowerShellProjectStack(new("comet", "comet-host", "Comet"));
+        ProjectCreationResult result = await new PowerShellProjectFactory(stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("powershell", created.Project.Stack.Descriptor.Identifier);
-        Assert.Equal("PowerShell", created.Project.Stack.Descriptor.DisplayName);
+        Assert.Same(stack, created.Project.Stack);
         Assert.Equal(expectedReason, created.Reason);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        Assert.Equal("powershell", worker.WorkerRuntime);
+        await _workerResolver.Received(1).ResolveWorkerAsync(new FunctionsWorkerId("powershell"), Arg.Any<CancellationToken>());
+        Assert.Equal("comet-host", worker.WorkerRuntime);
     }
 
     [Fact]

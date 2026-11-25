@@ -68,11 +68,12 @@ public sealed class CliHostFactoryTests : IDisposable
         provider.GetRequiredService<InstalledProjectStackCatalog>().Should().BeSameAs(catalog);
     }
 
-    [Fact]
-    public async Task CreateHostAsync_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CreateHostAsync_LoadsCommandWithoutRequiringAProjectStack(bool declaresStack)
     {
-        StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
-        WriteRegistry(("withcommand.fixture", "1.0.0", CommandWorkloadType));
+        await StageWorkloadAsync("withcommand.fixture", CommandWorkloadType, declaresStack ? new("comet", "native", "Comet") : null, TestContext.Current.CancellationToken);
 
         var interaction = new TestInteractionService();
 
@@ -80,6 +81,7 @@ public sealed class CliHostFactoryTests : IDisposable
         var rootCommand = Parser.CreateCommand(host.Services);
 
         rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
+        host.Services.GetRequiredService<InstalledProjectStackCatalog>().Stacks.Should().BeEmpty();
         interaction.Lines.Should().NotContain(l => l.StartsWith("WARNING:", StringComparison.Ordinal));
     }
 
@@ -87,26 +89,12 @@ public sealed class CliHostFactoryTests : IDisposable
     public async Task RegisterWorkloads_ProvidesOnlyTheOwningInstalledDescriptorWithoutAFeed()
     {
         var paths = new WorkloadPathsOptions(_home);
-        var store = new WorkloadStore(paths);
         var token = TestContext.Current.CancellationToken;
-        async Task Stage(string id, string type, StackDescriptor? stack)
-        {
-            StageFixtureWorkload(id, "1.0.0", type);
-            await store.SaveWorkloadAsync(new WorkloadEntry
-            {
-                PackageId = id,
-                PackageVersion = "1.0.0",
-                DisplayName = "Package title",
-                Description = "Package description",
-                Stack = stack,
-                EntryPoint = new() { AssemblyPath = FixtureAssembly, Type = type },
-            }, token);
-        }
-
-        await Stage("Contoso.DevKit", StackWorkloadType, new("comet", "native", "Comet v1"));
-        await Stage("Other.Publisher", StackWorkloadType, new("lunar", "lunar", "Lunar"));
-        await Stage("Tool.WithoutStack", CommandWorkloadType, null);
+        await StageWorkloadAsync("Contoso.DevKit", StackWorkloadType, new("comet", "native", "Comet v1"), token);
+        await StageWorkloadAsync("Other.Publisher", StackWorkloadType, new("lunar", "lunar", "Lunar"), token);
+        await StageWorkloadAsync("Tool.WithoutStack", CommandWorkloadType, null, token);
         var services = new ServiceCollection();
+        services.AddSingleton<InstalledProjectStackCatalog>();
 
         await WorkloadRegistration.RegisterWorkloadsAsync(services, paths, new TestInteractionService(), token);
 
@@ -115,10 +103,51 @@ public sealed class CliHostFactoryTests : IDisposable
         var workloads = provider.GetServices<WorkloadInfo>().ToDictionary(w => w.PackageId);
         stacks["comet"].Descriptor.Should().BeSameAs(workloads["Contoso.DevKit"].Stack);
         stacks["lunar"].Descriptor.Should().BeSameAs(workloads["Other.Publisher"].Stack);
+        provider.GetRequiredService<InstalledProjectStackCatalog>().Stacks.Should().BeEquivalentTo(stacks.Values);
         var command = provider.GetServices<FuncCliCommand>().OfType<ExternalCommand>().Should().ContainSingle().Subject;
         command.Workload.PackageId.Should().Be("Tool.WithoutStack");
         command.Workload.DisplayName.Should().Be("Package title");
         provider.GetServices<StackDescriptor>().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null, "native", "Comet", "Fixture stack", "does not declare a stack")]
+    [InlineData("lunar", "native", "Comet", "Fixture stack", "Identifier")]
+    [InlineData("comet", "other-host", "Comet", "Fixture stack", "WorkerRuntime")]
+    [InlineData("comet", "native", "Renamed", "Fixture stack", "DisplayName")]
+    [InlineData("COMET", "native", "Comet", "Fixture stack", "Identifier")]
+    [InlineData("comet", "NATIVE", "Comet", "Fixture stack", "WorkerRuntime")]
+    [InlineData("comet", "native", "COMET", "Fixture stack", "DisplayName")]
+    [InlineData("comet", "native", "Comet", "Fixture Stack", "Description")]
+    [InlineData("comet", "native", "Comet", "Fixture stack", null)]
+    public async Task Catalog_ChecksTypeRegistrationAgainstItsPackage(string? id, string runtime, string label, string description, string? expectedError)
+    {
+        const string type = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.FixedStackWorkload";
+        await StageWorkloadAsync("Contoso.DevKit", type, id is null ? null : new(id, runtime, label, description), TestContext.Current.CancellationToken);
+        using IHost host = await StartHostAsync(new TestInteractionService());
+        var catalog = host.Services.GetRequiredService<InstalledProjectStackCatalog>();
+
+        if (expectedError is null)
+        {
+            catalog.FindStack("comet").Should().NotBeNull();
+        }
+        else
+        {
+            FluentActions.Invoking(() => catalog.FindStack("comet")).Should().Throw<ProjectStackResolutionException>().WithMessage($"*Contoso.DevKit@1.0.0*{expectedError}*");
+        }
+    }
+
+    [Fact]
+    public async Task Catalog_RejectsStacksRegisteredByEachOthersPackage()
+    {
+        const string type = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.SwappedStackWorkload";
+        var token = TestContext.Current.CancellationToken;
+        await StageWorkloadAsync("Contoso.Comet", type, new("comet", "native", "Comet"), token);
+        await StageWorkloadAsync("Contoso.Lunar", type, new("lunar", "lunar", "Lunar"), token);
+        using IHost host = await StartHostAsync(new TestInteractionService());
+        var catalog = host.Services.GetRequiredService<InstalledProjectStackCatalog>();
+
+        FluentActions.Invoking(() => catalog.Stacks).Should().Throw<ProjectStackResolutionException>().WithMessage("*Contoso.*@1.0.0*");
     }
 
     [Fact]
@@ -362,6 +391,21 @@ public sealed class CliHostFactoryTests : IDisposable
             e.Version,
             TypeName: (string?)e.TypeName,
             Kind: WorkloadKind.Workload))]);
+
+    private async Task StageWorkloadAsync(string id, string type, StackDescriptor? stack, CancellationToken cancellationToken)
+    {
+        StageFixtureWorkload(id, "1.0.0", type);
+        var store = new WorkloadStore(new WorkloadPathsOptions(_home));
+        await store.SaveWorkloadAsync(new WorkloadEntry
+        {
+            PackageId = id,
+            PackageVersion = "1.0.0",
+            DisplayName = "Package title",
+            Description = "Package description",
+            Stack = stack,
+            EntryPoint = new() { AssemblyPath = FixtureAssembly, Type = type },
+        }, cancellationToken);
+    }
 
     private void WriteRegistry(params (string PackageId, string Version, string? TypeName, WorkloadKind Kind)[] entries)
     {

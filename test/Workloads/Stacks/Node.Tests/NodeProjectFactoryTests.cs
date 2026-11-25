@@ -95,14 +95,15 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new NodeProjectFactory(NodeWorkloadTests.Stack).TryCreateProjectAsync(
+        var stack = new NodeProjectStack(new("comet", "comet-host", "Comet"));
+        ProjectCreationResult result = await new NodeProjectFactory(stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Stack.Descriptor.Identifier.Should().Be("node");
-        created.Project.Stack.Descriptor.DisplayName.Should().Be("Node.js");
+        created.Project.Stack.Should().BeSameAs(stack);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        worker.WorkerRuntime.Should().Be("node");
+        await _workerResolver.Received(1).ResolveWorkerAsync(new FunctionsWorkerId("node"), Arg.Any<CancellationToken>());
+        worker.WorkerRuntime.Should().Be("comet-host");
         created.Reason.Should().NotBeNull();
     }
 

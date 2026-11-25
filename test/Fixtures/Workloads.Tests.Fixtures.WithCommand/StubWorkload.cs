@@ -26,13 +26,30 @@ public sealed class StackWorkload(StackDescriptor descriptor) : Workloads.Worklo
     private readonly FixtureStack _stack = new(descriptor);
 
     public override void Configure(FunctionsCliBuilder builder) => builder.Services.AddSingleton<IProjectStack>(_stack);
+}
 
-    private sealed class FixtureStack(StackDescriptor descriptor) : IProjectStack
+public sealed class FixedStackWorkload : Workloads.Workload
+{
+    public override void Configure(FunctionsCliBuilder builder) => builder.Services.AddSingleton<IProjectStack, FixedStack>();
+
+    private sealed class FixedStack() : FixtureStack(new("comet", "native", "Comet", "Fixture stack"));
+}
+
+public sealed class SwappedStackWorkload(StackDescriptor descriptor) : Workloads.Workload
+{
+    public override void Configure(FunctionsCliBuilder builder)
     {
-        public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
-
-        public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("fixture", "Fixture")];
+        string other = descriptor.Identifier == "comet" ? "lunar" : "comet";
+        builder.Services.AddKeyedSingleton<IProjectStack>(descriptor.Identifier, new FixtureStack(descriptor));
+        builder.Services.AddSingleton(sp => sp.GetRequiredKeyedService<IProjectStack>(other));
     }
+}
+
+internal class FixtureStack(StackDescriptor descriptor) : IProjectStack
+{
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("fixture", "Fixture")];
 }
 
 /// <summary>

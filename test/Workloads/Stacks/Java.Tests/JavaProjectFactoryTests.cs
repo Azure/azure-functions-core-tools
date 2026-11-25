@@ -103,14 +103,15 @@ public class JavaProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new JavaProjectFactory(JavaWorkloadTests.Stack).TryCreateProjectAsync(
+        var stack = new JavaProjectStack(new("comet", "comet-host", "Comet"));
+        ProjectCreationResult result = await new JavaProjectFactory(stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("java", created.Project.Stack.Descriptor.Identifier);
-        Assert.Equal("Java", created.Project.Stack.Descriptor.DisplayName);
+        Assert.Same(stack, created.Project.Stack);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        Assert.Equal("java", worker.WorkerRuntime);
+        await _workerResolver.Received(1).ResolveWorkerAsync(new FunctionsWorkerId("java"), Arg.Any<CancellationToken>());
+        Assert.Equal("comet-host", worker.WorkerRuntime);
         Assert.NotNull(created.Reason);
     }
 

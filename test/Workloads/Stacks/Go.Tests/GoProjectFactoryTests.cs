@@ -89,14 +89,15 @@ public class GoProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new GoProjectFactory(GoWorkloadTests.Stack).TryCreateProjectAsync(
+        var stack = new GoProjectStack(new("comet", "comet-host", "Comet"));
+        ProjectCreationResult result = await new GoProjectFactory(stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Stack.Descriptor.Identifier.Should().Be("go");
-        created.Project.Stack.Descriptor.DisplayName.Should().Be("Go");
+        created.Project.Stack.Should().BeSameAs(stack);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        worker.WorkerRuntime.Should().Be("native");
+        await _workerResolver.Received(1).ResolveWorkerAsync(new FunctionsWorkerId("go"), Arg.Any<CancellationToken>());
+        worker.WorkerRuntime.Should().Be("comet-host");
         created.Reason.Should().NotBeNull();
     }
 

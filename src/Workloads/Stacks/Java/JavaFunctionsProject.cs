@@ -27,7 +27,7 @@ internal sealed class JavaFunctionsProject : FunctionsProject
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
 
         Stack = stack ?? throw new ArgumentNullException(nameof(stack));
-        _workerReference = FunctionsWorkerReference.FromWorkload(stack.Descriptor.Identifier, stack.Descriptor.WorkerRuntime);
+        _workerReference = FunctionsWorkerReference.FromWorkload("java", stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seams so tests can stub the Maven discovery/build without spawning real processes.

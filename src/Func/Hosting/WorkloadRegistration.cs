@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Invocation;
@@ -122,11 +123,13 @@ internal static class WorkloadRegistration
 
         services.AddSingleton<IWorkloadInvoker, WorkloadInvoker>();
 
+        Dictionary<ServiceDescriptor, RuntimeWorkloadInfo> stackOwners = [];
         foreach (RuntimeWorkloadInfo workload in runtimeWorkloads)
         {
             // Per-workload builder so RegisterCommand can tag the resulting
             // ExternalCommand with its owning workload.
             var builder = new DefaultFunctionsCliBuilder(services, workload);
+            HashSet<ServiceDescriptor> existingStacks = [.. services.Where(IsProjectStack)];
             try
             {
                 workload.Instance.Configure(builder);
@@ -140,10 +143,21 @@ internal static class WorkloadRegistration
                 interaction.WriteWarning(
                     $"Workload '{workload.PackageId}@{workload.PackageVersion}' failed to initialize: {ex.Message}");
             }
+
+            foreach (ServiceDescriptor registration in services.Where(IsProjectStack).Except(existingStacks))
+            {
+                stackOwners[registration] = workload;
+            }
         }
 
+        // DI resolves IEnumerable<IProjectStack> in registration order. Read the final order without
+        // activating factories early or replacing registrations and changing their lifetimes.
+        services.AddSingleton(_ => new ProjectStackRegistrationOwners(
+            [.. services.Where(IsProjectStack).Select(stackOwners.GetValueOrDefault)]));
         return runtimeWorkloads.Count;
     }
+
+    private static bool IsProjectStack(ServiceDescriptor registration) => !registration.IsKeyedService && registration.ServiceType == typeof(IProjectStack);
 
     private static IReadOnlyList<WorkloadEntry> SelectRuntimeCompatibleEntries(
         IReadOnlyList<WorkloadEntry> entries,
