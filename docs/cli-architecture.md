@@ -79,7 +79,7 @@ Workloads can add their own subcommands by calling `builder.RegisterCommand(...)
 to show the same command help as `func workload install --help` without executing the command.
 Paths can include nested subcommands and aliases; an unknown path reports an error and exits with code 1.
 
-### Planned template package commands
+### Template package commands
 
 [Template package management](templates/package-management.md)
 adds a top-level group separate from function generation:

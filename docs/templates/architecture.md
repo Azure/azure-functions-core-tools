@@ -87,7 +87,7 @@ The workload provider does not watch for mutations during an existing command. I
 | Mount folders/archives, find template definitions, parse native template metadata, build/reuse the local cache, and normalize duplicate identities | Microsoft.TemplateEngine |
 | Native filtering, parameter evaluation, and instantiation APIs | Microsoft.TemplateEngine; command integration is still pending |
 | Project/Stack context, supported command behavior, prompts, errors, destination permissions, and explicitly supported follow-up work | CLI commands and services |
-| Future standalone NuGet template acquisition, managed-package state, update/uninstall, and archive mounting | Microsoft.TemplateEngine's managed provider, called by future CLI management commands |
+| Standalone NuGet template acquisition, managed-package state, install/uninstall, and archive mounting | CLI package catalog and lifecycle services, using Microsoft.TemplateEngine's managed provider |
 | Functions-specific raw constraint validation and eligibility | Separate constraints increment; not implemented |
 | Remote package search index and search UX | Separate Functions search/index work, not the local engine cache |
 
