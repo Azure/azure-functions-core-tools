@@ -1,0 +1,8 @@
+{
+  "symbolInfo": {
+    "PackageName": { "longName": "package-name" },
+    "NoHttp": { "longName": "no-http" },
+    "NoBundle": { "longName": "no-bundles" },
+    "BundlesChannel": { "longName": "bundles-channel", "shortName": "c" }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "symbolInfo": {
+    "PackageName": { "longName": "package-name" },
+    "AuthLevel": { "longName": "auth-level", "shortName": "a" }
+  }
+}
