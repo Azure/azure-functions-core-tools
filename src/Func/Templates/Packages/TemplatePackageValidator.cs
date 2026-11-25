@@ -44,19 +44,24 @@ internal sealed class TemplatePackageValidator
         }
     }
 
-    public void VerifyInstalled(IEnumerable<ITemplateInfo> templates, IReadOnlyList<string> identities, IEngineEnvironmentSettings settings)
+    public void VerifyInstalled(
+        IEnumerable<ITemplateInfo> packageTemplates, IEnumerable<ITemplateInfo> discoveredTemplates, IReadOnlyList<string> identities,
+        IEngineEnvironmentSettings settings)
     {
-        ArgumentNullException.ThrowIfNull(templates);
+        ArgumentNullException.ThrowIfNull(packageTemplates);
+        ArgumentNullException.ThrowIfNull(discoveredTemplates);
         ArgumentNullException.ThrowIfNull(identities);
         ArgumentNullException.ThrowIfNull(settings);
-        ITemplateInfo[] installed = [.. templates];
-        string[] discovered = [.. installed.Select(t => t.Identity)];
-        if (discovered.Length != identities.Count || identities.Except(discovered, StringComparer.Ordinal).Any())
+        ITemplateInfo[] package = [.. packageTemplates];
+        string[] packageIdentities = [.. package.Select(t => t.Identity)];
+        string[] discoveredIdentities = [.. discoveredTemplates.Select(t => t.Identity)];
+        if (packageIdentities.Except(identities, StringComparer.Ordinal).Any()
+            || identities.Except(discoveredIdentities, StringComparer.Ordinal).Any())
         {
             throw new TemplatePackageException("The installed template cache did not expose the validated package.");
         }
 
-        foreach (ITemplateInfo template in installed)
+        foreach (ITemplateInfo template in package)
         {
             _ = FuncTemplateInfo.Create(template, settings);
         }

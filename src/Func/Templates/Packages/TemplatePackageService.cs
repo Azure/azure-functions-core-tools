@@ -29,7 +29,7 @@ internal class TemplatePackageService(
     private readonly TemplatePackageVerifier _verifier = verifier ?? throw new ArgumentNullException(nameof(verifier));
 
     /// <summary>
-    /// Preflights a remote NuGet archive and installs it, restoring the previous package if mutation or discovery fails.
+    /// Validates the downloaded archive's identity, package types, host metadata, and template identities before hive mutation, then installs it.
     /// </summary>
     /// <exception cref="TemplatePackageException">Validation, acquisition, mutation, cache verification, or recovery failed.</exception>
     /// <exception cref="ArgumentException">The source is not an HTTP(S) feed URL.</exception>
@@ -66,9 +66,13 @@ internal class TemplatePackageService(
         if (previous is not null && inspection is not null)
         {
             previousVersion = NuGetVersion.Parse(previous.Version!);
-            previousIdentities = [.. (await inspection.GetTemplatesAsync(previous, cancellationToken)).Select(t => t.Identity)];
             backupPath = Path.Combine(download.Path, "previous.nupkg");
             _fileSystem.CopyFile(previous.MountPointUri, backupPath);
+            await using (Stream backup = _fileSystem.OpenReadIfExists(backupPath)
+                ?? throw new TemplatePackageException("The previous template package could not be backed up."))
+            {
+                previousIdentities = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+            }
         }
 
         inspection?.Dispose();
@@ -122,7 +126,13 @@ internal class TemplatePackageService(
         string backupPath = Path.Combine(recovery.Path, "previous.nupkg");
         _fileSystem.CopyFile(installed.MountPointUri, backupPath);
         var previousVersion = NuGetVersion.Parse(installed.Version!);
-        IReadOnlyList<string> identities = [.. (await inspection.GetTemplatesAsync(installed, cancellationToken)).Select(t => t.Identity)];
+        IReadOnlyList<string> identities;
+        await using (Stream backup = _fileSystem.OpenReadIfExists(backupPath)
+            ?? throw new TemplatePackageException("The previous template package could not be backed up."))
+        {
+            identities = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+        }
+
         inspection.Dispose();
         cancellationToken.ThrowIfCancellationRequested();
         bool completed = false;
@@ -133,6 +143,11 @@ internal class TemplatePackageService(
                 ?? throw new TemplatePackageException($"Template package '{packageId}' is no longer installed.");
             await RemoveAsync(templater, current, cancellationToken);
             await templater.RefreshAsync(cancellationToken);
+            if (await FindInstalledAsync(templater, packageId, cancellationToken) is not null)
+            {
+                throw new TemplatePackageException($"Template package '{packageId}' remains installed after removal.");
+            }
+
             _validator.VerifyUninstalled(await templater.GetTemplatesAsync(current, cancellationToken));
             cancellationToken.ThrowIfCancellationRequested();
             completed = true;
@@ -155,7 +170,9 @@ internal class TemplatePackageService(
     private async Task InstallArchiveAsync(
         Templater templater, string path, string packageId, NuGetVersion version, IReadOnlyList<string> identities, CancellationToken cancellationToken)
     {
-        InstallResult result = await templater.InstallAsync(new InstallRequest(path), cancellationToken);
+        // Let the managed provider finish the archive-and-registration operation before observing cancellation.
+        InstallResult result = await templater.InstallAsync(new InstallRequest(path), CancellationToken.None);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!result.Success)
         {
             throw new TemplatePackageException($"Template package installation failed: {result.ErrorMessage}");
@@ -169,7 +186,11 @@ internal class TemplatePackageService(
         }
 
         await templater.RefreshAsync(cancellationToken);
-        _validator.VerifyInstalled(await templater.GetTemplatesAsync(installed, cancellationToken), identities, templater.Settings);
+        _validator.VerifyInstalled(
+            await templater.GetTemplatesAsync(installed, cancellationToken),
+            await templater.GetTemplatesAsync(cancellationToken),
+            identities,
+            templater.Settings);
         cancellationToken.ThrowIfCancellationRequested();
     }
 
@@ -210,6 +231,10 @@ internal class TemplatePackageService(
         {
             throw RecoveryFailure(packageId, ex);
         }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw RecoveryFailure(packageId, ex);
+        }
         catch (InvalidOperationException ex)
         {
             throw RecoveryFailure(packageId, ex);
@@ -218,7 +243,7 @@ internal class TemplatePackageService(
 
     private static TemplatePackageException RecoveryFailure(string packageId, Exception exception)
         => new($"Template package '{packageId}' may be missing or partially installed. Recovery failed: {exception.Message} "
-            + "Retry installation to repair the installed state.", exception);
+            + "Check the package state before retrying; repeating this command may not repair a partial installation.", exception);
 
     private async Task<IManagedTemplatePackage?> FindInstalledAsync(Templater templater, string id, CancellationToken cancellationToken)
     {
@@ -228,7 +253,9 @@ internal class TemplatePackageService(
 
     private async Task RemoveAsync(Templater templater, IManagedTemplatePackage package, CancellationToken cancellationToken)
     {
-        UninstallResult result = await templater.UninstallAsync(package, cancellationToken);
+        // Keep provider deletion and registration updates together, then roll back if cancellation was requested.
+        UninstallResult result = await templater.UninstallAsync(package, CancellationToken.None);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!result.Success)
         {
             throw new TemplatePackageException($"Template package uninstallation failed: {result.ErrorMessage}");

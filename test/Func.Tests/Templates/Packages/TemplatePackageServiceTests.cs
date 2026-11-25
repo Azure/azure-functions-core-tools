@@ -349,6 +349,46 @@ public sealed class TemplatePackageServiceTests : IDisposable
         await AssertInstalledVersionAsync("1.0.0");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Recovery_WithOverlappingTemplateIdentityVerifiesExpectedIdentities(bool uninstall)
+    {
+        _catalog.Archive = MakeArchive(itemNameOverride: "First package");
+        await InstallAsync("1.0.0");
+        _catalog.Archive = MakeArchive(packageId: "other.templates", itemNameOverride: "Second package", includeOnlyItemTemplate: true);
+        await _service.InstallAsync("other.templates", "1.0.0", null, false, TestContext.Current.CancellationToken);
+        (await GetWinningItemNameAsync()).Should().Be("Second package");
+
+        _factory.FailCache = true;
+        Func<Task> act;
+        if (uninstall)
+        {
+            act = () => _service.UninstallAsync("test.templates", TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            _catalog.Archive = MakeArchive("2.0.0", itemNameOverride: "Replacement package");
+            act = () => InstallAsync("2.0.0");
+        }
+
+        await act.Should().ThrowAsync<IOException>().WithMessage("cache failed");
+
+        using var templater = _factory.Create(Context());
+        (await templater.ListAsync(TestContext.Current.CancellationToken)).Templates
+            .Select(template => template.Identity)
+            .Should().BeEquivalentTo([
+                TemplateFixtures.ItemTemplateIdentity,
+                TemplateFixtures.ProjectTemplateIdentity,
+                TemplateFixtures.OtherTypeTemplateIdentity,
+                TemplateFixtures.UntypedTemplateIdentity,
+            ]);
+        (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken))
+            .Select(package => (package.Identifier, package.Version))
+            .Should().BeEquivalentTo([("test.templates", "1.0.0"), ("other.templates", "1.0.0")]);
+        AssertTemporaryFilesRemoved();
+    }
+
     [Fact]
     public async Task Install_RecoveryFailureReportsIncompleteEffectsAndCleansTemporaryFiles()
     {
@@ -368,6 +408,32 @@ public sealed class TemplatePackageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Install_MalformedPreviousBackupFailsBeforeMutation()
+    {
+        await InstallAsync("1.0.0");
+        string installedArchive;
+        using (var templater = _factory.Create(Context()))
+        {
+            installedArchive = (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Single().MountPointUri;
+        }
+
+        File.WriteAllBytes(installedArchive, MakeArchive("1.0.0", hostJson: "{"));
+        _catalog.Archive = MakeArchive("2.0.0");
+
+        Func<Task> act = () => InstallAsync("2.0.0");
+
+        var failure = (await act.Should().ThrowAsync<TemplatePackageException>()
+            .WithMessage("*invalid template or func.host.json metadata*")).Which;
+        failure.InnerException.Should().BeOfType<System.Text.Json.JsonException>();
+        _factory.Installations.Should().Be(1);
+        _factory.Uninstallations.Should().Be(0);
+        using var verificationTemplater = _factory.Create(Context());
+        (await verificationTemplater.GetManagedPackagesAsync(TestContext.Current.CancellationToken))
+            .Should().ContainSingle().Which.Version.Should().Be("1.0.0");
+        AssertTemporaryFilesRemoved();
+    }
+
+    [Fact]
     public async Task Install_CancellationDuringMutationRestoresPreviousInstallation()
     {
         await InstallAsync("1.0.0");
@@ -380,6 +446,22 @@ public sealed class TemplatePackageServiceTests : IDisposable
         await act.Should().ThrowAsync<OperationCanceledException>();
         File.Exists(_factory.Request!.PackageIdentifier).Should().BeFalse();
         _factory.CancelCache = null;
+        AssertTemporaryFilesRemoved();
+        await AssertInstalledVersionAsync("1.0.0");
+    }
+
+    [Fact]
+    public async Task Install_CancellationDuringProviderInstallRestoresPreviousInstallation()
+    {
+        await InstallAsync("1.0.0");
+        _catalog.Archive = MakeArchive("2.0.0");
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        _factory.CancelInstall = cancellation;
+
+        Func<Task> act = () => _service.InstallAsync("test.templates", "2.0.0", null, false, cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _factory.CancelInstall.Should().BeNull();
         AssertTemporaryFilesRemoved();
         await AssertInstalledVersionAsync("1.0.0");
     }
@@ -438,6 +520,13 @@ public sealed class TemplatePackageServiceTests : IDisposable
         (await templater.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().HaveCount(4);
     }
 
+    private async Task<string> GetWinningItemNameAsync()
+    {
+        using var templater = _factory.Create(Context());
+        return (await templater.ListAsync(TestContext.Current.CancellationToken)).Templates
+            .Single(template => template.Identity == TemplateFixtures.ItemTemplateIdentity).Name;
+    }
+
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
     private void AssertTemporaryFilesRemoved() => _temporaryDirectories.Should().OnlyContain(path => !Directory.Exists(path));
@@ -487,18 +576,32 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
     private byte[] MakeArchive(
         string version = "1.0.0", string types = "FuncTemplate", string? hostJson = null, bool includeTemplates = true,
-        bool invalidTemplate = false, string packageId = "test.templates")
+        bool invalidTemplate = false, string packageId = "test.templates", string? itemNameOverride = null,
+        bool includeOnlyItemTemplate = false)
     {
         string directory = TemplateFixtures.WriteBasicPackage(_root, hostJson);
         if (invalidTemplate)
         {
             File.WriteAllText(Path.Combine(directory, "item", ".template.config", "template.json"), """{"identity":"Invalid"}""");
         }
+        else if (itemNameOverride is not null)
+        {
+            string itemConfig = Path.Combine(directory, "item", ".template.config", "template.json");
+            string templateJson = File.ReadAllText(itemConfig).Replace("\"name\": \"Func Tests Item\"", $"\"name\": \"{itemNameOverride}\"", StringComparison.Ordinal);
+            File.WriteAllText(itemConfig, templateJson);
+        }
 
         using var output = new MemoryStream();
         using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
         {
-            foreach (string path in includeTemplates ? Directory.GetFiles(directory, "*", SearchOption.AllDirectories) : [])
+            IEnumerable<string> paths = includeTemplates ? Directory.GetFiles(directory, "*", SearchOption.AllDirectories) : [];
+            if (includeOnlyItemTemplate)
+            {
+                paths = paths.Where(path => Path.GetRelativePath(directory, path)
+                    .StartsWith($"item{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+            }
+
+            foreach (string path in paths)
             {
                 archive.CreateEntryFromFile(path, Path.GetRelativePath(directory, path).Replace('\\', '/'));
             }
@@ -550,6 +653,8 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
         internal InstallRequest? Request { get; set; }
 
+        internal CancellationTokenSource? CancelInstall { get; set; }
+
         internal CancellationTokenSource? CancelCache { get; set; }
 
         public Templater Create(TemplateEngineContext context) => new FaultTemplater(context, HivePath, this);
@@ -564,6 +669,12 @@ public sealed class TemplatePackageServiceTests : IDisposable
                 if (factory.FailRecoveryInstall && Path.GetFileName(request.PackageIdentifier) == "previous.nupkg")
                 {
                     throw new IOException("cannot recover");
+                }
+
+                if (factory.CancelInstall is { } cancellation)
+                {
+                    factory.CancelInstall = null;
+                    await cancellation.CancelAsync();
                 }
 
                 InstallResult result = await base.InstallAsync(request, cancellationToken);

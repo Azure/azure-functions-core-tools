@@ -60,6 +60,9 @@ internal class Templater : IDisposable
     internal Task<IReadOnlyList<IManagedTemplatePackage>> GetManagedPackagesAsync(CancellationToken cancellationToken)
         => _packageManager.GetManagedTemplatePackagesAsync(true, cancellationToken);
 
+    internal virtual Task<IReadOnlyList<ITemplateInfo>> GetTemplatesAsync(CancellationToken cancellationToken)
+        => _packageManager.GetTemplatesAsync(cancellationToken);
+
     internal virtual Task<IEnumerable<ITemplateInfo>> GetTemplatesAsync(ITemplatePackage package, CancellationToken cancellationToken)
         => _packageManager.GetTemplatesAsync(package, cancellationToken);
 
