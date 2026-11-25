@@ -15,6 +15,11 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal sealed class PublishCommand : FuncCliCommand, IBuiltInCommand
 {
+    private static readonly HashSet<string> _settingsOnlyFlags = ["-o", "--publish-settings-only"];
+
+    private static readonly HashSet<string> _settingsFlags =
+        [.. _settingsOnlyFlags, "-i", "--publish-local-settings", "-y", "--overwrite-settings"];
+
     private readonly IInteractionService _interaction;
 
     public PublishCommand(IInteractionService interaction)
@@ -29,9 +34,21 @@ internal sealed class PublishCommand : FuncCliCommand, IBuiltInCommand
     {
         _interaction.WriteWarning("'func publish' is not supported in v5 of the Azure Functions CLI.");
         _interaction.WriteBlankLine();
-        _interaction.WriteLine("Use the Azure CLI to deploy your function app, for example:");
-        _interaction.WriteLine(l => l.Muted("  ").Code("az functionapp deployment source config-zip -g <resource-group> -n <app-name> --src <zip-path>"));
-        _interaction.WriteBlankLine();
+
+        if (!parseResult.UnmatchedTokens.Any(_settingsOnlyFlags.Contains))
+        {
+            _interaction.WriteLine("Use the Azure CLI to deploy your function app, for example:");
+            _interaction.WriteLine(l => l.Muted("  ").Code("az functionapp deployment source config-zip -g <resource-group> -n <app-name> --src <zip-path>"));
+            _interaction.WriteBlankLine();
+        }
+
+        if (parseResult.UnmatchedTokens.Any(_settingsFlags.Contains))
+        {
+            _interaction.WriteLine("To publish app settings, use the Azure CLI, for example:");
+            _interaction.WriteLine(l => l.Muted("  ").Code("az functionapp config appsettings set -g <resource-group> -n <app-name> --settings <name>=<value>"));
+            _interaction.WriteBlankLine();
+        }
+
         _interaction.WriteLine("Or use v4 of Core Tools for the legacy 'func azure functionapp publish' flow:");
         _interaction.WriteLine(l => l.Muted("  ").Plain("https://learn.microsoft.com/azure/azure-functions/functions-run-local"));
         return Task.FromResult(1);

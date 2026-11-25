@@ -31,6 +31,48 @@ public class PublishCommandTests
         _interaction.AllOutput.Should().Contain("functions-run-local");
     }
 
+    [Theory]
+    [InlineData("--publish-local-settings")]
+    [InlineData("-i")]
+    [InlineData("--publish-settings-only")]
+    [InlineData("-o")]
+    [InlineData("--overwrite-settings")]
+    [InlineData("-y")]
+    public async Task ExecuteAsync_WithSettingsFlag_PointsToAzAppSettings(string flag)
+    {
+        var command = new PublishCommand(_interaction);
+        var parseResult = command.Parse(["myapp", flag]);
+
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        exitCode.Should().NotBe(0);
+        _interaction.AllOutput.Should().Contain("az functionapp config appsettings set");
+    }
+
+    [Theory]
+    [InlineData("--publish-settings-only")]
+    [InlineData("-o")]
+    public async Task ExecuteAsync_WithSettingsOnlyFlag_OmitsDeploymentGuidance(string flag)
+    {
+        var command = new PublishCommand(_interaction);
+        var parseResult = command.Parse(["myapp", flag]);
+
+        await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        _interaction.AllOutput.Should().NotContain("az functionapp deployment");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutSettingsFlag_OmitsAppSettingsGuidance()
+    {
+        var command = new PublishCommand(_interaction);
+        var parseResult = command.Parse(["myapp"]);
+
+        await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        _interaction.AllOutput.Should().NotContain("appsettings");
+    }
+
     [Fact]
     public async Task ExecuteAsync_IgnoresExtraArguments()
     {
