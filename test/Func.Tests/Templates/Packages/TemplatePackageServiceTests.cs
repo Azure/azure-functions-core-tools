@@ -261,6 +261,78 @@ public sealed class TemplatePackageServiceTests : IDisposable
 
     [Theory]
     [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Install_MissingTemplateHostMetadataFailsBeforeMutation(bool replacement, bool orphanHost)
+    {
+        if (replacement)
+        {
+            await InstallAsync("1.0.0");
+        }
+
+        _catalog.Archive = MakeArchive(replacement ? "2.0.0" : "1.0.0", includeHost: false, includeOrphanHost: orphanHost);
+        Func<Task> act = () => InstallAsync(replacement ? "2.0.0" : "1.0.0");
+
+        await act.Should().ThrowAsync<TemplatePackageException>().WithMessage("*func.host.json*alongside*template.json*");
+        _factory.Installations.Should().Be(replacement ? 1 : 0);
+        _factory.Uninstallations.Should().Be(0);
+        if (replacement)
+        {
+            await AssertInstalledVersionAsync("1.0.0");
+        }
+        else
+        {
+            Directory.Exists(_factory.HivePath).Should().BeFalse();
+        }
+
+        AssertTemporaryFilesRemoved();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ExistingPackageWithoutHostMetadataCanBeRemovedReplacedOrRecovered(bool uninstall, bool failAfterMutation)
+    {
+        string legacyArchive = Path.Combine(_root, "legacy.nupkg");
+        File.WriteAllBytes(legacyArchive, MakeArchive(includeHost: false));
+        using (var templater = _factory.Create(Context()))
+        {
+            var result = await templater.InstallAsync(new InstallRequest(legacyArchive), TestContext.Current.CancellationToken);
+            result.Success.Should().BeTrue(result.ErrorMessage ?? string.Empty);
+        }
+
+        _catalog.Archive = MakeArchive("2.0.0");
+        _factory.FailCache = failAfterMutation;
+        Func<Task> act = uninstall
+            ? () => _service.UninstallAsync("test.templates", TestContext.Current.CancellationToken)
+            : () => InstallAsync("2.0.0");
+
+        if (failAfterMutation)
+        {
+            await act.Should().ThrowAsync<IOException>().WithMessage("cache failed");
+            await AssertInstalledVersionAsync("1.0.0");
+        }
+        else
+        {
+            await act();
+            if (uninstall)
+            {
+                using var templater = _factory.Create(Context());
+                (await templater.GetManagedPackagesAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+            }
+            else
+            {
+                await AssertInstalledVersionAsync("2.0.0");
+            }
+        }
+
+        AssertTemporaryFilesRemoved();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
     [InlineData(true, true)]
     public async Task Install_RejectsEmptyOrUndiscoverableDeclarationsAndPreservesPreviousInstallation(bool includeTemplates, bool invalidTemplate)
     {
@@ -680,7 +752,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
     private byte[] MakeArchive(
         string version = "1.0.0", string types = "FuncTemplate", string? hostJson = null, bool includeTemplates = true,
         bool invalidTemplate = false, string packageId = "test.templates", string? itemNameOverride = null,
-        bool includeOnlyItemTemplate = false)
+        bool includeOnlyItemTemplate = false, bool includeHost = true, bool includeOrphanHost = false)
     {
         string directory = TemplateFixtures.WriteBasicPackage(_root, hostJson);
         if (invalidTemplate)
@@ -705,9 +777,20 @@ public sealed class TemplatePackageServiceTests : IDisposable
                     .StartsWith($"item{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
             }
 
+            if (!includeHost)
+            {
+                paths = paths.Where(path => !path.EndsWith("func.host.json", StringComparison.OrdinalIgnoreCase));
+            }
+
             foreach (string path in paths)
             {
                 archive.CreateEntryFromFile(path, Path.GetRelativePath(directory, path).Replace('\\', '/'));
+            }
+
+            if (includeOrphanHost)
+            {
+                using var host = new StreamWriter(archive.CreateEntry("orphan/.template.config/func.host.json").Open());
+                host.Write("{}");
             }
 
             using var writer = new StreamWriter(archive.CreateEntry("test.templates.nuspec").Open());

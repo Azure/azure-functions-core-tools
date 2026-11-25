@@ -102,8 +102,10 @@ specific preview.
 
 Before installation, inspect the downloaded archive. Require the resolved
 package ID and version, the `FuncTemplate` package type, and no workload
-package type. Require valid `func.host.json` metadata and at least one
-template identity. A standard `Template` package type alone is not sufficient
+package type. Require at least one valid `func.host.json` alongside a
+`template.json` declaration, and at least one template identity. Existing
+packages without host metadata can still be removed or replaced. A standard
+`Template` package type alone is not sufficient
 for this initial catalog. Leave archive path safety and template-format
 validation to NuGet and Microsoft.TemplateEngine. Scan the staged archive in a
 temporary, isolated engine hive before changing the shared hive, so templates

@@ -60,7 +60,7 @@ internal class TemplatePackageService(
         await using Stream staged = _fileSystem.OpenReadIfExists(packagePath)
             ?? throw new TemplatePackageException("The downloaded template package could not be staged.");
         await _verifier.VerifyAsync(staged, cancellationToken);
-        TemplatePackageContents contents = _validator.Validate(staged, packageId, resolvedVersion, cancellationToken);
+        TemplatePackageContents contents = _validator.Validate(staged, packageId, resolvedVersion, requireHostMetadata: true, cancellationToken);
         await ValidateDiscoveryAsync(packagePath, Path.Combine(download.Path, "staged-hive"), contents, cancellationToken);
         string? backupPath = null;
         IReadOnlyList<string> previousIdentities = [];
@@ -73,7 +73,7 @@ internal class TemplatePackageService(
             await using (Stream backup = _fileSystem.OpenReadIfExists(backupPath)
                 ?? throw new TemplatePackageException("The previous template package could not be backed up."))
             {
-                TemplatePackageContents previousContents = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+                TemplatePackageContents previousContents = _validator.Validate(backup, packageId, previousVersion, requireHostMetadata: false, cancellationToken);
                 previousIdentities = previousContents.Identities;
                 await ValidateDiscoveryAsync(backupPath, Path.Combine(download.Path, "backup-hive"), previousContents, cancellationToken);
             }
@@ -137,7 +137,7 @@ internal class TemplatePackageService(
         await using (Stream backup = _fileSystem.OpenReadIfExists(backupPath)
             ?? throw new TemplatePackageException("The previous template package could not be backed up."))
         {
-            TemplatePackageContents contents = _validator.Validate(backup, packageId, previousVersion, cancellationToken);
+            TemplatePackageContents contents = _validator.Validate(backup, packageId, previousVersion, requireHostMetadata: false, cancellationToken);
             identities = contents.Identities;
             await ValidateDiscoveryAsync(backupPath, Path.Combine(recovery.Path, "backup-hive"), contents, cancellationToken);
         }

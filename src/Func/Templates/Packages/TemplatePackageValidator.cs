@@ -16,14 +16,15 @@ namespace Azure.Functions.Cli.Templates.Packages;
 /// </summary>
 internal sealed class TemplatePackageValidator
 {
-    public TemplatePackageContents Validate(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    public TemplatePackageContents Validate(
+        Stream archive, string packageId, NuGetVersion version, bool requireHostMetadata, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(archive);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentNullException.ThrowIfNull(version);
         try
         {
-            return ValidateCore(archive, packageId, version, cancellationToken);
+            return ValidateCore(archive, packageId, version, requireHostMetadata, cancellationToken);
         }
 
         catch (JsonException ex)
@@ -91,7 +92,8 @@ internal sealed class TemplatePackageValidator
 
     private static string NormalizePath(string path) => path.Replace('\\', '/').TrimStart('/');
 
-    private TemplatePackageContents ValidateCore(Stream archive, string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    private TemplatePackageContents ValidateCore(
+        Stream archive, string packageId, NuGetVersion version, bool requireHostMetadata, CancellationToken cancellationToken)
     {
         using PackageArchiveReader reader = new(archive, leaveStreamOpen: true);
         cancellationToken.ThrowIfCancellationRequested();
@@ -131,7 +133,8 @@ internal sealed class TemplatePackageValidator
             identities.Add(identity.GetString()!);
         }
 
-        foreach (string path in reader.GetFiles().Where(p => p.EndsWith(".template.config/func.host.json", StringComparison.OrdinalIgnoreCase)))
+        string[] hostPaths = [.. reader.GetFiles().Where(p => p.EndsWith(".template.config/func.host.json", StringComparison.OrdinalIgnoreCase))];
+        foreach (string path in hostPaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
             using Stream content = reader.GetStream(path);
@@ -142,6 +145,13 @@ internal sealed class TemplatePackageValidator
         if (identities.Count == 0)
         {
             throw new TemplatePackageException("The archive must contain at least one template identity.");
+        }
+
+        if (requireHostMetadata && !templatePaths.Any(templatePath =>
+            hostPaths.Contains(templatePath[..^"template.json".Length] + "func.host.json", StringComparer.Ordinal)))
+        {
+            throw new TemplatePackageException(
+                "The archive must contain a func.host.json file alongside a template.json declaration in .template.config.");
         }
 
         return new([.. identities.Distinct(StringComparer.Ordinal)], templatePaths);
