@@ -7,6 +7,7 @@ using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Templates.Packages;
 using Microsoft.Extensions.Options;
@@ -554,7 +555,7 @@ public sealed class TemplatePackageServiceTests : IDisposable
         public Templater Create(TemplateEngineContext context) => new FaultTemplater(context, HivePath, this);
 
         private sealed class FaultTemplater(TemplateEngineContext context, string hive, TestFactory factory)
-            : Templater(context, hive, [])
+            : Templater(context, hive, new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()).Get())
         {
             internal override async Task<InstallResult> InstallAsync(InstallRequest request, CancellationToken cancellationToken)
             {
