@@ -278,6 +278,38 @@ public sealed class TemplateCatalogTests
         requests.Should().Be(1);
     }
 
+    [Fact]
+    public async Task ResolveVersion_FeedFailureRedactsCredentialsAndQueryFromDiagnostic()
+    {
+        const string source = "https://user:password@feed.test/v3/index.json?token=sensitive";
+        const string nestedUrl = "https://user:password@feed.test/v3/registration?token=sensitive";
+        var metadata = Substitute.For<PackageMetadataResource>();
+        metadata.GetMetadataAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<SourceCacheContext>(),
+            Arg.Any<NuGet.Common.ILogger>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IEnumerable<IPackageSearchMetadata>>(
+                new FatalProtocolException($"Request to {nestedUrl} failed.")));
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions { Source = source }),
+            feed => new NuGetProtocolSourceClient(TestRepository.Build(feed, metadata)));
+
+        Func<Task> act = () => catalog.ResolveVersionAsync("test.templates", null, null, false, TestContext.Current.CancellationToken);
+
+        TemplatePackageException exception = (await act.Should().ThrowAsync<TemplatePackageException>()).Which;
+        exception.Message.Should().Contain("https://feed.test/v3/index.json");
+        exception.ToString().Should().NotContain("user:password").And.NotContain("sensitive");
+    }
+
+    [Fact]
+    public void SourceValidationFailureRedactsCredentialsAndQuery()
+    {
+        var catalog = new TemplateCatalog(Options.Create(new TemplateCatalogOptions()),
+            _ => throw new InvalidOperationException());
+
+        Action act = () => catalog.GetSource("ftp://user:password@feed.test/index.json?token=sensitive");
+
+        var exception = act.Should().Throw<ArgumentException>().Which;
+        exception.Message.Should().NotContain("user:password").And.NotContain("sensitive");
+    }
+
     [Theory]
     [InlineData("1.0.0")]
     [InlineData("2.0.0-preview.1")]

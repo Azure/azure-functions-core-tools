@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
 using NuGet.Protocol.Core.Types;
@@ -50,7 +51,8 @@ internal class TemplateCatalog(
             () => _clients(feed).ListListedVersionsAsync(packageId, cancellationToken), feed.Source, cancellationToken);
 
         return versions.Where(v => prerelease || !v.IsPrerelease).Max()
-            ?? throw new TemplatePackageException($"No matching version of '{packageId}' was found on '{feed.Source}'. Check --source or use --prerelease.");
+            ?? throw new TemplatePackageException(
+                $"No matching version of '{packageId}' was found on '{RedactUrls(feed.Source)}'. Check --source or use --prerelease.");
     }
 
     /// <summary>
@@ -82,7 +84,8 @@ internal class TemplateCatalog(
         catch (WorkloadPackageNotFoundException ex)
         {
             throw new TemplatePackageException(
-                $"Template package '{packageId}' {version} was not found on '{feed.Source}'. Check --source and --version.", ex);
+                $"Template package '{packageId}' {version} was not found on '{RedactUrls(feed.Source)}'. Check --source and --version.",
+                RedactException(ex));
         }
     }
 
@@ -98,7 +101,14 @@ internal class TemplateCatalog(
             return new PackageSource(PackageSourceProvider.DefaultSourceUrl);
         }
 
-        return PackageSourceProvider.Build(selected!.Trim(), "Template");
+        try
+        {
+            return PackageSourceProvider.Build(selected!.Trim(), "Template");
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ArgumentException(RedactUrls(ex.Message), ex.ParamName);
+        }
     }
 
     internal static void ValidatePackageId(string packageId)
@@ -112,29 +122,72 @@ internal class TemplateCatalog(
     private async Task<T> FromSourceAsync<T>(Func<Task<T>> operation, string source, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        string safeSource = RedactUrls(source);
         try
         {
             return await operation();
         }
         catch (FatalProtocolException ex)
         {
-            throw new TemplatePackageException($"Cannot read template feed '{source}'. Check --source, connectivity, and feed credentials.", ex);
+            throw new TemplatePackageException(
+                $"Cannot read template feed '{safeSource}'. Check --source, connectivity, and feed credentials.", RedactException(ex));
         }
         catch (InvalidDataException ex)
         {
-            throw new TemplatePackageException($"Template feed '{source}' returned an invalid response. Check --source.", ex);
+            throw new TemplatePackageException($"Template feed '{safeSource}' returned an invalid response. Check --source.", RedactException(ex));
         }
         catch (Newtonsoft.Json.JsonException ex)
         {
-            throw new TemplatePackageException($"Template feed '{source}' returned malformed JSON. Check --source.", ex);
+            throw new TemplatePackageException($"Template feed '{safeSource}' returned malformed JSON. Check --source.", RedactException(ex));
         }
         catch (HttpRequestException ex)
         {
-            throw new TemplatePackageException($"Cannot reach template feed '{source}'. Check --source and connectivity.", ex);
+            throw new TemplatePackageException($"Cannot reach template feed '{safeSource}'. Check --source and connectivity.", RedactException(ex));
         }
         catch (NuGetResourceUnavailableException ex)
         {
-            throw new TemplatePackageException($"Template feed '{source}' does not provide the required V3 service. Check --source.", ex);
+            throw new TemplatePackageException(
+                $"Template feed '{safeSource}' does not provide the required V3 service. Check --source.", RedactException(ex));
         }
     }
+
+    private static string RedactUrls(string value)
+        => Regex.Replace(value, """[a-zA-Z][a-zA-Z0-9+.-]*://[^\s"'<>]+""", match =>
+        {
+            string candidate = match.Value;
+            int end = candidate.Length;
+            while (end > 0 && candidate[end - 1] is '.' or ',' or ';' or ':' or ')' or ']' or '}')
+            {
+                end--;
+            }
+
+            string url = candidate[..end];
+            int queryOrFragment = url.IndexOfAny(['?', '#']);
+            if (queryOrFragment >= 0)
+            {
+                url = url[..queryOrFragment];
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+            {
+                return url;
+            }
+
+            var builder = new UriBuilder(uri)
+            {
+                UserName = string.Empty,
+                Password = string.Empty,
+                Query = string.Empty,
+                Fragment = string.Empty,
+            };
+            return builder.Uri.GetLeftPart(UriPartial.Path) + (queryOrFragment < 0 ? candidate[end..] : string.Empty);
+        });
+
+    private static Exception RedactException(Exception exception)
+    {
+        string details = RedactUrls(exception.ToString());
+        return details == exception.ToString() ? exception : new RedactedException(details);
+    }
+
+    private sealed class RedactedException(string message) : Exception(message);
 }
