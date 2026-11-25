@@ -1,7 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -31,7 +31,7 @@ internal sealed record StartInitializationProgressEvent(DateTimeOffset Timestamp
 /// <summary>
 /// Emitted when an initialization step streams log output.
 /// </summary>
-internal sealed record StartInitializationLogEvent(DateTimeOffset Timestamp, string StepId, string Line, FunctionsProjectReportSeverity Severity)
+internal sealed record StartInitializationLogEvent(DateTimeOffset Timestamp, string StepId, string Line, FunctionsReportSeverity Severity)
     : StartInitializationEvent(Timestamp);
 
 /// <summary>

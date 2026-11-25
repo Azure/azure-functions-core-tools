@@ -100,7 +100,7 @@ internal sealed class NodeFunctionsProject : FunctionsProject
         }
     }
 
-    private async Task RunAsync(string root, IReadOnlyList<string> args, string display, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
+    private async Task RunAsync(string root, IReadOnlyList<string> args, string display, IFunctionsReporter reporter, CancellationToken cancellationToken)
     {
         reporter.ReportStatus($"Running {display}");
 
@@ -109,8 +109,8 @@ internal sealed class NodeFunctionsProject : FunctionsProject
         int exitCode = await RunNpm(
             root,
             args,
-            line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-            line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+            line => reporter.WriteLog(line, FunctionsReportSeverity.Info),
+            line => reporter.WriteLog(line, FunctionsReportSeverity.Error),
             cancellationToken).ConfigureAwait(false);
 
         if (exitCode != 0)

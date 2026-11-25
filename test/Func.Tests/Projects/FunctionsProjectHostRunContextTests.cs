@@ -70,7 +70,7 @@ public sealed class FunctionsProjectHostRunContextTests
             new Dictionary<string, string>());
 
         context.Reporter.Should().NotBeNull();
-        context.Reporter.Should().BeOfType<NullFunctionsProjectHostRunReporter>();
+        context.Reporter.Should().BeOfType<NullFunctionsReporter>();
     }
 
     [Fact]
@@ -85,12 +85,12 @@ public sealed class FunctionsProjectHostRunContextTests
     }
 
     [Fact]
-    public void NullFunctionsProjectHostRunReporter_Methods_DoNotThrow()
+    public void NullFunctionsReporter_Methods_DoNotThrow()
     {
-        IFunctionsProjectHostRunReporter reporter = NullFunctionsProjectHostRunReporter.Instance;
+        IFunctionsReporter reporter = NullFunctionsReporter.Instance;
 
         reporter.ReportStatus("working");
-        reporter.WriteLog("line", FunctionsProjectReportSeverity.Warning);
+        reporter.WriteLog("line", FunctionsReportSeverity.Warning);
     }
 
     [Fact]

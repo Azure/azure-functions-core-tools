@@ -725,7 +725,7 @@ public class StartInitializationTests : IDisposable
     {
         using var stream = new MemoryStream();
         var renderer = new JsonStartInitializationRenderer(stream, ownsStream: false);
-        var logEvent = new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "npm output", FunctionsProjectReportSeverity.Warning);
+        var logEvent = new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "npm output", FunctionsReportSeverity.Warning);
         var failedEvent = new StartInitializationStepFailedEvent(DateTimeOffset.UnixEpoch, "prepare", "build failed");
 
         await renderer.OnEventAsync(logEvent, CancellationToken.None);
@@ -750,7 +750,7 @@ public class StartInitializationTests : IDisposable
     {
         var interaction = new TestInteractionService();
         var renderer = new PlainStartInitializationRenderer(interaction);
-        var logEvent = new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "npm output", FunctionsProjectReportSeverity.Info);
+        var logEvent = new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "npm output", FunctionsReportSeverity.Info);
 
         await renderer.OnEventAsync(logEvent, CancellationToken.None);
 
@@ -896,7 +896,7 @@ public class StartInitializationTests : IDisposable
         await renderer.OnEventAsync(new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, "prepare", double.NaN, "running npm install"), CancellationToken.None);
         for (int i = 1; i <= 12; i++)
         {
-            await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"entry {i:00}", FunctionsProjectReportSeverity.Info), CancellationToken.None);
+            await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"entry {i:00}", FunctionsReportSeverity.Info), CancellationToken.None);
             if (i == 10)
             {
                 // Ensure the transcript contains an earlier frame with entries that will leave the tail.
@@ -946,7 +946,7 @@ public class StartInitializationTests : IDisposable
         await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
         for (int i = 1; i <= 3; i++)
         {
-            await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"line {i}", FunctionsProjectReportSeverity.Info), CancellationToken.None);
+            await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"line {i}", FunctionsReportSeverity.Info), CancellationToken.None);
         }
 
         string output = await WaitForFrameAsync(writer, frame => frame.Contains("3 lines", StringComparison.Ordinal));
@@ -968,7 +968,7 @@ public class StartInitializationTests : IDisposable
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
-        await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", longLine, FunctionsProjectReportSeverity.Info), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", longLine, FunctionsReportSeverity.Info), CancellationToken.None);
 
         string ellipsis = console.Profile.Capabilities.Unicode ? "\u2026" : "...";
         await WaitForOutputAsync(writer, output => output.Contains(ellipsis, StringComparison.Ordinal));
@@ -992,7 +992,7 @@ public class StartInitializationTests : IDisposable
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
-        await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "error tail", FunctionsProjectReportSeverity.Error), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "error tail", FunctionsReportSeverity.Error), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationStepFailedEvent(DateTimeOffset.UnixEpoch, "prepare", "build failed"), CancellationToken.None);
         await WaitForFrameAsync(writer, frame => frame.Contains("build failed", StringComparison.Ordinal)
             && frame.Contains("error tail", StringComparison.Ordinal)

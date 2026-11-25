@@ -66,8 +66,8 @@ public class JavaFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, TestContext.Current.CancellationToken);
 
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "[INFO] BUILD SUCCESS");
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "[WARNING] something");
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsReportSeverity.Info && e.Line == "[INFO] BUILD SUCCESS");
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsReportSeverity.Error && e.Line == "[WARNING] something");
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class JavaFunctionsProjectTests : IDisposable
         Assert.True(ex.IsUserError);
         Assert.Contains("mvn clean package", ex.Message);
         Assert.Contains("exit 1", ex.Message);
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "[ERROR] BUILD FAILURE");
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsReportSeverity.Error && e.Line == "[ERROR] BUILD FAILURE");
     }
 
     [Fact]
@@ -166,12 +166,12 @@ public class JavaFunctionsProjectTests : IDisposable
     private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
         => new(_projectDir, "java", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
 
-    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    private sealed class CapturingReporter : IFunctionsReporter
     {
-        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly List<(string Line, FunctionsReportSeverity Severity)> _logs = [];
         private readonly object _gate = new();
 
-        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        public IReadOnlyList<(string Line, FunctionsReportSeverity Severity)> Logs
         {
             get
             {
@@ -186,7 +186,7 @@ public class JavaFunctionsProjectTests : IDisposable
         {
         }
 
-        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        public void WriteLog(string line, FunctionsReportSeverity severity = FunctionsReportSeverity.Info)
         {
             lock (_gate)
             {
