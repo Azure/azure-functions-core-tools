@@ -1,8 +1,8 @@
 steps:
 - task: NodeTool@0
   inputs:
-    versionSpec: '18.x'
-  displayName: 'Install Node 18.x'
+    versionSpec: '22.x'
+  displayName: 'Install Node 22.x'
 
 # PipAuthenticate must run before UsePythonVersion because UsePythonVersion's
 # setup.sh upgrades pip from pypi.org. PipAuthenticate sets PIP_INDEX_URL to
