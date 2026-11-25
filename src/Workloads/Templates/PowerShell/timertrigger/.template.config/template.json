@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Timer" ],
+  "identity": "Azure.Functions.Cli.PowerShell.TimerTrigger",
+  "name": "Azure Functions timer trigger (PowerShell)",
+  "description": "A timer trigger using PowerShell.",
+  "shortName": "timertrigger",
+  "defaultName": "TimerFunction",
+  "tags": {
+    "language": "PowerShell",
+    "stack": "powershell",
+    "type": "item"
+  },
+  "sourceName": "TimerFunction",
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "rename": {
+        "TimerFunction/run.ps1.txt": "TimerFunction/run.ps1"
+      }
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "TimerFunction/run.ps1" },
+    { "path": "TimerFunction/function.json" }
+  ]
+}

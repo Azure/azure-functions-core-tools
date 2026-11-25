@@ -1,0 +1,9 @@
+{
+  "symbolInfo": {
+    "NoHttp": { "longName": "no-http" },
+    "RuntimeVersion": { "longName": "runtime-version" },
+    "ManagedDependencies": { "longName": "managed-dependencies" },
+    "NoBundle": { "longName": "no-bundles" },
+    "BundlesChannel": { "longName": "bundles-channel", "shortName": "c" }
+  }
+}

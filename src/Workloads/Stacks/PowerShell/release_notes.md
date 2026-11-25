@@ -3,7 +3,8 @@
 ## 1.0.0-preview.3
 
 - Retarget the stack workload to `net11.0` for the .NET 11-based Azure Functions CLI; generated PowerShell applications are unchanged.
-- Add a workload template root with placeholder scaffolding for future PowerShell templates. (#5960)
+- Replace the PowerShell template placeholder with workload-included PowerShell project, HTTP-trigger, and timer-trigger templates; managed dependencies remain opt-in. (#5960, #5994)
+- Default PowerShell projects to runtime version 7.6; 7.4 reached end of life and is no longer accepted. (#5994)
 - **Compatibility:** Requires Azure Functions CLI 5.0.0-preview.7 or later for the .NET 11 runtime and contracts.
 
 ## 1.0.0-preview.2

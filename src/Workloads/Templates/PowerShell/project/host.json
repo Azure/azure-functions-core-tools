@@ -1,0 +1,14 @@
+{
+  //#if (!NoBundle)
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  },
+  //#endif
+  //#if (ManagedDependencies)
+  "managedDependency": {
+    "enabled": true
+  },
+  //#endif
+  "version": "2.0"
+}

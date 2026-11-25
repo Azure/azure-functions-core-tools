@@ -82,7 +82,7 @@ public class PowerShellProjectInitializerTests
 
             string localSettings = File.ReadAllText(Path.Combine(tempDir, "local.settings.json"));
             localSettings.Should().Contain("powershell");
-            localSettings.Should().Contain("7.4");
+            localSettings.Should().Contain("\"7.6\"");
         }
         finally
         {
@@ -211,8 +211,10 @@ public class PowerShellProjectInitializerTests
         }
     }
 
-    [Fact]
-    public async Task InitializeAsync_WithUnsupportedRuntimeVersion_Throws()
+    [Theory]
+    [InlineData("6.0")]
+    [InlineData("7.4")]
+    public async Task InitializeAsync_WithUnsupportedRuntimeVersion_Throws(string runtimeVersion)
     {
         string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
@@ -231,7 +233,7 @@ public class PowerShellProjectInitializerTests
                 Language: null,
                 Force: false);
 
-            await FluentActions.Awaiting(() => initializer.InitializeAsync(context, root.Parse(["--runtime-version", "6.0"]))).Should().ThrowAsync<ArgumentException>();
+            await FluentActions.Awaiting(() => initializer.InitializeAsync(context, root.Parse(["--runtime-version", runtimeVersion]))).Should().ThrowAsync<ArgumentException>();
         }
         finally
         {

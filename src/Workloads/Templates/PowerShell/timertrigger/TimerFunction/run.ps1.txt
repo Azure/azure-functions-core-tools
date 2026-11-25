@@ -1,0 +1,9 @@
+param($Timer)
+
+$currentUTCtime = (Get-Date).ToUniversalTime()
+
+if ($Timer.IsPastDue) {
+    Write-Host "PowerShell timer is running late!"
+}
+
+Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
