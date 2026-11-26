@@ -2,12 +2,14 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
+/// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters and
+/// refuses overwrites that the command did not force.
 /// </summary>
 /// <param name="context">The template engine context for the current command.</param>
 /// <param name="components">The template components to expose to the engine.</param>
@@ -18,7 +20,8 @@ internal class FuncTemplateEngineHost(
         AssemblyCliVersionProvider.Instance.Version,
         CreateDefaults(context),
         [.. (components ?? throw new ArgumentNullException(nameof(components)))
-            .Select(component => (component.InterfaceType, component.Instance))])
+            .Select(component => (component.InterfaceType, component.Instance))]),
+    ITemplateEngineHost
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -44,6 +47,19 @@ internal class FuncTemplateEngineHost(
 
         return base.TryGetHostParamDefault(paramName, out value);
     }
+
+    /// <summary>
+    /// Refuses to overwrite existing files. The engine asks only when creation runs without force, and a refusal
+    /// makes it return
+    /// <see cref="Microsoft.TemplateEngine.Edge.Template.CreationResultStatus.DestructiveChangesDetected"/>
+    /// before it writes anything.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DefaultTemplateEngineHost"/> approves every overwrite, so a file that appears after a dry run would
+    /// otherwise be replaced. Its implementation is explicit, so this host re-implements the interface.
+    /// </remarks>
+    bool ITemplateEngineHost.OnPotentiallyDestructiveChangesDetected(
+        IReadOnlyList<IFileChange> changes, IReadOnlyList<IFileChange> destructiveChanges) => false;
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {

@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -113,6 +115,20 @@ public class FuncTemplateEngineHostTests
         host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.ProjectRoot, out _).Should().BeTrue();
         host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.Language, out string? language).Should().BeTrue();
         language.Should().Be("TypeScript");
+    }
+
+    [Fact]
+    public void OnPotentiallyDestructiveChangesDetected_RefusesOverwrite()
+    {
+        using FuncTemplateEngineHost host = new(new TemplateEngineContext(_commandDirectory), []);
+        IFileChange change = Substitute.For<IFileChange>();
+        change.ChangeKind.Returns(ChangeKind.Overwrite);
+
+#pragma warning disable CS0618 // The engine still calls this obsolete member when creation runs without force.
+        bool approved = ((ITemplateEngineHost)host).OnPotentiallyDestructiveChangesDetected([change], [change]);
+#pragma warning restore CS0618
+
+        approved.Should().BeFalse();
     }
 
     [Fact]
