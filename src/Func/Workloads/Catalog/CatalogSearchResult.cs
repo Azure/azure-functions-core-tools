@@ -1,16 +1,17 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Projects;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
-/// One entry returned by <see cref="IWorkloadCatalog.SearchAsync"/>.
+/// Metadata for one version of a package on one source.
 /// </summary>
-/// <param name="PackageId">Lowercased NuGet package id.</param>
-/// <param name="LatestVersion">Highest version visible at the source under the requested prerelease policy.</param>
+/// <param name="PackageId">Package id as published on the source.</param>
+/// <param name="LatestVersion">Version described by this row.</param>
 /// <param name="Title">Optional <c>title</c> from the package metadata.</param>
 /// <param name="Description">Optional <c>description</c> from the package metadata.</param>
 /// <param name="Aliases">CLI-facing aliases parsed from <c>alias:&lt;name&gt;</c> tags.</param>
@@ -23,11 +24,12 @@ internal sealed record CatalogSearchResult(
     IReadOnlyList<string> Aliases,
     PackageSource Source)
 {
+    public StackDescriptor? Stack { get; init; }
+
     /// <summary>
     /// Lowercased value parsed from the <c>kind:</c> NuGet tag (e.g. <c>workload</c>,
     /// <c>content</c>, <c>meta</c>). <see langword="null"/> when the package omits the
-    /// tag. Lets callers filter results to a particular package shape, e.g.
-    /// <c>func workload search --stack</c> keeps only <c>kind:workload</c> entries.
+    /// tag; this describes the package shape, not whether it provides a project stack.
     /// </summary>
     public string? Kind { get; init; }
 

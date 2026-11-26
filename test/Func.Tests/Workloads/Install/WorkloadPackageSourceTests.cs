@@ -46,18 +46,16 @@ public sealed class WorkloadPackageSourceTests : IDisposable
         _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
             .Returns(
             [
-                SearchResult("example.implementation", alias, kind: "rid-package"),
+                SearchResult("example.pointer.win-x64", alias, kind: "content") with { Rid = "win-x64" },
                 SearchResult(expected.PackageId, alias, kind: "rid-pointer"),
             ]);
-        _catalog.ResolveLatestVersionAsync(
-            expected.PackageId, false, null, true, null, Arg.Any<CancellationToken>()).Returns(expected);
         WorkloadPackageSource source = NewSource();
 
         ResolvedPackage resolved = await source.ResolveAsync(
             alias, version: null, source: null, includePrerelease: null, exact: false,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        resolved.Should().BeSameAs(expected);
+        resolved.Should().Be(expected);
     }
 
     [Fact]
@@ -79,28 +77,43 @@ public sealed class WorkloadPackageSourceTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveAsync_EmptyFilteredSearch_RetriesWithoutFilter()
+    public async Task ResolveAsync_VersionPinUsesTheAliasAtThatVersion_NotTheLatestAlias()
     {
-        const string alias = "example";
-        ResolvedPackage expected = Package("example.pointer", "1.0.0");
-        _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == alias),
+        const string alias = "legacy";
+        const string feed = "https://example.test/v3/index.json";
+        var version = NuGetVersion.Parse("1.0.0");
+        _catalog.SearchVersionsAsync(
+                Arg.Is<CatalogSearchQuery>(query => query.Source == feed && query.Filter == null && query.IncludePrerelease == false),
                 Arg.Any<CancellationToken>())
-            .Returns([]);
-        _catalog.SearchAsync(
-                Arg.Is<CatalogSearchQuery>(query => query.Filter == null),
-                Arg.Any<CancellationToken>())
-            .Returns([SearchResult(expected.PackageId, alias, kind: "rid-pointer")]);
-        _catalog.ResolveLatestVersionAsync(
-            expected.PackageId, false, null, true, null, Arg.Any<CancellationToken>()).Returns(expected);
-        WorkloadPackageSource source = NewSource();
+            .Returns(
+            [
+                SearchResult("Contoso.DevKit", alias, "workload"),
+                SearchResult("Contoso.DevKit", "renamed", "workload") with { LatestVersion = NuGetVersion.Parse("2.0.0") },
+                SearchResult("Different.Owner", alias, "workload") with { LatestVersion = NuGetVersion.Parse("2.0.0") },
+            ]);
 
-        ResolvedPackage resolved = await source.ResolveAsync(
-            alias, version: null, source: null, includePrerelease: null, exact: false,
-            cancellationToken: TestContext.Current.CancellationToken);
+        var resolved = await NewSource().ResolveAsync(alias, version, feed, includePrerelease: false, exact: false, TestContext.Current.CancellationToken);
 
-        resolved.Should().BeSameAs(expected);
-        await _catalog.Received(2).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+        resolved.PackageId.Should().Be("Contoso.DevKit");
+        resolved.Version.Should().Be(version);
+        resolved.Source.Source.Should().Be(feed);
+        await _catalog.DidNotReceive().SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Contoso.DevKit", null)]
+    [InlineData("Other.Pointer.win-x64", "win-x64")]
+    public async Task ResolveAsync_UnrelatedPointerCannotMaskAStackOwnerCollision(string packageId, string? rid)
+    {
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns([
+                SearchResult("Other.Pointer", "comet", "rid-pointer") with { Stack = new("comet", "native", "Pointer") },
+                SearchResult(packageId, "comet", "workload") with { Rid = rid, Stack = new("COMET", "other", "Other") },
+            ]);
+
+        var act = () => NewSource().ResolveAsync("comet", version: null, source: null, includePrerelease: false, exact: false, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowExactlyAsync<AmbiguousPackageMatchException>().WithMessage($"*Other.Pointer*{packageId}*");
     }
 
     [Fact]

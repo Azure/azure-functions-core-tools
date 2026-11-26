@@ -5,18 +5,9 @@ using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Java;
 
-internal sealed class JavaProjectStack : IProjectStack
+internal sealed class JavaProjectStack(StackDescriptor descriptor) : IProjectStack
 {
-    public string Stack => "java";
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    public string DisplayName => "Java";
-
-    public IReadOnlyList<string> WorkerRuntimeAliases => [];
-
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
-    {
-        { "Java", [] }
-    };
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("java", "Java")];
 }

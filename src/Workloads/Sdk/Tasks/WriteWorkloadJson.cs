@@ -25,6 +25,10 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
 
     public string Description { get; set; } = string.Empty;
 
+    public string StackIdentifier { get; set; } = string.Empty;
+
+    public string WorkerRuntime { get; set; } = string.Empty;
+
     public string RuntimeIdentifier { get; set; } = string.Empty;
 
     public string EntryPointAssemblyPath { get; set; } = string.Empty;
@@ -69,6 +73,13 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
             Kind = Kind,
             DisplayName = string.IsNullOrEmpty(DisplayName) ? null : DisplayName,
             Description = string.IsNullOrEmpty(Description) ? null : Description,
+            Stack = string.IsNullOrEmpty(StackIdentifier) ? null : new StackModel
+            {
+                StackIdentifier = StackIdentifier,
+                WorkerRuntime = WorkerRuntime,
+                DisplayName = DisplayName,
+                Description = string.IsNullOrEmpty(Description) ? null : Description,
+            },
             RuntimeIdentifier = string.IsNullOrEmpty(RuntimeIdentifier) ? null : RuntimeIdentifier,
             EntryPoint = entryPoint,
             TemplateRoot = string.IsNullOrEmpty(TemplateRoot) ? null : TemplateRoot,
@@ -99,6 +110,28 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
         bool isPointer = string.Equals(Kind, "rid-pointer", StringComparison.Ordinal);
         bool isRidImplementation = !string.IsNullOrEmpty(RuntimeIdentifier);
         bool hasEntryPoint = !string.IsNullOrEmpty(EntryPointAssemblyPath) || !string.IsNullOrEmpty(EntryPointType);
+
+        if (!string.IsNullOrEmpty(StackIdentifier))
+        {
+            if (Kind != "workload" && !isPointer)
+            {
+                Log.LogError($"Workload kind '{Kind}' cannot declare a stack.");
+            }
+
+            if (!IsTagValue(StackIdentifier) || !IsTagValue(WorkerRuntime))
+            {
+                Log.LogError("StackIdentifier and WorkerRuntime must each be a single non-empty NuGet tag value.");
+            }
+
+            if (string.IsNullOrWhiteSpace(DisplayName))
+            {
+                Log.LogError("A stack workload must declare a Title.");
+            }
+        }
+        else if (!string.IsNullOrEmpty(WorkerRuntime))
+        {
+            Log.LogError("WorkerRuntime requires a StackIdentifier.");
+        }
 
         if (isPointer)
         {
@@ -189,6 +222,9 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
             && string.Equals(value, value.Trim(), StringComparison.Ordinal)
             && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
 
+    private static bool IsTagValue(string value)
+        => !string.IsNullOrEmpty(value) && !value.Any(c => char.IsWhiteSpace(c) || c == ',' || c == ';');
+
     private static bool FileContentEquals(string path, byte[] expected)
     {
         byte[] existing = File.ReadAllBytes(path);
@@ -229,6 +265,9 @@ internal sealed class WorkloadJsonModel
     [JsonPropertyName("description")]
     public string? Description { get; set; }
 
+    [JsonPropertyName("stack")]
+    public StackModel? Stack { get; set; }
+
     [JsonPropertyName("runtimeIdentifier")]
     public string? RuntimeIdentifier { get; set; }
 
@@ -249,4 +288,19 @@ internal sealed class EntryPointModel
 
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
+}
+
+internal sealed class StackModel
+{
+    [JsonPropertyName("stackIdentifier")]
+    public string StackIdentifier { get; set; } = string.Empty;
+
+    [JsonPropertyName("workerRuntime")]
+    public string WorkerRuntime { get; set; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
 }

@@ -19,12 +19,7 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// </summary>
 internal sealed class WorkloadSearchCommand : FuncCliCommand
 {
-    private const int DefaultTake = 20;
-
-    // Lowercased value of the `kind:` NuGet tag that marks a package as a stack
-    // workload (the only kind `func init --stack` can target). Mirrors the
-    // `kind:workload` PackageTag stack csprojs emit.
-    private const string StackKind = "workload";
+    private const int PageSize = 20;
 
     // Label used for non-prerelease versions when grouping search results by
     // release channel. Versions without a prerelease label all collapse to
@@ -58,7 +53,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<bool> StackOption { get; } = new("--stack")
     {
-        Description = "Show only stack workloads (packages tagged 'kind:workload', e.g. dotnet, node, python).",
+        Description = "Show only packages that declare a project stack.",
     };
 
     public WorkloadSearchCommand(IInteractionService interaction, IWorkloadCatalog catalog, IOptions<WorkloadCatalogOptions> catalogOptions)
@@ -90,41 +85,30 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
         }
 
-        // TODO: surface --skip and --take for paging once we have a UX
-        // story for repeated queries (see workload spec §4.1).
-        var searchQuery = new CatalogSearchQuery
+        CatalogSearchQuery searchQuery = new()
         {
             Filter = query,
             IncludePrerelease = effectivePrerelease,
-            Take = DefaultTake,
+            Take = PageSize,
             Source = source,
         };
 
         IReadOnlyList<CatalogSearchResult> results;
         try
         {
-            results = await _catalog.SearchAsync(searchQuery, cancellationToken);
+            results = await _catalog.SearchVersionsAsync(searchQuery, cancellationToken);
         }
-        catch (ArgumentException ex)
+        catch (WorkloadCatalogException ex)
         {
-            throw new GracefulException(ex.Message, isUserError: true);
+            throw new GracefulException($"Workload discovery is unavailable: {ex.Message}", ex, isUserError: true);
         }
 
         if (stackOnly)
         {
-            results = [.. results.Where(r => string.Equals(r.Kind, StackKind, StringComparison.OrdinalIgnoreCase))];
+            results = [.. results.Where(r => r.Stack is not null)];
         }
 
-        // Track the number of distinct packages the catalog returned before
-        // we expand into per-channel rows, so the "more may be available"
-        // hint stays anchored to the search page size rather than the
-        // post-expansion row count.
-        int packageCount = results.Count;
-
-        if (effectivePrerelease && results.Count > 0)
-        {
-            results = await ExpandResultsByChannelAsync(results, cancellationToken);
-        }
+        results = SelectChannelRows(results, effectivePrerelease);
 
         if (json)
         {
@@ -136,6 +120,14 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
                 title = r.Title,
                 description = r.Description,
                 aliases = r.Aliases,
+                source = r.Source.Source,
+                stack = r.Stack is null ? null : new
+                {
+                    stackIdentifier = r.Stack.Identifier,
+                    workerRuntime = r.Stack.WorkerRuntime,
+                    displayName = r.Stack.DisplayName,
+                    description = r.Stack.Description,
+                },
             }));
             return 0;
         }
@@ -159,7 +151,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             WriteCard(card, result);
         }
 
-        WriteFooter(results.Count, packageCount);
+        WriteFooter(results.Count);
         return 0;
     }
 
@@ -191,54 +183,20 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
     }
 
     /// <summary>
-    /// Expands each search hit into one row per release channel, fetching
-    /// the full version list per package and picking the latest version in
-    /// each channel. Preserves the original package ordering returned by
-    /// the catalog; within a package, channels are sorted by latest version
-    /// descending so the newest channel renders first.
+    /// Picks each channel's newest actual row, so a preview title or stack declaration
+    /// never leaks onto a stable version of the same package.
     /// </summary>
-    private async Task<IReadOnlyList<CatalogSearchResult>> ExpandResultsByChannelAsync(
-        IReadOnlyList<CatalogSearchResult> results,
-        CancellationToken cancellationToken)
-    {
-        CatalogSearchResult[][] perPackage = await Task.WhenAll(results.Select(r => ExpandSingleAsync(r, cancellationToken)));
-        return [.. perPackage.SelectMany(x => x)];
-    }
-
-    private async Task<CatalogSearchResult[]> ExpandSingleAsync(CatalogSearchResult result, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<NuGetVersion> versions;
-        try
-        {
-            versions = await _catalog.ListVersionsAsync(result.PackageId, result.Source.Source, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
-        {
-            // Version listing failures shouldn't drop the package from
-            // search output, the user can still see and install the row
-            // they already had. Fall back to the original hit, just
-            // tagged with the channel of the version we already know.
-            return [result with { Channel = GetChannel(result.LatestVersion) }];
-        }
-
-        if (versions.Count == 0)
-        {
-            return [result with { Channel = GetChannel(result.LatestVersion) }];
-        }
-
-        return [.. versions
-            .GroupBy(GetChannel, StringComparer.OrdinalIgnoreCase)
-            .Select(g => result with { LatestVersion = g.Max()!, Channel = g.Key })
-            .OrderByDescending(r => r.LatestVersion)];
-    }
+    private static IReadOnlyList<CatalogSearchResult> SelectChannelRows(IReadOnlyList<CatalogSearchResult> results, bool includePrerelease)
+        => [.. results.GroupBy(r => r.Source.Source, StringComparer.Ordinal)
+            .SelectMany(source => source.GroupBy(r => r.PackageId, StringComparer.OrdinalIgnoreCase))
+            .SelectMany(package => package
+                .OrderByDescending(r => r.LatestVersion)
+                .DistinctBy(r => GetChannel(r.LatestVersion))
+                .Select(r => includePrerelease ? r with { Channel = GetChannel(r.LatestVersion) } : r))];
 
     private static void WriteCard(WorkloadCardWriter card, CatalogSearchResult result)
     {
-        card.WriteHeading(DisplayNameOrPackageId(result));
+        card.WriteHeading(result.Stack?.DisplayName ?? (string.IsNullOrWhiteSpace(result.Title) ? result.PackageId : result.Title));
         card.WriteField("Version", result.LatestVersion.ToNormalizedString());
         if (!string.IsNullOrEmpty(result.Channel))
         {
@@ -246,24 +204,20 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         }
 
         card.WriteField("Package ID", result.PackageId);
-        card.WriteAliases(result.Aliases);
-        card.WriteDescription(result.Description);
-    }
-
-    private void WriteFooter(int count, int packageCount)
-    {
-        _interaction.WriteBlankLine();
-        string countLine = $"Showing {count} {(count == 1 ? "result" : "results")}.";
-        if (packageCount >= DefaultTake)
+        if (result.Stack is { } stack)
         {
-            countLine += " More may be available, refine your query.";
+            card.WriteField("Stack ID", stack.Identifier);
         }
 
-        _interaction.WriteHint(countLine);
-        _interaction.WriteHint("Run 'func workload install <alias | package id>' to install one (stable by default).");
-        _interaction.WriteHint("When several versions or channels exist, pass --version (-v) to install a specific one.");
+        card.WriteAliases(result.Aliases);
+        card.WriteDescription(result.Stack?.Description ?? result.Description);
     }
 
-    private static string DisplayNameOrPackageId(CatalogSearchResult result)
-        => string.IsNullOrWhiteSpace(result.Title) ? result.PackageId : result.Title!;
+    private void WriteFooter(int count)
+    {
+        _interaction.WriteBlankLine();
+        _interaction.WriteHint($"Showing {count} {(count == 1 ? "result" : "results")}.");
+        _interaction.WriteHint("Run 'func workload install <package-id> --exact' to install a package by ID.");
+        _interaction.WriteHint("When several versions or channels exist, pass --version (-v) to install a specific one.");
+    }
 }

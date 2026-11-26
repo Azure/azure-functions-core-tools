@@ -38,7 +38,7 @@ public class PowerShellProjectFactoryTests : IDisposable
     [Fact]
     public async Task Empty_directory_does_not_match()
     {
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -53,7 +53,7 @@ public class PowerShellProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.Created>(result);
@@ -64,7 +64,7 @@ public class PowerShellProjectFactoryTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "Modules"));
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
@@ -78,7 +78,7 @@ public class PowerShellProjectFactoryTests : IDisposable
         WriteFile("requirements.psd1", "@{}");
         WriteFile("run.ps1", "param($Request)");
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
@@ -91,7 +91,7 @@ public class PowerShellProjectFactoryTests : IDisposable
         WriteFile("requirements.txt", string.Empty);
         WriteFile("function_app.py", "import azure.functions");
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -103,7 +103,7 @@ public class PowerShellProjectFactoryTests : IDisposable
         WriteFile("package.json", "{}");
         WriteFile("index.js", "module.exports = async function() {}");
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -114,7 +114,7 @@ public class PowerShellProjectFactoryTests : IDisposable
     {
         WriteFile("MyModule.Format.ps1xml", "<Configuration />");
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
@@ -127,15 +127,16 @@ public class PowerShellProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        var stack = new PowerShellProjectStack(new("comet", "comet-host", "Comet"));
+        ProjectCreationResult result = await new PowerShellProjectFactory(stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("powershell", created.Project.StackName);
-        Assert.Equal("PowerShell", created.Project.StackDisplayName);
+        Assert.Same(stack, created.Project.Stack);
         Assert.Equal(expectedReason, created.Reason);
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        Assert.Equal("powershell", worker.WorkerRuntime);
+        await _workerResolver.Received(1).ResolveWorkerAsync(new FunctionsWorkerId("powershell"), Arg.Any<CancellationToken>());
+        Assert.Equal("comet-host", worker.WorkerRuntime);
     }
 
     [Fact]
@@ -148,7 +149,7 @@ public class PowerShellProjectFactoryTests : IDisposable
         _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
             .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
 
-        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(
+        ProjectCreationResult result = await new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(
             CreateContext(), TestContext.Current.CancellationToken);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
@@ -163,7 +164,7 @@ public class PowerShellProjectFactoryTests : IDisposable
     public async Task NullContext_throws()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new PowerShellProjectFactory().TryCreateProjectAsync(null!, TestContext.Current.CancellationToken));
+            () => new PowerShellProjectFactory(PowerShellWorkloadTests.Stack).TryCreateProjectAsync(null!, TestContext.Current.CancellationToken));
     }
 
     private void WriteFile(string name, string contents)

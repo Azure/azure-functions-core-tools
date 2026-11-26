@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Title>Java Stack</Title>
+    <Title>Java</Title>
     <Description>Azure Functions CLI tooling for Java projects.</Description>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
-    <WorkloadAlias>java</WorkloadAlias>
+    <StackIdentifier>java</StackIdentifier>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
   </PropertyGroup>
 

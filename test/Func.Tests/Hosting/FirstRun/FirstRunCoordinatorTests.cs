@@ -431,6 +431,9 @@ public sealed class FirstRunCoordinatorTests
                 : Task.FromResult(whenInputUnavailable);
         }
 
+        public Task<T> PromptForSelectionAsync<T>(string title, IEnumerable<T> choices, Func<T, string> display, CancellationToken cancellationToken = default) where T : notnull
+            => throw new NotSupportedException();
+
         public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
             => Task.FromResult(string.Empty);
 

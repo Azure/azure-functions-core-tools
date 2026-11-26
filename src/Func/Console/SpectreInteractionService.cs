@@ -366,6 +366,30 @@ internal class SpectreInteractionService : IInteractionService
             .ShowAsync(_stderr, cancellationToken);
     }
 
+    public async Task<T> PromptForSelectionAsync<T>(string title, IEnumerable<T> choices, Func<T, string> display, CancellationToken cancellationToken = default) where T : notnull
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(display);
+        List<T> values = [.. choices];
+        if (values.Count == 0)
+        {
+            throw new ArgumentException("At least one choice is required.", nameof(choices));
+        }
+
+        if (!CanSelect)
+        {
+            return values[0];
+        }
+
+        _managedInputConsole = _stderr;
+        return await new SelectionPrompt<T>()
+            .Title(title)
+            .EnableSearch()
+            .UseConverter(value => Markup.Escape(display(value)))
+            .AddChoices(values)
+            .ShowAsync(_stderr, cancellationToken);
+    }
+
     public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
         => PromptForMultiSelectionAsync(title, choices.Select(static c => new MultiSelectionChoice(c)), cancellationToken);
 

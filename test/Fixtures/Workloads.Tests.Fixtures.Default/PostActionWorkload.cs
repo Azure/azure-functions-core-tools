@@ -7,10 +7,6 @@ namespace Azure.Functions.Cli.Workloads.Tests.Fixtures.Default;
 
 public class PostActionWorkload : Workload
 {
-    public override string DisplayName => "Post-action fixture";
-
-    public override string Description => "Exercises the workload post-action contract across assembly load contexts.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);

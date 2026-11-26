@@ -3,10 +3,12 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Azure.Functions.Cli.Workloads.Install;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using NSubstitute;
 using NuGet.Common;
+using NuGet.Packaging.Core;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
@@ -52,6 +54,182 @@ public sealed class WorkloadCatalogTests
             new CatalogSearchQuery { Source = _altSource.Source }, TestContext.Current.CancellationToken);
 
         results.Should().ContainSingle().Subject.PackageId.Should().Be("override-pkg");
+    }
+
+    [Fact]
+    public async Task ResolveAlias_FindsUntaggedWorkloadOnNuGetOrg()
+    {
+        var nuget = new PackageSource(PackageSourceProvider.DefaultSourceUrl);
+        var index = new ServiceIndexResourceV3(JObject.Parse("""
+            {"version":"3.0.0","resources":[
+                {"@id":"https://legacy.test/query","@type":"SearchQueryService"},
+                {"@id":"https://typed.test/query","@type":"SearchQueryService/3.5.0"}
+            ]}
+            """), DateTime.UtcNow);
+        var client = new FakeClient(TestRepository.Build(nuget, index), null, uri =>
+        {
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            uri.Host.Should().Be("typed.test");
+            query["packageType"].Should().Be("FuncCliWorkload");
+            return string.IsNullOrEmpty(query["q"])
+                ? JObject.Parse("""
+                    {"totalHits":2,"data":[
+                        {"id":"Unrelated","version":"2.0.0","packageTypes":["Dependency"],"tags":"alias:comet"},
+                        {"id":"Contoso.DevKit","version":"1.0.0","packageTypes":["FuncCliWorkload"],"tags":"stack:comet worker-runtime:native alias:comet","title":"Comet"}
+                    ]}
+                    """)
+                : SearchResponse();
+        });
+        var packages = new WorkloadPackageSource(NewCatalog((nuget, client)), Substitute.For<IWorkloadPackageInspector>(), Options.Create(new WorkloadCatalogOptions()));
+
+        var result = await packages.ResolveAsync("comet", null, nuget.Source, false, false, TestContext.Current.CancellationToken);
+
+        result.PackageId.Should().Be("Contoso.DevKit");
+        result.Version.Should().Be(V("1.0.0"));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task SearchAsync_BoundsOnlyUnverifiedInventories(bool reportsTotal, bool allWorkloads)
+    {
+        const int pageSize = 500;
+        const int hitCount = 1001;
+        var requests = 0;
+        var client = new FakeClient(TestRepository.Build(_defaultSource, NewServiceIndex()), null, uri =>
+        {
+            requests++;
+            int skip = int.Parse(System.Web.HttpUtility.ParseQueryString(uri.Query)["skip"]!);
+            var hits = new JArray();
+            foreach (int i in Enumerable.Range(skip, Math.Min(pageSize, hitCount - skip)))
+            {
+                var hit = new JObject { ["id"] = $"Package.{i}", ["version"] = "1.0.0" };
+                if (allWorkloads || i == 0)
+                {
+                    hit["packageTypes"] = new JArray("FuncCliWorkload");
+                }
+                else if (reportsTotal)
+                {
+                    hit["packageTypes"] = new JArray("Dependency");
+                }
+                hits.Add(hit);
+            }
+
+            return reportsTotal ? new JObject { ["totalHits"] = hitCount, ["data"] = hits } : new JObject { ["data"] = hits };
+        });
+        var catalog = NewCatalog((_defaultSource, client));
+
+        var act = () => catalog.SearchAsync(new CatalogSearchQuery { Take = pageSize }, TestContext.Current.CancellationToken);
+
+        if (allWorkloads)
+        {
+            (await act()).Should().HaveCount(hitCount);
+        }
+        else
+        {
+            await act.Should().ThrowExactlyAsync<WorkloadCatalogException>().WithMessage("*FuncCliWorkload*--exact*");
+            requests.Should().Be(reportsTotal ? 1 : 3);
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SearchVersionsAsync_UsesTheSelectedSourcesListedVersionMetadataAcrossPages(bool includePrerelease)
+    {
+        const string id = "Contoso.DevKit";
+        var metadata = Substitute.For<PackageMetadataResource>();
+        IPackageSearchMetadata[] versions =
+        [
+            VersionMetadata("0.9.0", "Before stacks", "kind:workload alias:comet"),
+            VersionMetadata("1.0.0", "Comet", "kind:workload alias:legacy alias:comet stack:comet worker-runtime:comet"),
+            VersionMetadata("2.0.0-preview.1", "Comet Next", "kind:workload alias:comet stack:comet worker-runtime:native"),
+        ];
+        metadata.GetMetadataAsync(id, includePrerelease, false, Arg.Any<SourceCacheContext>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IEnumerable<IPackageSearchMetadata>>(versions));
+
+        var repo = TestRepository.Build(_altSource, NewServiceIndex(), metadata);
+        var offsets = new List<int>();
+        var client = new FakeClient(repo, response: null, uri =>
+        {
+            var offset = int.Parse(System.Web.HttpUtility.ParseQueryString(uri.Query)["skip"]!);
+            offsets.Add(offset);
+            var hit = offset == 0
+                ? JObject.Parse("""{"id":"Unrelated","version":"4.0.0","packageTypes":[{"name":"Dependency"}]}""")
+                : JObject.Parse("""{"id":"Contoso.DevKit","version":"2.0.0-preview.1","title":"Latest hit, not the stable title"}""");
+            return new JObject { ["data"] = new JArray(hit), ["totalHits"] = 2 };
+        });
+        var provider = Substitute.For<IPackageSourceProvider>();
+        provider.GetSource(_altSource.Source).Returns(_altSource);
+        var catalog = new WorkloadCatalog(Options.Create(new WorkloadCatalogOptions { IncludePrerelease = true }), provider, source =>
+        {
+            source.Should().BeSameAs(_altSource);
+            return client;
+        });
+
+        var rows = await catalog.SearchVersionsAsync(new CatalogSearchQuery { Source = _altSource.Source, Take = 1, IncludePrerelease = includePrerelease }, TestContext.Current.CancellationToken);
+
+        offsets.Should().Equal(0, 1);
+        rows.Should().OnlyContain(row => row.PackageId == id && row.Source == _altSource);
+        rows.Single(row => row.LatestVersion == V("0.9.0")).Stack.Should().BeNull();
+        var stable = rows.Single(row => row.LatestVersion == V("1.0.0"));
+        stable.Stack!.Identifier.Should().Be("comet");
+        stable.Stack.DisplayName.Should().Be("Comet");
+        stable.Stack.WorkerRuntime.Should().Be("comet");
+        stable.Stack.Description.Should().Be("Comet tooling");
+        stable.Aliases.Should().Equal("legacy", "comet");
+        if (includePrerelease)
+        {
+            var preview = rows.Single(row => row.LatestVersion.IsPrerelease);
+            preview.Stack!.DisplayName.Should().Be("Comet Next");
+            preview.Stack.WorkerRuntime.Should().Be("native");
+            preview.Stack.Description.Should().Be("Comet Next tooling");
+        }
+        else
+        {
+            rows.Should().NotContain(row => row.LatestVersion.IsPrerelease);
+        }
+
+        static IPackageSearchMetadata VersionMetadata(string version, string title, string tags)
+        {
+            var result = Substitute.For<IPackageSearchMetadata>();
+            result.Identity.Returns(new PackageIdentity(id, V(version)));
+            result.IsListed.Returns(true);
+            result.Tags.Returns(tags);
+            result.Title.Returns(title);
+            result.Description.Returns($"{title} tooling");
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task SearchVersionsAsync_UnavailableMetadataSource_IsNotAnEmptyInventory()
+    {
+        var catalog = NewCatalog((_defaultSource, BuildClient(_defaultSource, search: [("Contoso.DevKit", "1.0.0")])));
+
+        var act = () => catalog.SearchVersionsAsync(new(), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowExactlyAsync<WorkloadCatalogException>().WithMessage($"*{_defaultSource.Source}*");
+    }
+
+    [Fact]
+    public async Task ResolveAlias_ConflictingOwnersOnDifferentFeedPages_RequiresExactPackageId()
+    {
+        var client = new FakeClient(TestRepository.Build(_defaultSource, NewServiceIndex()), null, uri =>
+        {
+            string id = uri.Query.Contains("skip=0&", StringComparison.Ordinal) ? "Contoso.DevKit" : "Another.Owner";
+            JObject page = SearchResponse((id, "1.0.0"));
+            page["totalHits"] = 2;
+            page["data"]![0]!["tags"] = "kind:workload stack:comet worker-runtime:comet alias:comet";
+            page["data"]![0]!["title"] = "Comet";
+            return page;
+        });
+        var source = new WorkloadPackageSource(NewCatalog((_defaultSource, client)), Substitute.For<IWorkloadPackageInspector>(), Options.Create(new WorkloadCatalogOptions()));
+
+        var act = () => source.ResolveAsync("comet", null, _defaultSource.Source, false, false, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowExactlyAsync<AmbiguousPackageMatchException>().WithMessage("*Contoso.DevKit*Another.Owner*--exact*");
     }
 
     [Fact]
@@ -378,7 +556,7 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
-    public async Task ResolveVersionAsync_LowercasesPackageId()
+    public async Task ResolveVersionAsync_PreservesPackageId()
     {
         WorkloadCatalog catalog = NewCatalog(
             (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0")])));
@@ -386,7 +564,7 @@ public sealed class WorkloadCatalogTests
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync(
             "Alpha", V("1.0.0"), cancellationToken: TestContext.Current.CancellationToken);
 
-        resolved!.PackageId.Should().Be("alpha");
+        resolved!.PackageId.Should().Be("Alpha");
     }
 
     [Fact]
@@ -432,14 +610,14 @@ public sealed class WorkloadCatalogTests
 
     private static NuGetVersion V(string v) => NuGetVersion.Parse(v);
 
-    private sealed class FakeClient(SourceRepository repo, JObject? response) : NuGetProtocolSourceClient(repo)
+    private sealed class FakeClient(SourceRepository repo, JObject? response, Func<Uri, JObject?>? getPage = null) : NuGetProtocolSourceClient(repo)
     {
         public Uri? LastSearchUri { get; private set; }
 
         internal override Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
         {
             LastSearchUri = searchUri;
-            return Task.FromResult(response);
+            return Task.FromResult(getPage is null ? response : getPage(searchUri));
         }
     }
 

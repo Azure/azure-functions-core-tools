@@ -117,7 +117,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
             "test.workload",
             "1.0.0",
             Arg.Is<WorkloadEntry>(entry =>
-                entry.PackageId == "test.workload"
+                entry.PackageId == "Test.Workload"
                 && entry.PackageVersion == "1.1.0"),
             Arg.Any<CancellationToken>());
     }

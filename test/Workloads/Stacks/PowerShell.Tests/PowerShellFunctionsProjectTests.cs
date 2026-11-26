@@ -40,7 +40,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
     {
         PowerShellFunctionsProject project = CreateProject();
 
-        Assert.Equal("powershell", project.StackName);
+        Assert.Equal("powershell", project.Stack.Descriptor.Identifier);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class PowerShellFunctionsProjectTests : IDisposable
     {
         PowerShellFunctionsProject project = CreateProject();
 
-        Assert.Equal("PowerShell", project.StackDisplayName);
+        Assert.Equal("PowerShell", project.Stack.Descriptor.DisplayName);
     }
 
     [Fact]
@@ -99,11 +99,11 @@ public class PowerShellFunctionsProjectTests : IDisposable
     [Fact]
     public void Constructor_NullWorkingDirectory_throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new PowerShellFunctionsProject(null!));
+        Assert.Throws<ArgumentNullException>(() => new PowerShellFunctionsProject(null!, PowerShellWorkloadTests.Stack));
     }
 
     private PowerShellFunctionsProject CreateProject()
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName));
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), PowerShellWorkloadTests.Stack);
 
     private static IFunctionsWorker CreateWorker(string workerId, string workerRuntime)
         => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", "1.0.0");

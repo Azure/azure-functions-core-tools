@@ -274,6 +274,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             PackageVersion = entry.PackageVersion,
             PackageRoot = entry.PackageRoot,
             Kind = entry.Kind,
+            Stack = entry.Stack,
             Aliases = entry.Aliases,
             DisplayName = entry.DisplayName,
             Description = entry.Description,
@@ -324,7 +325,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             HydratePackageRoots(registry);
             return registry;
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or ArgumentException)
         {
             throw new GracefulException(
                 $"Failed to parse '{path}': {ex.Message}",

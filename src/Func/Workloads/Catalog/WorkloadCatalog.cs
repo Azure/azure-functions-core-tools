@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.Options;
+using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
 
@@ -21,12 +22,37 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
 
     /// <inheritdoc />
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
+        => SearchCoreAsync(query, allVersions: false, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<CatalogSearchResult>> SearchVersionsAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
+        => SearchCoreAsync(query, allVersions: true, cancellationToken);
+
+    private async Task<IReadOnlyList<CatalogSearchResult>> SearchCoreAsync(CatalogSearchQuery query, bool allVersions, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfNegative(query.Skip);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(query.Take ?? CatalogSearchQuery.DefaultTake);
 
-        CatalogSearchQuery effectiveQuery = query with { IncludePrerelease = IncludePrerelease(query.IncludePrerelease) };
+        NuGetProtocolSourceClient client;
+        try
+        {
+            client = ResolveClient(query.Source);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new WorkloadCatalogException(ex.Message, ex);
+        }
 
-        return ResolveClient(effectiveQuery.Source).SearchAsync(effectiveQuery, cancellationToken);
+        try
+        {
+            return await client.SearchWorkloadAsync(query with { IncludePrerelease = IncludePrerelease(query.IncludePrerelease) }, allVersions, cancellationToken);
+        }
+        catch (Exception ex) when (ex is NuGetProtocolException or HttpRequestException or IOException or InvalidOperationException
+            or Newtonsoft.Json.JsonException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            throw new WorkloadCatalogException($"Could not read package metadata from '{client.Source.Source}': {ex.Message}", ex);
+        }
     }
 
     /// <inheritdoc />
@@ -106,7 +132,7 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
         IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
         NuGetVersion? selected = selectVersion(versions);
 
-        return selected is null ? null : new ResolvedPackage(packageId.ToLowerInvariant(), selected, client.Source);
+        return selected is null ? null : new ResolvedPackage(packageId, selected, client.Source);
     }
 
     private static NuGetVersion? SelectLatest(IEnumerable<NuGetVersion> versions, Func<NuGetVersion, bool> predicate)

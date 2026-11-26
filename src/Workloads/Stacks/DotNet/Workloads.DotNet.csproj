@@ -2,11 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Title>.NET Stack</Title>
+    <Title>.NET</Title>
     <Description>Azure Functions CLI tooling for .NET (C#, F#) projects.</Description>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
-    <WorkloadAlias>dotnet</WorkloadAlias>
+    <StackIdentifier>dotnet</StackIdentifier>
+    <WorkerRuntime>dotnet-isolated</WorkerRuntime>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
   </PropertyGroup>
 

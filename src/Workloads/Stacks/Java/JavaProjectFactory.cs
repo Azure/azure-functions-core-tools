@@ -11,8 +11,10 @@ namespace Azure.Functions.Cli.Workloads.Java;
 /// Creates Java Functions projects from Java-specific fingerprints
 /// (Maven <c>pom.xml</c>, Gradle build scripts, or a <c>src/main/java</c> tree).
 /// </summary>
-internal sealed class JavaProjectFactory : IFunctionsProjectFactory
+internal sealed class JavaProjectFactory(JavaProjectStack stack) : IFunctionsProjectFactory
 {
+    private readonly JavaProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -30,7 +32,7 @@ internal sealed class JavaProjectFactory : IFunctionsProjectFactory
             return Task.FromResult(NotCreated("no Java project fingerprint found"));
         }
 
-        FunctionsProject project = new JavaFunctionsProject(context.WorkingDirectory);
+        FunctionsProject project = new JavaFunctionsProject(context.WorkingDirectory, _stack);
         return Task.FromResult(Created(project, reason));
     }
 

@@ -198,7 +198,7 @@ public class GoFunctionsProjectTests : IDisposable
     }
 
     private GoFunctionsProject CreateProject(Func<string, string, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), GoWorkloadTests.Stack)
         {
             RunGoBuild = runner,
             ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 24)),

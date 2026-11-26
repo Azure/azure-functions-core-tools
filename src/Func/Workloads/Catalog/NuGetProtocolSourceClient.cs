@@ -28,25 +28,93 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     // Wiki: https://github.com/NuGet/Home/wiki/Search-by-Package-Type-and-Query-Language-Surfacing
     private const string PackageTypeQueryParam = "packageType";
 
+    // Limit unverified inventory to the size of one maximum-size nuget.org search page.
+    private const int MaxClientFilteredHits = 1000;
+
     private readonly SourceRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
     public PackageSource Source => _repository.PackageSource;
 
-    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CatalogSearchResult>> SearchWorkloadAsync(CatalogSearchQuery query, bool allVersions, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        int take = query.Take ?? CatalogSearchQuery.DefaultTake;
-        Uri? searchUri = await TryBuildV3SearchUriAsync(query, take, cancellationToken);
+        CatalogSearchQuery page = query;
+        bool includePrerelease = query.IncludePrerelease == true;
+        HashSet<string> visited = [with(StringComparer.OrdinalIgnoreCase)];
+        List<CatalogSearchResult> rows = [];
+        using SourceCacheContext cache = new();
+        PackageMetadataResource? registration = null;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            JObject? raw = await ReadSearchPageAsync(page, cancellationToken);
+            if (raw?["data"] is not JArray hits)
+            {
+                throw new WorkloadCatalogException($"Source '{Source.Source}' returned an invalid workload search page.");
+            }
 
-        if (searchUri is null)
+            // Bound client-side filtering when a feed ignores packageType or doesn't echo the type.
+            // A source returning confirmed workload packages can be paged to completion.
+            int next = page.Skip + hits.Count;
+            int? total = (int?)raw["totalHits"];
+            if (Math.Max(next, total.GetValueOrDefault()) - query.Skip > MaxClientFilteredHits
+                && hits.Any(hit => DeclaresWorkloadPackageType(hit["packageTypes"]) is not true))
+            {
+                throw new WorkloadCatalogException($"Source '{Source.Source}' returned a broad search without confirming the '{WorkloadPackageTypes.Workload}' package type. Refine the search or install a known package ID with --exact.");
+            }
+
+            foreach (CatalogSearchResult hit in ParseV3Hits(raw, Source))
+            {
+                if (!visited.Add(hit.PackageId))
+                {
+                    continue;
+                }
+
+                if (!allVersions)
+                {
+                    if (includePrerelease || !hit.LatestVersion.IsPrerelease)
+                    {
+                        rows.Add(hit);
+                    }
+
+                    continue;
+                }
+
+                // The search hit describes only its latest version. Registration supplies the
+                // title, description and tags of each listed version without downloading a package.
+                registration ??= await GetRequiredResourceAsync<PackageMetadataResource>(cancellationToken);
+                IEnumerable<IPackageSearchMetadata> versions = await registration.GetMetadataAsync(hit.PackageId, includePrerelease, includeUnlisted: false,
+                    cache, NullLogger.Instance, cancellationToken);
+                foreach (IPackageSearchMetadata version in versions)
+                {
+                    if (version.IsListed && (includePrerelease || !version.Identity.Version.IsPrerelease))
+                    {
+                        rows.Add(CreateResult(version.Identity.Id, version.Identity.Version, version.Title, version.Description, version.Tags, Source));
+                    }
+                }
+            }
+
+            // Advance by raw hits, not client-filtered workloads or expanded version rows.
+            if (hits.Count == 0 || (total.HasValue ? next >= total : hits.Count < (page.Take ?? CatalogSearchQuery.DefaultTake)))
+            {
+                return rows;
+            }
+
+            page = page with { Skip = next };
+        }
+    }
+
+    private async Task<JObject?> ReadSearchPageAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
+    {
+        Uri? uri = await TryBuildV3SearchUriAsync(query, query.Take ?? CatalogSearchQuery.DefaultTake, cancellationToken);
+        if (uri is null)
         {
             throw new InvalidOperationException(
                 $"Source '{Source.Source}' does not advertise a SearchQueryService entry. Workload search requires a V3 NuGet feed.");
         }
 
-        JObject? raw = await FetchSearchResponseAsync(searchUri, cancellationToken);
-        return raw is null ? [] : ParseV3Hits(raw, Source);
+        return await FetchSearchResponseAsync(uri, cancellationToken);
     }
 
     public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, CancellationToken cancellationToken)
@@ -59,11 +127,19 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return versions?.ToList() ?? [];
     }
 
-    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<NuGetVersion>> ListListedVersionsAsync(string packageId, CancellationToken cancellationToken)
     {
-        FindPackageByIdResource findResource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
-        using var cache = new SourceCacheContext();
+        PackageMetadataResource metadata = await GetRequiredResourceAsync<PackageMetadataResource>(cancellationToken);
+        using var cache = new SourceCacheContext { NoCache = true };
 
+        IEnumerable<IPackageSearchMetadata> versions = await metadata.GetMetadataAsync(
+            packageId, includePrerelease: true, includeUnlisted: false, cache, NullLogger.Instance, cancellationToken);
+
+        return versions.Where(version => version.IsListed).Select(version => version.Identity.Version).ToList();
+    }
+
+    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken, bool bypassCache = false)
+    {
         // Spool to a temp file so the caller gets a seekable stream that
         // PackageArchiveReader can consume without keeping NuGet.Protocol's
         // internal buffers alive. The stream is returned to the caller
@@ -74,8 +150,9 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         FileStream fileStream = new(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, bufferSize: 4096, FileOptions.DeleteOnClose);
         try
         {
-            bool copied = await findResource.CopyNupkgToStreamAsync(
-                packageId, version, fileStream, cache, NullLogger.Instance, cancellationToken);
+            FindPackageByIdResource resource = await GetRequiredResourceAsync<FindPackageByIdResource>(cancellationToken);
+            using SourceCacheContext cache = new() { NoCache = bypassCache };
+            bool copied = await resource.CopyNupkgToStreamAsync(packageId, version, fileStream, cache, NullLogger.Instance, cancellationToken);
 
             if (!copied)
             {
@@ -115,7 +192,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         where T : class, INuGetResource
     {
         T? resource = await _repository.GetResourceAsync<T>(cancellationToken);
-        return resource ?? throw new InvalidOperationException(
+        return resource ?? throw new NuGetResourceUnavailableException(
             $"Source '{Source.Source}' does not provide the NuGet resource '{typeof(T).Name}'.");
     }
 
@@ -133,11 +210,10 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             return null;
         }
 
-        // GetServiceEntryUri picks the best match in priority order across
-        // the V3 service index versions; pass the unversioned key first.
+        // Version 3.5.0 introduced packageType filtering.
         string? baseUrl = serviceIndex.GetServiceEntryUri(
-            "SearchQueryService",
             "SearchQueryService/3.5.0",
+            "SearchQueryService",
             "SearchQueryService/3.0.0-rc",
             "SearchQueryService/3.0.0-beta")?.AbsoluteUri;
 
@@ -160,13 +236,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     }
 
     /// <summary>
-    /// Parses the V3 search response and applies a defensive client-side
-    /// filter on each hit's <c>packageTypes</c> array. nuget.org honours
-    /// <c>packageType=</c> only when the query string is non-empty; an
-    /// unfiltered <c>func workload search</c> otherwise leaks arbitrary
-    /// matches like <c>Azure.Functions.Cli.Abstractions</c> (see
-    /// azure-functions-core-tools#5198). Hits that omit <c>packageTypes</c>
-    /// are kept, since some V3 feeds don't surface the field.
+    /// Parses the V3 search response, excluding packages that explicitly declare only other types.
     /// </summary>
     internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
     {
@@ -186,27 +256,24 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
                 continue;
             }
 
-            if (!HitMatchesWorkloadPackageType(hit["packageTypes"]))
+            if (DeclaresWorkloadPackageType(hit["packageTypes"]) is false)
             {
                 continue;
             }
 
-            string? tagsString = GetTagsString(hit["tags"]);
-            results.Add(new CatalogSearchResult(
-                PackageId: id.ToLowerInvariant(),
-                LatestVersion: version,
-                Title: (string?)hit["title"],
-                Description: (string?)hit["description"],
-                Aliases: WorkloadPackageTags.ParseValues(tagsString, WorkloadPackageTags.AliasPrefix),
-                Source: source)
-            {
-                Kind = ParseKind(tagsString),
-                Rid = ParseRid(tagsString),
-            });
+            results.Add(CreateResult(id, version, (string?)hit["title"], (string?)hit["description"], GetTagsString(hit["tags"]), source));
         }
 
         return results;
     }
+
+    private static CatalogSearchResult CreateResult(string id, NuGetVersion version, string? title, string? description, string? tags, PackageSource source)
+        => new(id, version, title, description, WorkloadPackageTags.ParseValues(tags, WorkloadPackageTags.AliasPrefix), source)
+        {
+            Kind = WorkloadPackageTags.ParseLastValue(tags, WorkloadPackageTags.KindPrefix),
+            Rid = WorkloadPackageTags.ParseLastValue(tags, WorkloadPackageTags.RuntimeIdentifierPrefix),
+            Stack = WorkloadPackageTags.ParseStack(tags, title, description),
+        };
 
     private static string? GetTagsString(JToken? tags)
     {
@@ -227,34 +294,17 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return null;
     }
 
-    // Last kind:<value> tag wins if a package is mis-tagged with more than one;
-    // returning null when the tag is absent means callers can distinguish
-    // "not declared" from a typo'd value.
-    private static string? ParseKind(string? tags)
-        => WorkloadPackageTags.ParseLastValue(tags, WorkloadPackageTags.KindPrefix);
-
-    // Last rid:<value> tag wins, same as kind. Per-RID workload packs (host,
-    // python worker) carry exactly one `rid:` tag matching the runtime they
-    // target; single-RID packs omit it.
-    private static string? ParseRid(string? tags)
-        => WorkloadPackageTags.ParseLastValue(tags, WorkloadPackageTags.RuntimeIdentifierPrefix);
-
-    // Hits without a `packageTypes` array fall through (kept): V3 search
-    // responses don't guarantee the field, and dropping silent hits would
-    // empty out compliant feeds. When the array is present, require the
-    // FuncCliWorkload entry so arbitrary nuget.org packages don't leak
-    // through when the server-side `packageType=` filter is ignored (e.g.
-    // for empty queries).
-    private static bool HitMatchesWorkloadPackageType(JToken? packageTypes)
+    // Some V3 feeds honor the filter without echoing packageTypes in their results.
+    private static bool? DeclaresWorkloadPackageType(JToken? packageTypes)
     {
         if (packageTypes is not JArray array || array.Count == 0)
         {
-            return true;
+            return null;
         }
 
         foreach (JToken entry in array)
         {
-            string? name = (string?)entry["name"] ?? (entry as JValue)?.Value as string;
+            string? name = entry is JObject objectEntry ? (string?)objectEntry["name"] : (entry as JValue)?.Value as string;
             if (!string.IsNullOrEmpty(name)
                 && string.Equals(name, WorkloadPackageTypes.Workload, StringComparison.OrdinalIgnoreCase))
             {

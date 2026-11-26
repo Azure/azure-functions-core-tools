@@ -7,9 +7,9 @@
 .DESCRIPTION
     Builds func once, then invokes the `DeployForDebug` MSBuild target on one
     or more workload csprojs. `DeployForDebug` (eng/build/WorkloadDebug.targets)
-    packs + installs the workload on first use, and after that just copies the
-    freshly built DLL+PDB into the workload's install dir, so subsequent runs
-    are sub-second.
+    packs and installs missing workloads. When the installed manifest matches,
+    it copies the fresh DLL and PDB. A changed manifest needs a new package
+    version or a fresh workloads home.
 
     The resolved workloads home (default `<repo>/.debug-workloads`) is the same
     one the VS Code launch profiles use, so you can pre-stage with this script
