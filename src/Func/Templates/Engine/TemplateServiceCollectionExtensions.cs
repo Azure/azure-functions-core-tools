@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Templates.PostActions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -52,7 +54,10 @@ internal static class TemplateServiceCollectionExtensions
             services.TryAddSingleton<IFuncTemplateComponentProvider, FuncTemplateComponentsProvider>();
             services.TryAddSingleton<IWorkloadTemplateSource, WorkloadTemplateSource>();
             services.TryAddSingleton<PostActionDispatcher>();
+            services.TryAddSingleton<IProcessRunner, ProcessRunner>();
+            services.TryAddSingleton<IFileSystem, PhysicalFileSystem>();
             services.AddTemplateComponent<PostActionDispatcher, PostActionDispatcher>();
+            services.AddTemplateComponent<ICorePostActionProcessor, ProcessStartPostActionProcessor>();
             services.AddTemplateComponent<ITemplatePackageProviderFactory, WorkloadTemplatePackageProviderFactory>();
             return services;
         }

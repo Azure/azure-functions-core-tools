@@ -17,6 +17,11 @@ internal sealed class ProcessRunner : IProcessRunner
         ArgumentNullException.ThrowIfNull(request.Arguments);
         ArgumentOutOfRangeException.ThrowIfNegative(request.MaximumStandardInputBytes);
         ArgumentOutOfRangeException.ThrowIfNegative(request.MaximumCapturedOutputCharacters);
+        if (request.ArgumentString is not null && request.Arguments.Count > 0)
+        {
+            throw new ArgumentException("Specify either an argument list or an argument string, not both.", nameof(request));
+        }
+
         if (request.StandardInput is not null && Encoding.UTF8.GetByteCount(request.StandardInput) > request.MaximumStandardInputBytes)
         {
             throw new ArgumentException("The process input exceeds the configured byte limit.", nameof(request));
@@ -28,11 +33,18 @@ internal sealed class ProcessRunner : IProcessRunner
         {
             FileName = request.FileName,
             RedirectStandardInput = request.StandardInput is not null,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
+            RedirectStandardOutput = request.RedirectStandardOutput,
+            RedirectStandardError = request.RedirectStandardError,
             UseShellExecute = false,
-            CreateNoWindow = true,
+
+            // A child writing directly to the CLI's console must stay attached to it.
+            CreateNoWindow = request.RedirectStandardOutput && request.RedirectStandardError,
         };
+
+        if (request.ArgumentString is not null)
+        {
+            startInfo.Arguments = request.ArgumentString;
+        }
 
         if (startInfo.RedirectStandardInput)
         {
@@ -83,8 +95,12 @@ internal sealed class ProcessRunner : IProcessRunner
                 ExecutableNotFound: true);
         }
 
-        Task<string> stdout = CaptureAsync(process.StandardOutput, request.MaximumCapturedOutputCharacters, operationCts.Token);
-        Task<string> stderr = CaptureAsync(process.StandardError, request.MaximumCapturedOutputCharacters, operationCts.Token);
+        Task<string> stdout = request.RedirectStandardOutput
+            ? CaptureAsync(process.StandardOutput, request.MaximumCapturedOutputCharacters, operationCts.Token)
+            : Task.FromResult(string.Empty);
+        Task<string> stderr = request.RedirectStandardError
+            ? CaptureAsync(process.StandardError, request.MaximumCapturedOutputCharacters, operationCts.Token)
+            : Task.FromResult(string.Empty);
         Task input = request.StandardInput is null
             ? Task.CompletedTask
             : WriteInputAsync(process.StandardInput, request.StandardInput, operationCts.Token);
@@ -98,7 +114,7 @@ internal sealed class ProcessRunner : IProcessRunner
         {
             TryKill(process);
             operationCts.Cancel();
-            ClosePipes(process, request.StandardInput is not null);
+            ClosePipes(process, request);
             await ObserveStoppedOperationAsync(operation);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -113,7 +129,7 @@ internal sealed class ProcessRunner : IProcessRunner
         {
             TryKill(process);
             operationCts.Cancel();
-            ClosePipes(process, request.StandardInput is not null);
+            ClosePipes(process, request);
             await ObserveStoppedOperationAsync(operation);
             throw;
         }
@@ -172,15 +188,22 @@ internal sealed class ProcessRunner : IProcessRunner
         return captured.ToString();
     }
 
-    private static void ClosePipes(Process process, bool hasInput)
+    private static void ClosePipes(Process process, ProcessRunRequest request)
     {
-        if (hasInput)
+        if (request.StandardInput is not null)
         {
             process.StandardInput.BaseStream.Dispose();
         }
 
-        process.StandardOutput.BaseStream.Dispose();
-        process.StandardError.BaseStream.Dispose();
+        if (request.RedirectStandardOutput)
+        {
+            process.StandardOutput.BaseStream.Dispose();
+        }
+
+        if (request.RedirectStandardError)
+        {
+            process.StandardError.BaseStream.Dispose();
+        }
     }
 
     private static async Task ObserveStoppedOperationAsync(Task operation)
