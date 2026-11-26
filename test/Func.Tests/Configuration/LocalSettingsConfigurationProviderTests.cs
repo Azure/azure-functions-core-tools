@@ -44,7 +44,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
             .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
             .Build();
 
-        configuration["stack:runtime"].Should().Be("node");
+        configuration["stack:runtime"].Should().BeNull();
         configuration["HostStartup:Port"].Should().Be("7073");
         configuration["HostStartup:Cors"].Should().Be("*");
         configuration["HostStartup:CorsCredentials"].Should().Be("True");
@@ -123,7 +123,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
     }
 
     [Fact]
-    public void Build_ProjectConfigCanOverrideLocalSettingsProjection()
+    public void Build_ProjectStackIdRemainsIndependentOfLocalWorkerRuntime()
     {
         WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"node"}}""");
 
@@ -169,7 +169,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
     }
 
     [Fact]
-    public void Build_LocalSettingsProjectionOverridesGlobalAndEnvironmentSources()
+    public void Build_LocalWorkerRuntimeDoesNotOverrideStackIdFromOtherSources()
     {
         WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"local"}}""");
 
@@ -188,13 +188,14 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         StackOptions options = new();
         new StackOptionsSetup(configuration).Configure(options);
 
-        options.Runtime.Should().Be("local");
+        options.Runtime.Should().Be("global");
     }
 
     [Fact]
     public void StackOptionsSetup_NamedOptionsUseRequestedProjectDirectory()
     {
-        WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"custom-runtime"}}""");
+        WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"native"}}""");
+        WriteProjectConfig("""{"stack":{"runtime":"go"}}""");
         IConfigurationRoot defaultConfiguration = new ConfigurationBuilder().Build();
         var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
         var setup = new StackOptionsSetup(defaultConfiguration, configurationProvider);
@@ -202,7 +203,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         setup.Configure(_dir.FullName, options);
 
-        options.Runtime.Should().Be("custom-runtime");
+        options.Runtime.Should().Be("go");
     }
 
     [Fact]
@@ -231,7 +232,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         configuration["profiles:0"].Should().Be("project-profile");
         configuration["defaultProfile"].Should().BeNull();
-        configuration["stack:runtime"].Should().Be("node");
+        configuration["stack:runtime"].Should().BeNull();
     }
 
     [Fact]

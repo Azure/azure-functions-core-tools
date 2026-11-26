@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
-using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Workloads;
@@ -233,7 +232,7 @@ public sealed class SetupRunnerProfileLifecycleTests
 
         result.ExitCode.Should().Be(1);
         fixture.Interaction.EventTypes.Should().Equal("setup.failed");
-        fixture.Interaction.Events.Single().GetProperty("message").GetString().Should().Contain("Use 'dotnet'");
+        fixture.Interaction.Events.Single().GetProperty("message").GetString().Should().Contain("Use a stack ID");
         fixture.Profiles.ReceivedCalls().Should().BeEmpty();
         fixture.BundleReader.ReceivedCalls().Should().BeEmpty();
         fixture.Catalog.ReceivedCalls().Should().BeEmpty();
@@ -278,10 +277,12 @@ public sealed class SetupRunnerProfileLifecycleTests
                 MarkerEvents.Add(Interaction.EventTypes.LastOrDefault());
                 return Task.CompletedTask;
             });
+            Catalog.SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+                .Returns([SetupTestInventory.Row(StackId, "dotnet", "dotnet-isolated", ".NET")]);
             Catalog.ResolveLatestVersionInRangeAsync(Arg.Any<string>(), Arg.Any<VersionRange>(), Arg.Any<bool?>(),
                 Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(call =>
                 {
-                    string[] versions = ["4.1.0", "4.2.0", "4.3.0"];
+                    string[] versions = ["1.0.0", "4.1.0", "4.2.0", "4.3.0"];
                     NuGetVersion version = versions.Select(NuGetVersion.Parse).Single(candidate => call.Arg<VersionRange>().Satisfies(candidate));
                     return Task.FromResult<ResolvedPackage?>(Resolved(call.ArgAt<string>(0), version));
                 });
@@ -300,7 +301,7 @@ public sealed class SetupRunnerProfileLifecycleTests
                 });
             PackageInstaller.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                cancellationToken: Arg.Any<CancellationToken>()).Returns(async call =>
+                requiredStack: Arg.Any<WorkloadStackRequirement?>(), cancellationToken: Arg.Any<CancellationToken>()).Returns(async call =>
                 {
                     string id = call.ArgAt<string>(0);
                     string version = call.ArgAt<NuGetVersion>(1).ToNormalizedString();
@@ -315,9 +316,9 @@ public sealed class SetupRunnerProfileLifecycleTests
         }
 
         public SetupRunner Runner(ISetupProfileScopeResolver? profiles = null)
-            => new(Interaction, new SetupFeatureResolver(Interaction, Store, Substitute.For<ICliConfigurationProvider>()),
+            => new(Interaction, new SetupFeatureResolver(Interaction, SetupTestInventory.StackPackages(Store, Catalog), SetupTestInventory.Configuration()),
                 profiles ?? Profiles, new SetupDependencyPlanBuilder(BundleReader),
-                new SetupDependencyInstaller(Interaction, Store, Catalog, PackageInstaller), FirstRun);
+                new SetupDependencyInstaller(Interaction, Store, Catalog, PackageInstaller, SetupTestInventory.RuntimeIdentifiers()), FirstRun);
 
         public SetupCommandOptions Options(bool check = false, IReadOnlyList<string>? features = null)
             => new(new DirectoryInfo(Paths.Home), features ?? ["dotnet", "runtime"], ["p1", "p2", "p3"], null,
@@ -353,6 +354,12 @@ public sealed class SetupRunnerProfileLifecycleTests
             => new(id, version, new PackageSource("https://example.test/v3/index.json"));
 
         private static WorkloadEntry Entry(string id, string version)
-            => new() { PackageId = id, PackageVersion = version, Kind = id == StackId ? WorkloadKind.Workload : WorkloadKind.Content };
+            => new()
+            {
+                PackageId = id,
+                PackageVersion = version,
+                Kind = id == StackId ? WorkloadKind.Workload : WorkloadKind.Content,
+                Stack = id == StackId ? new("dotnet", "dotnet-isolated", ".NET") : null,
+            };
     }
 }

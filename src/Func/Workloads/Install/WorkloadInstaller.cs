@@ -54,7 +54,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
     public async Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
         bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
-        CancellationToken cancellationToken = default)
+        WorkloadStackRequirement? requiredStack = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         progress?.Report(new WorkloadInstallProgress(
@@ -63,7 +63,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ResolvedPackage resolved = await _packageSource.ResolveAsync(packageId, version, source, includePrerelease, exact, cancellationToken);
         WorkloadInstallResult? reused = force
             ? null
-            : await _deploymentService.TryReuseExplicitAsync(resolved.PackageId, resolved.Version.ToNormalizedString(), cancellationToken);
+            : await _deploymentService.TryReuseExplicitAsync(resolved.PackageId, resolved.Version.ToNormalizedString(), requiredStack, cancellationToken);
 
         if (reused is not null)
         {
@@ -74,6 +74,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         using WorkloadPackageSnapshot snapshot = await _packageTrust.AcquireAsync(packageDownload.Path, allowUntrusted, cancellationToken);
         InspectedWorkloadPackage package = await _packageInspector.InspectAsync(snapshot.Path, cancellationToken);
         ValidateResolvedIdentity(resolved, package.Identity);
+        requiredStack?.ValidateManifest(package.Identity.PackageId, package.Metadata);
 
         if (package.Role != WorkloadPackageRole.Pointer)
         {
@@ -86,7 +87,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         WorkloadInstallResult? existingImplementation = force
             ? null
             : await _deploymentService.TryReuseImplementationAsync(
-                selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier, logicalPackage, cancellationToken);
+                selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier, logicalPackage, requiredStack, cancellationToken);
 
         if (existingImplementation is not null)
         {
@@ -101,6 +102,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ValidateResolvedIdentity(implementationResolved, implementation.Identity);
 
         _ridPackageSelector.ValidateImplementation(package, selection, implementation);
+        requiredStack?.ValidateManifest(implementation.Identity.PackageId, implementation.Metadata);
 
         return await _deploymentService.InstallAsync(implementation, implementationResolved.Source.Source, WorkloadOwnershipKind.Logical, logicalPackage, force, progress, cancellationToken);
     }

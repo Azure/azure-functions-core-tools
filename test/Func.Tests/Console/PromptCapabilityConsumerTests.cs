@@ -37,8 +37,9 @@ public class PromptCapabilityConsumerTests
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
         var installed = Substitute.For<IInstalledBundleWorkloads>();
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
-        var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), localSettings,
-            Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed), [initializer]);
+        var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
+            Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
+            new InstalledBundleScanner(installed), new InstalledProjectStackCatalog([initializer.Stack]), [initializer]);
         string directory = Path.Combine(Path.GetTempPath(), $"func-5511-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
 
@@ -83,7 +84,8 @@ public class PromptCapabilityConsumerTests
         var store = Substitute.For<IFirstRunStateStore>();
         store.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.NeverPrompted);
         var setup = Substitute.For<ISetupRunner>();
-        var coordinator = new FirstRunCoordinator(service, store, setup);
+        var coordinator = new FirstRunCoordinator(service, store, setup,
+            Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
 
         (await coordinator.EnsureFirstRunPromptedAsync("unknown", new RootCommand().Parse([]), CancellationToken.None)).Should().BeNull();
 

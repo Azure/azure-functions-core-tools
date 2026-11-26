@@ -13,4 +13,6 @@ internal static class ProjectResolutionResults
 
     public static ProjectResolutionResult NotResolved(string message, ProjectCreationFailure? failure = null)
         => new ProjectResolutionResult.NotResolved(message, failure);
+
+    public static ProjectResolutionResult Unrecognized(string message) => new ProjectResolutionResult.NotResolved(message, IsUnrecognized: true);
 }

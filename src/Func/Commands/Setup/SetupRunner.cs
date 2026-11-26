@@ -4,8 +4,10 @@
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Workloads.Catalog;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -102,21 +104,14 @@ internal sealed class SetupRunner(
 
             return new SetupRunResult(0);
         }
-        catch (SetupConfigurationException ex)
+        catch (WorkloadCatalogException ex)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            renderer.SetupFailed(ex.Message);
+            renderer.SetupFailed($"Stack discovery is unavailable: {ex.Message}");
             cancellationToken.ThrowIfCancellationRequested();
             return new SetupRunResult(1);
         }
-        catch (ProfileConfigurationException ex)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            renderer.SetupFailed(ex.Message);
-            cancellationToken.ThrowIfCancellationRequested();
-            return new SetupRunResult(1);
-        }
-        catch (ExtensionBundleConfigurationException ex)
+        catch (Exception ex) when (ex is SetupConfigurationException or ProfileConfigurationException or ExtensionBundleConfigurationException or ProjectStackConfigurationException)
         {
             cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);

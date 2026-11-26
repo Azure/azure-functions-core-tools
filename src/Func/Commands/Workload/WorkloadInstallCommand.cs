@@ -141,7 +141,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             force,
                             progress,
                             allowUntrusted,
-                            ct);
+                            cancellationToken: ct);
                 },
                 cancellationToken,
                 writeCompletion: false);
@@ -345,7 +345,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return;
         }
 
-        if (!SetupFeatureCatalog.TryGetFeatureForPackageId(entry.PackageId, out string feature))
+        if (SetupFeatureCatalog.GetFeatureForInstalledPackage(entry) is not { } feature)
         {
             return;
         }
@@ -354,7 +354,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         {
             SetupFeatureCatalog.RuntimeFeature => "the Functions host and the extension bundle",
             SetupFeatureCatalog.HostFeature => "the Functions host",
-            _ => $"the full {feature} dev environment (host, worker, stack, templates, bundle)",
+            _ => $"the {entry.Stack!.DisplayName} development dependencies",
         };
 
         _interaction.WriteHint(

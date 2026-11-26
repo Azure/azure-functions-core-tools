@@ -89,7 +89,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
                 if (fail)
                 {
                     events.Should().ContainSingle().Which.GetProperty("type").GetString().Should().Be("setup.failed");
-                    events[0].GetProperty("message").GetString().Should().Contain("Use 'dotnet'");
+                    events[0].GetProperty("message").GetString().Should().Contain("Use a stack ID");
                 }
                 else
                 {
@@ -104,7 +104,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             }
             else if (fail)
             {
-                result.StandardError.Should().Contain("Use 'dotnet'");
+                result.StandardError.Should().Contain("Use a stack ID");
                 result.StandardOutput.Should().NotContain("setup is complete");
             }
             else

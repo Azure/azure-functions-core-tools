@@ -100,6 +100,7 @@ internal static class CliHostFactory
 
         builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
         builder.Services.AddSingleton<IFileSystem, PhysicalFileSystem>();
+        builder.Services.AddSingleton<IProjectStackConfiguration, ProjectStackConfiguration>();
         builder.Services.AddSingleton<IInstallationMetadataReader, InstallationMetadataReader>();
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();

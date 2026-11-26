@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -11,114 +12,116 @@ namespace Azure.Functions.Cli.Tests.Projects;
 
 public sealed class FunctionsProjectResolverTests
 {
-    private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
+    private readonly WorkingDirectory _directory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
+    private readonly IProjectStackConfiguration _config = Substitute.For<IProjectStackConfiguration>();
+    private readonly TestProjectStack _go = new("go", "Go", "native", new LanguageDescriptor("go", "Go"));
+    private readonly TestProjectStack _other = new("comet", "Go", "comet-host", new LanguageDescriptor("script", "Script"));
 
-    [Fact]
-    public async Task ResolveProjectAsync_FirstFactoryCreatesProject_ReturnsProject()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ResolveProjectAsync_StackSignal_OnlyRunsOwningFactory(bool hasConfig)
     {
-        FunctionsProject project = Substitute.For<FunctionsProject>();
-        IFunctionsProjectFactory factory = NewFactory(ProjectCreationResults.Created(project, "matched"));
-        FunctionsProjectResolver resolver = NewResolver([factory]);
+        var otherFactory = Recognized(_other);
+        var goFactory = Recognized(_go);
+        FunctionsProjectResolver resolver = Create(hasConfig ? new(true, StackIdentifier: "GO") : new(WorkerRuntime: "NATIVE"), otherFactory, goFactory);
 
-        ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
 
-        ProjectResolutionResult.Resolved resolved = result.Should().BeOfType<ProjectResolutionResult.Resolved>().Subject;
-        resolved.Project.Should().BeSameAs(project);
-        resolved.Message.Should().Be("matched");
+        result.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.Stack.Should().BeSameAs(_go);
+        await goFactory.Registration.Factory.Received(1).TryCreateProjectAsync(new(_directory), TestContext.Current.CancellationToken);
+        await otherFactory.Registration.Factory.DidNotReceiveWithAnyArgs().TryCreateProjectAsync(default!, TestContext.Current.CancellationToken);
+        await _config.DidNotReceiveWithAnyArgs().CreateAsync(default!, default!, default, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ResolveProjectAsync_WrongSourceSelector_RejectsBeforeFingerprinting(bool hasConfig)
+    {
+        var factory = Recognized(_go);
+        FunctionsProjectResolver resolver = Create(hasConfig ? new(true, StackIdentifier: "native") : new(WorkerRuntime: "go"), factory);
+
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
+
+        result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Which.Message.Should().Contain(hasConfig ? ProjectStackSettings.StackSource : ProjectStackSettings.WorkerRuntimeSource);
+        await factory.Registration.Factory.DidNotReceiveWithAnyArgs().TryCreateProjectAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task ResolveProjectAsync_NotCreated_ContinuesToNextFactory()
+    public async Task ResolveProjectAsync_AdoptingWithOnlyOtherFingerprint_ReturnsConflictNotUnrecognized()
     {
-        FunctionsProject project = Substitute.For<FunctionsProject>();
-        IFunctionsProjectFactory first = NewFactory(ProjectCreationResults.NotCreated("not mine"));
-        IFunctionsProjectFactory second = NewFactory(ProjectCreationResults.Created(project, "matched second"));
-        FunctionsProjectResolver resolver = NewResolver([first, second]);
+        FunctionsProjectResolver resolver = Create(new(), Factory(_go, ProjectCreationResults.NotCreated("no match")), Recognized(_other));
 
-        ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory, _go), TestContext.Current.CancellationToken);
 
-        ProjectResolutionResult.Resolved resolved = result.Should().BeOfType<ProjectResolutionResult.Resolved>().Subject;
-        resolved.Project.Should().BeSameAs(project);
-        resolved.Message.Should().Be("matched second");
-        await second.Received(1).TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
+        var error = result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Subject;
+        error.IsUnrecognized.Should().BeFalse();
+        error.Message.Should().Contain("conflicts").And.Contain("go").And.Contain("comet");
     }
 
     [Fact]
-    public async Task ResolveProjectAsync_FirstCreated_Wins()
+    public async Task ResolveProjectAsync_AmbiguousFingerprints_ReturnsBothStackIds()
     {
-        FunctionsProject firstProject = Substitute.For<FunctionsProject>();
-        IFunctionsProjectFactory first = NewFactory(ProjectCreationResults.Created(firstProject, "matched first"));
-        IFunctionsProjectFactory second = NewFactory(ProjectCreationResults.Created(
-            Substitute.For<FunctionsProject>(),
-            "matched second"));
-        FunctionsProjectResolver resolver = NewResolver([first, second]);
+        FunctionsProjectResolver resolver = Create(new(), Recognized(_other), Recognized(_go));
 
-        ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
 
-        result.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.Should().BeSameAs(firstProject);
-        await second.DidNotReceive().TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
+        result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Which.Message.Should().Contain("both 'comet' and 'go'");
     }
 
     [Fact]
-    public async Task ResolveProjectAsync_Failed_StopsResolution()
+    public async Task ResolveProjectAsync_WithoutFingerprints_IsUnrecognized()
     {
-        FunctionsWorkerResolutionFailure workerFailure = FunctionsWorkerResolutionFailures.NotInstalled(
-            new FunctionsWorkerId("python"),
-            "missing worker");
-        ProjectCreationFailure failure = ProjectCreationFailures.WorkerNotResolved(workerFailure, "missing worker");
-        IFunctionsProjectFactory first = NewFactory(ProjectCreationResults.Failed(failure));
-        IFunctionsProjectFactory second = NewFactory(ProjectCreationResults.Created(
-            Substitute.For<FunctionsProject>(),
-            "matched second"));
-        FunctionsProjectResolver resolver = NewResolver([first, second]);
+        FunctionsProjectResolver resolver = Create(new(), Factory(_go, ProjectCreationResults.NotCreated("not mine")));
 
-        ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
 
-        ProjectResolutionResult.NotResolved notResolved = result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Subject;
-        notResolved.Message.Should().Be("missing worker");
+        result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Which.IsUnrecognized.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ResolveProjectAsync_FactoryFailure_IsNotAnUnrecognizedProject()
+    {
+        ProjectCreationFailure failure = ProjectCreationFailures.WorkerNotResolved(FunctionsWorkerResolutionFailures.NotInstalled(new FunctionsWorkerId("go"), "missing worker"));
+        FunctionsProjectResolver resolver = Create(new(), Factory(_go, ProjectCreationResults.Failed(failure)));
+
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
+
+        var notResolved = result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Subject;
         notResolved.Failure.Should().BeSameAs(failure);
-        await second.DidNotReceive().TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
+        notResolved.IsUnrecognized.Should().BeFalse();
     }
 
     [Fact]
-    public async Task ResolveProjectAsync_NoFactoryCreatesProject_ReturnsNotResolved()
+    public async Task ResolveProjectAsync_ConflictingPersistedAndDetectedLanguage_ReturnsBothSources()
     {
-        IFunctionsProjectFactory factory = NewFactory(ProjectCreationResults.NotCreated("not mine"));
-        FunctionsProjectResolver resolver = NewResolver([factory]);
+        TestProjectStack node = new("node", "Node", "node", new LanguageDescriptor("js", "JavaScript"), new LanguageDescriptor("ts", "TypeScript"));
+        FunctionsProjectResolver resolver = Create(new(true, "node", "js"), Recognized(node, node.SupportedLanguages[1]));
 
-        ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
+        ProjectResolutionResult result = await resolver.ResolveProjectAsync(new(_directory), TestContext.Current.CancellationToken);
 
-        result.Should().BeOfType<ProjectResolutionResult.NotResolved>()
-            .Which.Message.Should().Contain("No installed workload recognized");
+        result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Which.Message.Should().Contain(ProjectStackSettings.LanguageSource).And.Contain("detected project language 'ts'");
     }
 
-    [Fact]
-    public async Task ResolveProjectAsync_PassesCreationContextToFactory()
+    private FunctionsProjectResolver Create(ProjectStackSettings settings, params (IProjectStack Stack, WorkloadProjectFactoryRegistration Registration)[] factories)
     {
-        IFunctionsProjectFactory factory = NewFactory(ProjectCreationResults.NotCreated("not mine"));
-        FunctionsProjectResolver resolver = NewResolver([factory]);
-
-        await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
-
-        await factory.Received(1).TryCreateProjectAsync(
-            Arg.Is<ProjectCreationContext>(context =>
-                context.WorkingDirectory == _workingDirectory),
-            Arg.Any<CancellationToken>());
+        _config.Read(_directory.Info).Returns(settings);
+        return new(factories.Select(f => f.Registration), new(factories.Select(f => f.Stack)), _config);
     }
 
-    private ProjectResolutionContext CreateContext() => new(_workingDirectory);
+    private static (IProjectStack Stack, WorkloadProjectFactoryRegistration Registration) Recognized(IProjectStack stack, LanguageDescriptor? language = null)
+    {
+        FunctionsProject project = Substitute.For<FunctionsProject>();
+        project.Stack.Returns(stack);
+        project.Language.Returns(language);
+        return Factory(stack, ProjectCreationResults.Created(project, "matched"));
+    }
 
-    private FunctionsProjectResolver NewResolver(IReadOnlyList<IFunctionsProjectFactory> factories)
-        => new(
-            factories.Select((factory, index) => new WorkloadProjectFactoryRegistration(
-                TestWorkloads.CreateInfo($"Test.Workload.{index}"),
-                factory)));
-
-    private static IFunctionsProjectFactory NewFactory(ProjectCreationResult result)
+    private static (IProjectStack Stack, WorkloadProjectFactoryRegistration Registration) Factory(IProjectStack stack, ProjectCreationResult result)
     {
         IFunctionsProjectFactory factory = Substitute.For<IFunctionsProjectFactory>();
-        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>())
-            .Returns(result);
-        return factory;
+        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>()).Returns(result);
+        return (stack, new(TestWorkloads.CreateInfo($"Contoso.{stack.Descriptor.Identifier}") with { Stack = stack.Descriptor }, factory));
     }
 }

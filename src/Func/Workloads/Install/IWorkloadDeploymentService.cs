@@ -11,10 +11,10 @@ internal interface IWorkloadDeploymentService
     public Task<WorkloadEntry> GetUpdateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
 
-    public Task<WorkloadInstallResult?> TryReuseExplicitAsync(string packageId, string version, CancellationToken cancellationToken = default);
+    public Task<WorkloadInstallResult?> TryReuseExplicitAsync(string packageId, string version, WorkloadStackRequirement? requiredStack = null, CancellationToken cancellationToken = default);
 
     public Task<WorkloadInstallResult?> TryReuseImplementationAsync(string packageId, string version, string runtimeIdentifier,
-        LogicalPackage logicalPackage, CancellationToken cancellationToken = default);
+        LogicalPackage logicalPackage, WorkloadStackRequirement? requiredStack = null, CancellationToken cancellationToken = default);
 
     public Task<WorkloadInstallResult?> TryReuseImplementationForUpdateAsync(WorkloadEntry currentEntry, string packageId, string version,
         string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken = default);

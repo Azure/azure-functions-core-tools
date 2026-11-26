@@ -68,6 +68,7 @@ internal interface IWorkloadInstaller
     /// </param>
     /// <param name="force">Forwarded to <see cref="InstallFromPackageAsync"/>.</param>
     /// <param name="allowUntrusted">Explicitly bypass publisher trust checks for newly acquired archives only.</param>
+    /// <param name="requiredStack">Stack the package must provide before it can be deployed or reused.</param>
     /// <param name="cancellationToken">Token to cancel resolve, download, and install.</param>
     /// <exception cref="WorkloadPackageNotFoundException">
     /// No version matched on any configured source.
@@ -78,7 +79,7 @@ internal interface IWorkloadInstaller
     /// </exception>
     public Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
         bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
-        CancellationToken cancellationToken = default);
+        WorkloadStackRequirement? requiredStack = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// In-place version swap for an installed workload (spec §6.4). Stages

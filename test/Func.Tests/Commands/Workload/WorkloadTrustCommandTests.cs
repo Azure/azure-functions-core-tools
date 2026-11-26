@@ -31,7 +31,7 @@ public sealed class WorkloadTrustCommandTests
             Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(result);
         installer.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(result);
+            Arg.Any<bool>(), cancellationToken: Arg.Any<CancellationToken>()).Returns(result);
         WorkloadInstallCommand command = new(interaction, installer, store,
             new WorkloadUpdateCommand(interaction, installer, store, options), options);
         List<string> args = [local ? "test.nupkg" : "test.workload"];
@@ -51,7 +51,7 @@ public sealed class WorkloadTrustCommandTests
         else
         {
             await installer.Received(1).InstallFromCatalogAsync("test.workload", null, null, null, false, false,
-                Arg.Any<IProgress<WorkloadInstallProgress>?>(), allowUntrusted, Arg.Any<CancellationToken>());
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(), allowUntrusted, cancellationToken: Arg.Any<CancellationToken>());
         }
     }
 

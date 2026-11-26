@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Projects;
@@ -32,6 +33,44 @@ internal sealed class InstalledProjectStackCatalog
     {
         ArgumentNullException.ThrowIfNull(stackIdentifier);
         return Stacks.SingleOrDefault(stack => string.Equals(stack.Descriptor.Identifier, stackIdentifier.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IProjectStack? ResolveProjectStack(ProjectStackSettings settings, IProjectStack? selected = null)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        IReadOnlyList<IProjectStack> installed = Stacks;
+        if (settings.HasProjectConfig)
+        {
+            IProjectStack persisted = settings.StackIdentifier is { } id && FindStack(id) is { } stack
+                ? stack
+                : throw new ProjectStackResolutionException($"{ProjectStackSettings.StackSource} '{settings.StackIdentifier}' does not identify an installed stack.");
+
+            if (selected is not null && selected.Descriptor != persisted.Descriptor)
+            {
+                throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.Identifier}' conflicts with {ProjectStackSettings.StackSource} '{settings.StackIdentifier}'.");
+            }
+
+            return persisted;
+        }
+
+        if (settings.WorkerRuntime is not { } runtime)
+        {
+            return selected;
+        }
+
+        bool Matches(IProjectStack stack) => string.Equals(stack.Descriptor.WorkerRuntime, runtime.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (selected is not null)
+        {
+            return Matches(selected) ? selected
+                : throw new ProjectStackResolutionException($"--stack '{selected.Descriptor.Identifier}' uses worker runtime '{selected.Descriptor.WorkerRuntime}', which conflicts with {ProjectStackSettings.WorkerRuntimeSource} '{runtime}'.");
+        }
+
+        return installed.Where(Matches).ToList() switch
+        {
+            [var match] => match,
+            [] => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' does not match an installed stack's worker runtime. Run 'func workload search --stack' to find stack workloads."),
+            var matches => throw new ProjectStackResolutionException($"{ProjectStackSettings.WorkerRuntimeSource} '{runtime}' matches multiple stacks: {string.Join(", ", matches.Select(s => s.Descriptor.Identifier))}. Specify the matching CLI stack ID with 'func init --stack <id>'."),
+        };
     }
 
     public static LanguageDescriptor ResolveLanguage(IProjectStack stack, string value, string source)

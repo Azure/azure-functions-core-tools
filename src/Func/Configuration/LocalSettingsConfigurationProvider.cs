@@ -18,11 +18,6 @@ internal sealed class LocalSettingsConfigurationProvider(
         LocalSettingsSnapshot localSettings = _localSettingsProvider.Get(_projectDirectory);
         Dictionary<string, string?> data = [with(StringComparer.OrdinalIgnoreCase)];
 
-        if (localSettings.WorkerRuntime is { Length: > 0 } runtime)
-        {
-            data[$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime;
-        }
-
         if (localSettings.Host?.LocalHttpPort is { } port)
         {
             data[$"{HostStartupOptions.SectionName}:{nameof(HostStartupOptions.Port)}"] = port.ToString(CultureInfo.InvariantCulture);
