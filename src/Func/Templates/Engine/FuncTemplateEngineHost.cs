@@ -15,13 +15,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <param name="components">The template components to expose to the engine.</param>
 internal class FuncTemplateEngineHost(
     TemplateEngineContext context, IReadOnlyList<ICoreTemplateComponent> components)
-    : DefaultTemplateEngineHost(
-        Identifier,
-        AssemblyCliVersionProvider.Instance.Version,
-        CreateDefaults(context),
-        [.. (components ?? throw new ArgumentNullException(nameof(components)))
-            .Select(component => (component.InterfaceType, component.Instance))]),
-    ITemplateEngineHost
+    : DefaultTemplateEngineHost(Identifier, CliVersion, CreateDefaults(context), Pairs(components)), ITemplateEngineHost
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -34,6 +28,11 @@ internal class FuncTemplateEngineHost(
     private const string WorkingDirectoryParameter = "WorkingDirectory";
 
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    /// <summary>
+    /// The CLI version, reported to <c>Microsoft.TemplateEngine</c> as the host version.
+    /// </summary>
+    private static string CliVersion => AssemblyCliVersionProvider.Instance.Version;
 
     /// <inheritdoc />
     public override bool TryGetHostParamDefault(string paramName, out string? value)
@@ -86,6 +85,16 @@ internal class FuncTemplateEngineHost(
         }
 
         return defaults;
+    }
+
+    /// <summary>
+    /// Pairs each component's interface type with its instance, the form the engine registers built-in components in.
+    /// </summary>
+    private static List<(Type InterfaceType, IIdentifiedComponent Instance)> Pairs(
+        IReadOnlyList<ICoreTemplateComponent> components)
+    {
+        ArgumentNullException.ThrowIfNull(components);
+        return [.. components.Select(component => (component.InterfaceType, component.Instance))];
     }
 
     // Trim so the value doesn't depend on whether the user typed a trailing separator.

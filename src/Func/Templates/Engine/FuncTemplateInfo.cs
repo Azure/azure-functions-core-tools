@@ -18,10 +18,8 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <param name="template">The underlying template engine metadata.</param>
 /// <param name="hostData">The parsed func host configuration.</param>
 /// <param name="settings">The engine environment that discovered the template, used to instantiate it.</param>
-internal sealed class FuncTemplateInfo(
-    ITemplateInfo template,
-    FuncTemplateHostData hostData,
-    IEngineEnvironmentSettings? settings = null)
+internal sealed class FuncTemplateInfo(ITemplateInfo template,
+    FuncTemplateHostData hostData, IEngineEnvironmentSettings? settings = null)
     : ITemplateInfo
 {
     private readonly IEngineEnvironmentSettings? _settings = settings;
@@ -117,12 +115,8 @@ internal sealed class FuncTemplateInfo(
     /// <exception cref="InvalidOperationException">
     /// The template was not discovered through a template engine environment.
     /// </exception>
-    public async Task<ITemplateCreationResult> InstantiateAsync(
-        string? name,
-        string outputPath,
-        IReadOnlyDictionary<string, string> parameters,
-        bool force,
-        bool dryRun,
+    public async Task<ITemplateCreationResult> InstantiateAsync(string? name, string outputPath,
+        IReadOnlyDictionary<string, string> parameters, bool force, bool dryRun,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);

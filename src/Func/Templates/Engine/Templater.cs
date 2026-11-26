@@ -63,8 +63,7 @@ internal sealed class Templater : IDisposable
     /// Lists project templates for <paramref name="language"/> using the engine's package-manager filters, keeping
     /// the engine's match details for each candidate.
     /// </summary>
-    public async Task<TemplateResolutionResult> ListProjectTemplatesAsync(
-        string language,
+    public async Task<TemplateResolutionResult> ListProjectTemplatesAsync(string language,
         CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

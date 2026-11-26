@@ -32,11 +32,8 @@ internal static class TemplateArgumentBinder
     /// <exception cref="InvalidOperationException">
     /// The template authors conflicting option names, or <paramref name="tokens"/> cannot be bound.
     /// </exception>
-    public static IReadOnlyDictionary<string, string> Bind(
-        FuncTemplateInfo template,
-        IReadOnlyList<string> tokens,
-        IReadOnlyList<Option> reservedOptions,
-        out IReadOnlyList<string> unrecognizedTokens)
+    public static IReadOnlyDictionary<string, string> Bind(FuncTemplateInfo template, IReadOnlyList<string> tokens,
+        IReadOnlyList<Option> reservedOptions, out IReadOnlyList<string> unrecognizedTokens)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(tokens);
@@ -124,10 +121,8 @@ internal static class TemplateArgumentBinder
         return values;
     }
 
-    private static void AddValue(
-        Dictionary<string, string> values,
-        ITemplateParameter parameter,
-        OptionResult? optionResult)
+    private static void AddValue(Dictionary<string, string> values,
+        ITemplateParameter parameter, OptionResult? optionResult)
     {
         if (optionResult is null || optionResult.Implicit)
         {
@@ -153,11 +148,8 @@ internal static class TemplateArgumentBinder
         }
     }
 
-    private static string? ReadOptionName(
-        FuncTemplateInfo template,
-        string parameterName,
-        string propertyName,
-        string? name)
+    private static string? ReadOptionName(FuncTemplateInfo template,
+        string parameterName, string propertyName, string? name)
     {
         if (string.IsNullOrEmpty(name))
         {

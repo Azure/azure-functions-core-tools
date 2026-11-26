@@ -19,14 +19,14 @@ internal sealed class LegacyInitCommand(InitWorkflow workflow)
 {
     private readonly InitWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
 
-    public async Task<int> CreateAsync(
-        InitRequest request,
-        IProjectInitializer initializer,
-        string? language,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes <c>.func/config.json</c>, then scaffolds the project with the stack's initializer.
+    /// </summary>
+    public async Task<int> CreateAsync(InitRequest request,
+        InitResolution resolution, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(initializer);
+        ArgumentNullException.ThrowIfNull(resolution);
 
         // Stack options are typed only on this route, so their validation cannot reject a template invocation.
         ParseResult stackParse = request.StackOptionsCommand.Parse(
@@ -48,23 +48,31 @@ internal sealed class LegacyInitCommand(InitWorkflow workflow)
             return 1;
         }
 
-        InitContext context = new(request.WorkingDirectory, request.ProjectName, language, request.Force);
-        request.WorkingDirectory.CreateIfNotExists();
+        InitContext context = new(request.WorkingDirectory, request.ProjectName, resolution.Language, request.Force);
         if (!await _workflow.PrepareDestinationAsync(context, cancellationToken))
         {
             return 1;
         }
 
-        _workflow.WriteCliConfigurationFile(
-            request.WorkingDirectory.Info,
-            initializer.Stack,
-            InitWorkflow.GetPersistedLanguage(initializer, language),
-            request.Force);
-        _workflow.Interaction.WriteBlankLine();
+        if (!await _workflow.SaveProjectConfigAsync(request, resolution, cancellationToken))
+        {
+            return 1;
+        }
 
-        await initializer.InitializeAsync(context, stackParse, cancellationToken);
+        _workflow.Interaction.WriteBlankLine();
+        try
+        {
+            await resolution.Initializer.InitializeAsync(context, stackParse, cancellationToken);
+        }
+        catch (Exception ex) when (InitWorkflow.IsExpectedStackFailure(ex))
+        {
+            return _workflow.ReportCreationFailed(
+                request, $"Couldn't create the {resolution.Stack.Descriptor.DisplayName} project: {ex.Message}");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         return await _workflow.ReportInitializedAsync(
-            request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
+            request.WorkingDirectory.Info, resolution.Stack, cancellationToken);
     }
 }

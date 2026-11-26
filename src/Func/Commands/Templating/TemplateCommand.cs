@@ -39,8 +39,7 @@ internal abstract class TemplateCommand : FuncCliCommand
     /// <param name="passThroughOptions">
     /// Options whose tokens are returned as if they were unmatched, so the selected template owns them.
     /// </param>
-    protected internal static IReadOnlyList<string> GetTemplateTokens(
-        ParseResult parseResult,
+    protected internal static IReadOnlyList<string> GetTemplateTokens(ParseResult parseResult,
         IReadOnlyCollection<Option> passThroughOptions)
     {
         ArgumentNullException.ThrowIfNull(parseResult);
@@ -85,8 +84,7 @@ internal abstract class TemplateCommand : FuncCliCommand
 
     // Indexes into ParseResult.Tokens, in command-line order, of the tokens after this command that no option,
     // argument, or inherited recursive option consumed.
-    private static IEnumerable<int> GetUnconsumedTokenIndexes(
-        ParseResult parseResult,
+    private static IEnumerable<int> GetUnconsumedTokenIndexes(ParseResult parseResult,
         IReadOnlyCollection<Option> passThroughOptions)
     {
         HashSet<Token> consumed = [with(ReferenceEqualityComparer.Instance)];

@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.CommandLine;
-using System.CommandLine.Parsing;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands.Templating;
 using Azure.Functions.Cli.Projects;
@@ -20,6 +18,7 @@ namespace Azure.Functions.Cli.Commands.Init;
 /// Project content is owned by the template, which also owns the meaning of every option after the project path. The
 /// selected stack contributes only non-scaffolding setup through
 /// <see cref="IProjectInitializer.ConfigureProjectAsync"/>, and stack init options are never parsed in this flow.
+/// The stack and language are validated by <see cref="InitWorkflow.ResolveAsync"/> before this handler runs.
 /// </remarks>
 internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFactory templaterFactory)
 {
@@ -32,170 +31,55 @@ internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFact
     /// creating project content.
     /// </summary>
     /// <remarks>
-    /// The stack comes from <c>--stack</c>, otherwise from the project: <c>FUNCTIONS_WORKER_RUNTIME</c> in
-    /// <c>local.settings.json</c> when adopting, or <c>.func/config.json</c> when repairing. A stack that isn't
-    /// installed is refused with a pointer to <c>func setup</c>. When neither signal is available, the user is
-    /// prompted interactively, or the command refuses non-interactively. Repair adds only the missing language and
-    /// preserves every other key in the config.
+    /// The stack and language are resolved by <see cref="InitWorkflow.ResolveAsync"/>, which never auto-selects the
+    /// stack of an existing project. Completion adds only the missing language and preserves every other key in the
+    /// config.
     /// </remarks>
-    public async Task<int> ReconcileExistingAsync(
-        InitRequest request,
-        InitializationState state,
-        string? existingRuntime,
-        CancellationToken cancellationToken)
+    public async Task<int> ReconcileExistingAsync(InitRequest request,
+        InitResolution resolution, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        bool heal = state switch
+        ArgumentNullException.ThrowIfNull(resolution);
+        DirectoryInfo directory = request.WorkingDirectory.Info;
+        switch (resolution.Mode)
         {
-            InitializationState.PartiallyInitialized => true,
-            InitializationState.AdoptableExistingProject => false,
-            _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
-        };
+            case InitMode.Complete:
+                await _workflow.Configuration.CompleteLanguageAsync(
+                    directory, resolution.Stack, resolution.Language, cancellationToken);
+                _workflow.WriteSuccess("Existing project completed for ", resolution.Stack);
+                return 0;
 
-        // No template or stack scaffolding runs for an existing project, so options only they consume are rejected
-        // before any prompt or write.
-        if (request.UnmatchedTokens.Count > 0)
-        {
-            return RejectExistingProjectTokens(request);
+            case InitMode.Adopt:
+                await _workflow.Configuration.CreateAsync(
+                    directory, resolution.Stack, resolution.Language, cancellationToken);
+                _workflow.WriteConfigWritten();
+                _workflow.WriteSuccess("Existing project adopted for ", resolution.Stack);
+                return 0;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(resolution), resolution.Mode, null);
         }
-
-        // Where the project's stack runtime comes from: heal trusts what's
-        // already in .func/config.json; adopt reads local.settings.json
-        // (FUNCTIONS_WORKER_RUNTIME).
-        string? projectRuntime = heal
-            ? existingRuntime
-            : _workflow.ResolveLegacyWorkerRuntime(request.WorkingDirectory.Info);
-        string? requestedStack = request.RequestedStack;
-
-        // Resolve both signals to a concrete initializer (or null) using
-        // alias-aware matching, so e.g. "dotnet-isolated" in
-        // local.settings.json maps to the dotnet initializer and
-        // `--stack dotnet` is recognized as agreeing with it.
-        IProjectInitializer? requested = !string.IsNullOrWhiteSpace(requestedStack)
-            ? _workflow.FindInitializerForCandidate(requestedStack)
-            : null;
-        IProjectInitializer? declared = projectRuntime is not null
-            ? _workflow.FindInitializerForCandidate(projectRuntime)
-            : null;
-
-        // Explicit --stack that disagrees with the project's declared
-        // runtime is almost certainly a mistake (it would produce a
-        // .func/config.json that doesn't match what `func start` would
-        // run). --force is the existing escape hatch. We only block on a
-        // genuine conflict: when both signals resolve to known stacks
-        // and those stacks differ. An uninstalled-vs-installed mismatch
-        // is handled below by the "not installed" path.
-        if (requested is not null
-            && declared is not null
-            && !string.Equals(requested.Stack, declared.Stack, StringComparison.OrdinalIgnoreCase))
-        {
-            _workflow.Interaction.WriteError(
-                $"--stack '{requestedStack}' conflicts with the project's runtime '{projectRuntime}'. " +
-                "Re-run with the matching stack, or pass --force to override.");
-            return 1;
-        }
-
-        // Pick a candidate: explicit --stack wins, else snap to the
-        // project's declared runtime.
-        string? candidate = !string.IsNullOrWhiteSpace(requestedStack) ? requestedStack : projectRuntime;
-        IProjectInitializer? initializer = requested ?? declared;
-
-        if (candidate is not null && initializer is null)
-        {
-            // Candidate isn't an installed stack (and isn't an alias of
-            // one). Refuse rather than write a config we can't validate.
-            // The hint uses a `<stack>` placeholder on purpose: the
-            // candidate string may itself be unknown (e.g. a typo or a
-            // runtime value with no installed alias owner) and echoing
-            // it would promise a `func setup` command that won't
-            // necessarily work.
-            _workflow.Interaction.WriteError(
-                $"The '{candidate}' stack is not installed. " +
-                "Run `func setup --features <stack>` to setup your dev environment, then re-run `func init`.");
-            return 1;
-        }
-
-        if (initializer is null)
-        {
-            // No project signal and no --stack. Don't auto-select: even
-            // when only one initializer is installed, writing the wrong
-            // stack to an existing project's .func/config.json is worse
-            // than asking. Prompt when we can, refuse when we can't.
-            initializer = await _workflow.PromptForAdoptionStackAsync(cancellationToken);
-            if (initializer is null)
-            {
-                return 1;
-            }
-        }
-
-        // Reuse the runtime project resolver so adoption/heal doesn't need its
-        // own detection rules.
-        string? language = request.Language;
-        if (string.IsNullOrWhiteSpace(language))
-        {
-            language = await _workflow.DetectAdoptedLanguageAsync(request.WorkingDirectory, cancellationToken);
-        }
-
-        // Adopt without a resolvable language: skip prompting, the user isn't
-        // changing existing code. Heal is multi-language by construction, so
-        // language must be resolved (either from --language or the detector
-        // above); fall through to ResolveLanguageAsync to surface the right
-        // error if it wasn't.
-        if (heal || !string.IsNullOrWhiteSpace(language))
-        {
-            (string? resolved, int? errorCode) = await _workflow.ResolveLanguageAsync(
-                language, initializer, cancellationToken);
-            if (errorCode is int code)
-            {
-                return code;
-            }
-
-            language = resolved;
-        }
-
-        string? persistedLanguage = InitWorkflow.GetPersistedLanguage(initializer, language);
-        if (heal)
-        {
-            _workflow.MergeLanguageIntoConfig(request.WorkingDirectory.Info, persistedLanguage);
-            _workflow.Interaction.WriteBlankLine();
-            _workflow.Interaction.WriteLine(l => l
-                .Success("✓ ")
-                .Muted("Existing project completed for ")
-                .Code(initializer.Stack)
-                .Muted("."));
-            return 0;
-        }
-
-        _workflow.WriteCliConfigurationFile(
-            request.WorkingDirectory.Info, initializer.Stack, persistedLanguage, request.Force);
-        _workflow.Interaction.WriteBlankLine();
-        _workflow.Interaction.WriteLine(l => l
-            .Success("✓ ")
-            .Muted("Existing project adopted for ")
-            .Code(initializer.Stack)
-            .Muted("."));
-        return 0;
     }
 
     /// <summary>
-    /// Creates the project from the installed <c>func-{stack}</c> project template for <paramref name="language"/>.
+    /// Writes <c>.func/config.json</c>, then creates the project from the installed <c>func-{stack}</c> project
+    /// template for the resolved language.
     /// </summary>
     /// <returns>
-    /// The exit code, or <see langword="null"/> when no project template is installed for <paramref name="language"/>.
+    /// The exit code, or <see langword="null"/> when no project template is installed for the resolved language.
     /// </returns>
-    public async Task<int?> TryCreateAsync(
-        InitRequest request,
-        IProjectInitializer initializer,
-        string language,
-        CancellationToken cancellationToken)
+    public async Task<int?> TryCreateAsync(InitRequest request,
+        InitResolution resolution, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(initializer);
-        ArgumentException.ThrowIfNullOrWhiteSpace(language);
+        ArgumentNullException.ThrowIfNull(resolution);
 
+        IProjectInitializer initializer = resolution.Initializer;
+        string stackId = resolution.Stack.Descriptor.Identifier;
+        string language = TemplateLanguage.ToTemplateTag(resolution.Language);
         using Templater templater = _templaterFactory.Create(new TemplateEngineContext(
             request.WorkingDirectory,
-            new TemplateEngineProjectContext(request.WorkingDirectory, initializer.Stack, language)));
+            new TemplateEngineProjectContext(request.WorkingDirectory, stackId, language)));
         IReadOnlyList<FuncTemplateInfo> candidates;
         try
         {
@@ -214,7 +98,7 @@ internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFact
         }
 
         // Once project templates exist for the language, failures never fall back to stack scaffolding.
-        string defaultShortName = $"func-{initializer.Stack}";
+        string defaultShortName = $"func-{stackId}";
         FuncTemplateInfo[] defaults = [.. candidates
             .Where(template => template.ShortNameList.Contains(defaultShortName, StringComparer.OrdinalIgnoreCase))];
         if (defaults.Length != 1)
@@ -246,7 +130,8 @@ internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFact
             return 1;
         }
 
-        InitContext context = new(request.WorkingDirectory, request.ProjectName, language, request.Force);
+        InitContext context = new(request.WorkingDirectory, request.ProjectName, resolution.Language, request.Force);
+        IProjectStack stack = resolution.Stack;
         string outputPath = request.WorkingDirectory.Info.FullName;
         ITemplateCreationResult preflight = await template.InstantiateAsync(
             context.ProjectName, outputPath, parameters, context.Force, dryRun: true, cancellationToken);
@@ -254,7 +139,7 @@ internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFact
                 && !(context.Force && preflight.Status == CreationResultStatus.DestructiveChangesDetected))
             || (!context.Force && HasExistingFileChanges(preflight)))
         {
-            _workflow.Interaction.WriteError(DescribeCreationFailure(template, preflight));
+            _workflow.Interaction.WriteError(DescribeCreationFailure(stack, template, preflight));
             return 1;
         }
 
@@ -263,54 +148,60 @@ internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFact
             return 1;
         }
 
-        ITemplateCreationResult result = await template.InstantiateAsync(
-            context.ProjectName, outputPath, parameters, context.Force, dryRun: false, cancellationToken);
-        if (result.Status != CreationResultStatus.Success)
+        if (!await _workflow.SaveProjectConfigAsync(request, resolution, cancellationToken))
         {
-            _workflow.Interaction.WriteError(DescribeCreationFailure(template, result));
             return 1;
         }
 
-        _workflow.WriteCliConfigurationFile(
-            request.WorkingDirectory.Info,
-            initializer.Stack,
-            InitWorkflow.GetPersistedLanguage(initializer, language),
-            request.Force);
+        ITemplateCreationResult result;
+        try
+        {
+            result = await template.InstantiateAsync(
+                context.ProjectName, outputPath, parameters, context.Force, dryRun: false, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The engine reports generation failures in the result; outside it, only loading the template's files
+            // from its package is expected to fail.
+            return _workflow.ReportCreationFailed(request, DescribeTemplateFailure(stack, template, ex.Message));
+        }
 
-        await initializer.ConfigureProjectAsync(context, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (result.Status != CreationResultStatus.Success)
+        {
+            // Files that appeared after the dry run block creation before any project file is written.
+            if (IsConflict(result))
+            {
+                _workflow.Interaction.WriteError(DescribeCreationFailure(stack, template, result));
+                return 1;
+            }
+
+            string reason = result.ErrorMessage ?? result.Status.ToString();
+            return _workflow.ReportCreationFailed(request, DescribeTemplateFailure(stack, template, reason));
+        }
+
+        try
+        {
+            await initializer.ConfigureProjectAsync(context, cancellationToken);
+        }
+        catch (Exception ex) when (InitWorkflow.IsExpectedStackFailure(ex))
+        {
+            return _workflow.ReportCreationFailed(
+                request, $"Couldn't set up the {stack.Descriptor.DisplayName} project: {ex.Message}");
+        }
 
         // Stack setup may observe cancellation and return normally; a cancelled init never reports success.
         cancellationToken.ThrowIfCancellationRequested();
 
-        // POST-ACTION INTEGRATION DEFERRED TO #5963: template post-actions run here, after stack setup and before
-        // success is reported.
+        // Template post-actions aren't run yet; tracked in #6023.
 
-        _workflow.Interaction.WriteBlankLine();
-        return await _workflow.ReportInitializedAsync(
-            request.WorkingDirectory.Info, initializer.Stack, cancellationToken);
+        return await _workflow.ReportInitializedAsync(request.WorkingDirectory.Info, stack, cancellationToken);
     }
 
-    private int RejectExistingProjectTokens(InitRequest request)
+    private static string DescribeCreationFailure(IProjectStack stack, FuncTemplateInfo template,
+        ITemplateCreationResult result)
     {
-        // Parse against the stack options only to name a stack option, including its inline '--option=value' form;
-        // nothing is bound for an existing project.
-        ParseResult stackParse = request.StackOptionsCommand.Parse(
-            ["init", .. request.UnmatchedTokens], TemplateCommand.TokenParserConfiguration);
-        Token? first = stackParse.Tokens.SkipWhile(token => token.Type == TokenType.Command).FirstOrDefault();
-        if (first?.Type != TokenType.Option)
-        {
-            return _workflow.RejectUnmatchedTokens(request.UnmatchedTokens);
-        }
-
-        _workflow.Interaction.WriteError(
-            $"Option '{first.Value}' is not supported for an existing project because no project content is created. " +
-            "Remove it, or pass --force to re-initialize.");
-        return 1;
-    }
-
-    private static string DescribeCreationFailure(FuncTemplateInfo template, ITemplateCreationResult result)
-    {
-        if (HasExistingFileChanges(result) || result.Status == CreationResultStatus.DestructiveChangesDetected)
+        if (IsConflict(result))
         {
             string files = string.Join(", ", result.CreationEffects?.FileChanges
                 .Where(change => change.ChangeKind != ChangeKind.Create)
@@ -319,9 +210,14 @@ internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFact
                 + "Use --force to replace the directory contents.";
         }
 
-        return $"Failed to initialize the project from template '{template.Identity}': "
-            + (result.ErrorMessage ?? result.Status.ToString());
+        return DescribeTemplateFailure(stack, template, result.ErrorMessage ?? result.Status.ToString());
     }
+
+    private static string DescribeTemplateFailure(IProjectStack stack, FuncTemplateInfo template, string reason)
+        => $"Couldn't create the {stack.Descriptor.DisplayName} project from template '{template.Identity}': {reason}";
+
+    private static bool IsConflict(ITemplateCreationResult result)
+        => HasExistingFileChanges(result) || result.Status == CreationResultStatus.DestructiveChangesDetected;
 
     private static bool HasExistingFileChanges(ITemplateCreationResult result)
         => result.CreationEffects?.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create) == true;

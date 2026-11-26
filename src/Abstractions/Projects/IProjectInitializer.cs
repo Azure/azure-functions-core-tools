@@ -53,10 +53,10 @@ public interface IProjectInitializer
     public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Runs stack-owned, non-scaffolding setup after an installed project template has created
-    /// the project at <see cref="WorkloadContext.WorkingDirectory"/> and the <c>.func/config.json</c>
-    /// write has been attempted. Implementations must not create or overwrite template content; project
-    /// files are owned by the template. The default implementation does nothing.
+    /// Runs stack-owned, non-scaffolding setup at <see cref="InitContext.WorkingDirectory"/> after <c>func init</c> has
+    /// written <c>.func/config.json</c> and an installed project template has created the project. Implementations
+    /// must not create or overwrite template content; project files are owned by the template. The default
+    /// implementation does nothing.
     /// </summary>
     public Task ConfigureProjectAsync(InitContext context, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
