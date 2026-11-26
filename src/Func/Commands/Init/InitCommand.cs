@@ -16,7 +16,7 @@ using Azure.Functions.Cli.Workloads;
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Initializes an Azure Functions project. Routes to <see cref="NewInitCommand"/>, which creates projects from
+/// Initializes an Azure Functions project. Routes to <see cref="TemplatedInitHandler"/>, which creates projects from
 /// installed project templates and adopts or completes existing projects, or to <see cref="LegacyInitCommand"/>,
 /// which runs the stack's existing scaffolding when no project template is installed for the language.
 /// Each registered initializer may also contribute options used by its existing scaffolding
@@ -30,19 +30,8 @@ namespace Azure.Functions.Cli.Commands;
 /// project path is therefore given before template and stack options: <c>func init &lt;path&gt; [options]</c>.
 /// </para>
 /// <para>
-/// When the target directory already contains a <c>host.json</c> but no
-/// <c>.func/config.json</c>, the command "adopts" the project: it writes
-/// the CLI config and skips scaffolding. The stack is taken from
-/// <c>--stack</c> if provided, otherwise from <c>local.settings.json</c>'s
-/// <c>FUNCTIONS_WORKER_RUNTIME</c>. If the resolved stack isn't installed,
-/// adoption is refused with a pointer to <c>func setup</c>. When neither
-/// signal is available the user is prompted interactively, or the command
-/// refuses non-interactively. <c>--force</c> bypasses adopt mode entirely.
-/// When <c>.func/config.json</c> exists but is missing <c>stack.language</c>
-/// on a multi-language stack, the command "heals" it: it detects the
-/// language via the project resolver and merges the missing key in,
-/// preserving every other key in the file. <c>--force</c> still wipes.
-/// Adoption and healing are owned by <see cref="NewInitCommand"/>.
+/// <c>init</c> adopts a project with <c>host.json</c> but no CLI config, or fills in a missing language for a
+/// multi-language stack. <c>--force</c> skips adoption and repair and reinitializes the directory instead.
 /// </para>
 /// </remarks>
 internal class InitCommand : TemplateCommand, IBuiltInCommand
@@ -70,7 +59,7 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
     private readonly Command _stackOptionsCommand = new("init");
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
     private readonly InitWorkflow _workflow;
-    private readonly NewInitCommand _newInit;
+    private readonly TemplatedInitHandler _templatedInit;
     private readonly LegacyInitCommand _legacyInit;
 
     public InitCommand(
@@ -102,7 +91,7 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
             bundleSectionReader,
             bundleScanner,
             _initializers);
-        _newInit = new NewInitCommand(_workflow, templaterFactory);
+        _templatedInit = new TemplatedInitHandler(_workflow, templaterFactory);
         _legacyInit = new LegacyInitCommand(_workflow);
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -191,7 +180,7 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         if (!request.Force
             && state is InitializationState.AdoptableExistingProject or InitializationState.PartiallyInitialized)
         {
-            return await _newInit.ReconcileExistingAsync(request, state, existingRuntime, cancellationToken);
+            return await _templatedInit.ReconcileExistingAsync(request, state, existingRuntime, cancellationToken);
         }
 
         IProjectInitializer? initializer = await _workflow.SelectInitializerAsync(
@@ -209,7 +198,8 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         }
 
         if (!string.IsNullOrWhiteSpace(language)
-            && await _newInit.TryCreateAsync(request, initializer, language, cancellationToken) is int templateExitCode)
+            && await _templatedInit.TryCreateAsync(request, initializer, language, cancellationToken)
+                is int templateExitCode)
         {
             return templateExitCode;
         }
