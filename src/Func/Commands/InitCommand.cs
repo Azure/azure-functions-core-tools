@@ -126,12 +126,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             language ??= detected;
         }
 
-        // A pre-v5 project with no language fingerprints may be adopted with just its resolved stack.
-        // Repairing an existing config, unlike adoption, must actually fill the missing language.
-        if (language is null && !settings.IsAdoptable)
-        {
-            language = await SelectLanguageAsync(stack, cancellationToken);
-        }
+        language ??= await SelectLanguageAsync(stack, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
         if (force && directory.Exists && DirectoryGuard.HasNonGitContent(directory.Info))
@@ -149,7 +144,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         if (complete)
         {
-            await _configuration.CompleteLanguageAsync(directory.Info, stack, language!, cancellationToken);
+            await _configuration.CompleteLanguageAsync(directory.Info, stack, language, cancellationToken);
             WriteSuccess("Existing project completed for ", stack);
             return 0;
         }

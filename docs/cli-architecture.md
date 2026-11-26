@@ -402,6 +402,8 @@ For example `native` matches Go; the config stores `"runtime": "go"`. If several
 
 The CLI compares the selected stack and language with the detected project's descriptors before writing. Language inputs match a language ID or explicit alias in that stack; the file records the canonical `LanguageIdentifier` only for a multi-language stack. Once `.func/config.json` exists it is authoritative: project resolution does not reinterpret local settings as a CLI ID, implicitly adopt the directory, or rewrite its configuration. `--force` explicitly requests a new scaffold rather than adoption.
 
+If a multi-language project has no language fingerprint, adoption prompts for the language before creating `.func/config.json`. In a noninteractive session, pass `--language <id>`; without it, init reports the supported IDs and leaves the project untouched. A single-language stack needs no prompt.
+
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
 Help groups stack-specific options under the owning descriptor's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section. `func run` (alias `start`) uses each contributor's owning descriptor in the same way. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.

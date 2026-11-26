@@ -1106,29 +1106,43 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_ResolverReturnsNullLanguage_LeavesLanguageUnset()
+    public async Task InitCommand_Adopt_NoLanguageNonInteractive_RequiresLanguageBeforeWriting()
     {
-        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
-        try
-        {
-            Directory.CreateDirectory(newDir);
-            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "host.json"), "{}");
+        StubLocalSettingsRuntime("node");
+        var node = new FakeProjectInitializer("node", [_javascript, _typescript]);
 
-            _projectResolver
-                .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
-                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: null), "stub"));
+        int exitCode = await RunInitAsync(directory.Path, node, language: null);
 
-            var dotnet = new FakeProjectInitializer("dotnet", [_csharp, _fsharp]);
+        exitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("--language <javascript|typescript>");
+        Directory.Exists(Path.Combine(directory.Path, ".func")).Should().BeFalse();
+        node.WasInvoked.Should().BeFalse();
+    }
 
-            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+    [Fact]
+    public async Task InitCommand_Adopt_CancelLanguagePicker_DoesNotWriteOrScaffold()
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "host.json"), "{}");
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var node = new FakeProjectInitializer("node", [_javascript, _typescript]);
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.IsInteractive.Returns(true);
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<LanguageDescriptor>>(), Arg.Any<Func<LanguageDescriptor, string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                cancellation.Cancel();
+                return Task.FromCanceled<LanguageDescriptor>(call.Arg<CancellationToken>());
+            });
+        var root = new RootCommand { CreateCommand([node], interaction) };
+        var result = root.Parse(["init", directory.Path, "--stack", "node"]);
 
-            exitCode.Should().Be(0);
-            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
-        }
-        finally
-        {
-            CleanupDirectory(newDir);
-        }
+        await FluentActions.Awaiting(() => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+            .Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(Path.Combine(directory.Path, ".func")).Should().BeFalse();
+        node.WasInvoked.Should().BeFalse();
     }
 
     [Fact]
@@ -1367,15 +1381,15 @@ public class InitCommandTests
 
         result.Should().Be(0);
         stackLabels.Should().Equal("Comet (left)", "Comet (right)");
+        languageLabels.Should().Equal("Script (type-a)", "Script (type-b)");
+        AssertConfigJsonHasShape(directory.Path, "right", "type-b");
         if (mode == "Fresh")
         {
-            languageLabels.Should().Equal("Script (type-a)", "Script (type-b)");
-            AssertConfigJsonHasShape(directory.Path, "right", "type-b");
             right.SelectedLanguage.Should().BeSameAs(right.Stack.SupportedLanguages[1]);
         }
         else
         {
-            AssertConfigJsonHasShape(directory.Path, "right", null);
+            right.WasInvoked.Should().BeFalse();
         }
     }
 
