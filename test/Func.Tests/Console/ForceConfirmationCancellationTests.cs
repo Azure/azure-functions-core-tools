@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Tests.Templates;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
@@ -14,6 +15,70 @@ namespace Azure.Functions.Cli.Tests.Console;
 
 public class ForceConfirmationCancellationTests
 {
+    [Fact]
+    public async Task Init_TemplateForceCancellationBeforeClearingPreservesDirectory()
+    {
+        using CancellationTokenSource cancellation = new();
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.ConfirmAsync("Continue?", false, true, Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            CancellationToken forwardedToken = call.Arg<CancellationToken>();
+            forwardedToken.CanBeCanceled.Should().BeTrue();
+            cancellation.Cancel();
+            forwardedToken.IsCancellationRequested.Should().BeTrue();
+            return Task.FromResult(true);
+        });
+
+        var initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns("python");
+        initializer.DisplayName.Returns("Python");
+        initializer.SupportedLanguages.Returns(["python"]);
+        initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
+        string root = Path.Combine(Path.GetTempPath(), $"func-force-template-cancel-{Guid.NewGuid():N}");
+        string directory = Path.Combine(root, "App");
+        string home = Path.Combine(root, "home");
+        Directory.CreateDirectory(directory);
+        string sentinel = Path.Combine(directory, "keep.txt");
+        await File.WriteAllTextAsync(sentinel, "original content", TestContext.Current.CancellationToken);
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            var bundles = Substitute.For<IInstalledBundleWorkloads>();
+            bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
+            InitCommand command = new(
+                interaction,
+                Substitute.For<IWorkloadHintRenderer>(),
+                Substitute.For<ILocalSettingsProvider>(),
+                Substitute.For<IFunctionsProjectResolver>(),
+                Substitute.For<IHostJsonBundleSectionReader>(),
+                new InstalledBundleScanner(bundles),
+                TemplateFixtures.CreateTemplaterFactory(home),
+                [initializer]);
+            ParseResult parsed = command.Parse([directory, "--stack", "python", "--language", "python", "--force"]);
+
+            await FluentActions.Awaiting(() => parsed.InvokeAsync(
+                    new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+                .Should().ThrowAsync<OperationCanceledException>();
+
+            cancellation.IsCancellationRequested.Should().BeTrue();
+            Directory.GetFileSystemEntries(directory).Should().Equal(sentinel);
+            (await File.ReadAllTextAsync(sentinel, TestContext.Current.CancellationToken))
+                .Should().Be("original content");
+            File.Exists(Path.Combine(directory, "Program.cs")).Should().BeFalse();
+            File.Exists(Path.Combine(directory, ".func", "config.json")).Should().BeFalse();
+            await initializer.DidNotReceive().InitializeAsync(
+                Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+            await initializer.DidNotReceive().ConfigureProjectAsync(
+                Arg.Any<InitContext>(), Arg.Any<CancellationToken>());
+            await interaction.Received(1).ConfirmAsync("Continue?", false, true, Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -52,7 +117,7 @@ public class ForceConfirmationCancellationTests
         bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
         var command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), localSettings,
             Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-            new InstalledBundleScanner(bundles), [initializer]);
+            new InstalledBundleScanner(bundles), TemplateFixtures.CreateEmptyTemplaterFactory(), [initializer]);
         commandConstructed = true;
 
         string directory = Path.Combine(Path.GetTempPath(), $"func-force-cancel-{Guid.NewGuid():N}");

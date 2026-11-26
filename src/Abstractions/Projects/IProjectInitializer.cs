@@ -69,5 +69,20 @@ public interface IProjectInitializer
     /// <summary>
     /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.
     /// </summary>
+    /// <param name="context">The init context.</param>
+    /// <param name="parseResult">
+    /// The typed parse of the stack init options, from which this initializer reads the values of the options it
+    /// returned from <see cref="GetInitOptions"/>.
+    /// </param>
+    /// <param name="cancellationToken">A token to cancel initialization.</param>
     public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs stack-owned, non-scaffolding setup after an installed project template has created
+    /// the project at <see cref="WorkloadContext.WorkingDirectory"/> and the <c>.func/config.json</c>
+    /// write has been attempted. Implementations must not create or overwrite template content; project
+    /// files are owned by the template. The default implementation does nothing.
+    /// </summary>
+    public Task ConfigureProjectAsync(InitContext context, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }

@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.TemplateFiltering;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
 using NSubstitute;
@@ -54,6 +55,69 @@ public sealed class TemplaterTests : IDisposable
             TemplateFixtures.UntypedTemplateIdentity,
         ]);
         result.Templates.Should().AllSatisfy(template => template.Template.Identity.Should().Be(template.Identity));
+    }
+
+    [Fact]
+    public async Task ListProjectTemplatesAsync_UsesEngineTypeAndLanguageFilters()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ListProjectTemplatesAsync("python", CancellationToken.None);
+
+        result.Templates.Select(template => template.Identity).Should().Equal(TemplateFixtures.ProjectTemplateIdentity);
+    }
+
+    [Fact]
+    public async Task ListProjectTemplatesAsync_ReturnsMultipleApplicableTemplates()
+    {
+        string packageDirectory = TemplateFixtures.WriteInitProjectPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ListProjectTemplatesAsync("python", CancellationToken.None);
+
+        result.Templates.Select(template => template.Identity).Should().BeEquivalentTo(
+            TemplateFixtures.InitProjectTemplateIdentity,
+            $"{TemplateFixtures.InitProjectTemplateIdentity}.Alternative");
+    }
+
+    [Fact]
+    public async Task ListProjectTemplatesAsync_KeepsEachCandidatesNativeMatchDetails()
+    {
+        string packageDirectory = TemplateFixtures.WriteInitProjectPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ListProjectTemplatesAsync("python", CancellationToken.None);
+
+        result.Templates.Should().HaveCount(2);
+        result.Matches.Should().HaveCount(2);
+        result.Matches.Values.Should().OnlyHaveUniqueItems();
+        result.Templates.Should().AllSatisfy(template =>
+        {
+            result.Matches.Should().ContainKey(template);
+            ITemplateMatchInfo match = result.Matches[template];
+            match.Info.Should().BeSameAs(template.Template);
+            match.MatchDisposition.Should().Contain(info =>
+                info.Name == MatchInfo.BuiltIn.Type && info.Kind == MatchKind.Exact);
+            match.MatchDisposition.Should().Contain(info =>
+                info.Name == MatchInfo.BuiltIn.Language && info.Kind == MatchKind.Exact);
+        });
+    }
+
+    [Fact]
+    public async Task ListAsync_UnfilteredCandidatesHaveNoMatchDetails()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ListAsync(CancellationToken.None);
+
+        result.Templates.Should().NotBeEmpty();
+        result.Matches.Should().BeEmpty();
     }
 
     [Fact]

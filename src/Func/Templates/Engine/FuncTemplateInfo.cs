@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Parameters;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -16,9 +17,15 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </remarks>
 /// <param name="template">The underlying template engine metadata.</param>
 /// <param name="hostData">The parsed func host configuration.</param>
-internal sealed class FuncTemplateInfo(ITemplateInfo template, FuncTemplateHostData hostData)
+/// <param name="settings">The engine environment that discovered the template, used to instantiate it.</param>
+internal sealed class FuncTemplateInfo(
+    ITemplateInfo template,
+    FuncTemplateHostData hostData,
+    IEngineEnvironmentSettings? settings = null)
     : ITemplateInfo
 {
+    private readonly IEngineEnvironmentSettings? _settings = settings;
+
     public ITemplateInfo Template { get; } = template ?? throw new ArgumentNullException(nameof(template));
 
     public FuncTemplateHostData HostData { get; } = hostData ?? throw new ArgumentNullException(nameof(hostData));
@@ -94,6 +101,49 @@ internal sealed class FuncTemplateInfo(ITemplateInfo template, FuncTemplateHostD
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(settings);
 
-        return new(template, settings.ReadHostData(template));
+        return new(template, settings.ReadHostData(template), settings);
+    }
+
+    /// <summary>
+    /// Instantiates this template into <paramref name="outputPath"/> through the template engine,
+    /// which owns parameter conversion, defaults, validation, collision detection, and file creation.
+    /// </summary>
+    /// <param name="name">The requested output name, or <c>null</c> to use the output folder name.</param>
+    /// <param name="outputPath">The directory the template creates content in.</param>
+    /// <param name="parameters">Raw template parameter values keyed by parameter name.</param>
+    /// <param name="force">Whether the engine may overwrite existing files.</param>
+    /// <param name="dryRun">Whether to compute the creation effects without writing files.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The template was not discovered through a template engine environment.
+    /// </exception>
+    public async Task<ITemplateCreationResult> InstantiateAsync(
+        string? name,
+        string outputPath,
+        IReadOnlyDictionary<string, string> parameters,
+        bool force,
+        bool dryRun,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (_settings is null)
+        {
+            throw new InvalidOperationException(
+                $"Template '{Identity}' cannot be instantiated without a template engine environment.");
+        }
+
+        string fallbackName = Path.GetFileName(Path.TrimEndingDirectorySeparator(outputPath));
+        var inputParameters = parameters.ToDictionary(pair => pair.Key, pair => (string?)pair.Value);
+        TemplateCreator creator = new(_settings);
+        return await creator.InstantiateAsync(
+            Template,
+            name,
+            fallbackName,
+            outputPath,
+            inputParameters,
+            forceCreation: force,
+            dryRun: dryRun,
+            cancellationToken: cancellationToken);
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Commands;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -20,7 +21,7 @@ internal sealed class HelpMetadataValidator
     {
         AddViolationIfInvalid(command.Description, $"{path}: command", violations);
 
-        foreach (Option option in command.Options)
+        foreach (Option option in (command as FuncCliCommand)?.GetHelpOptions() ?? command.Options)
         {
             AddViolationIfInvalid(option.Description, $"{path} {option.Name}: option", violations);
         }

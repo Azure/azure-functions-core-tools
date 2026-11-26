@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.TemplateFiltering;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Utils;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -53,7 +55,30 @@ internal sealed class Templater : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
-        return new([.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
+        return new TemplateResolutionResult(
+            [.. templates.Select(template => FuncTemplateInfo.Create(template, _settings))]);
+    }
+
+    /// <summary>
+    /// Lists project templates for <paramref name="language"/> using the engine's package-manager filters, keeping
+    /// the engine's match details for each candidate.
+    /// </summary>
+    public async Task<TemplateResolutionResult> ListProjectTemplatesAsync(
+        string language,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(language);
+
+        IReadOnlyList<ITemplateMatchInfo> matches = await _packageManager.GetTemplatesAsync(
+            WellKnownSearchFilters.MatchesAllCriteria,
+            [
+                WellKnownSearchFilters.TypeFilter("project"),
+                WellKnownSearchFilters.LanguageFilter(language)
+            ],
+            cancellationToken);
+        return new TemplateResolutionResult(
+            [.. matches.Select(match => (FuncTemplateInfo.Create(match.Info, _settings), match))]);
     }
 
     public void Dispose()

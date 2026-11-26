@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
+    <!-- Real .NET stack and its shipped templates (under content/templates) for the func init integration test. -->
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
   </ItemGroup>
 
   <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">

@@ -150,7 +150,7 @@ internal class HelpCommand : FuncCliCommand
         WriteArgumentsSection(command);
         WriteSubcommandsSection(command);
 
-        IEnumerable<IGrouping<string?, Option>> optionGroups = command.Options
+        IEnumerable<IGrouping<string?, Option>> optionGroups = GetHelpOptions(command)
             .Where(o => !o.Hidden && o is not HelpOption)
             .GroupBy(o => (command as FuncCliCommand)?.GetOptionHelpHeading(o))
             .OrderBy(group => group.Key is not null)
@@ -285,12 +285,15 @@ internal class HelpCommand : FuncCliCommand
                 line.Plain(" ").Placeholder("<command>");
             }
 
-            if (command.Options.Any(o => !o.Hidden && o is not HelpOption))
+            if (GetHelpOptions(command).Any(o => !o.Hidden && o is not HelpOption))
             {
                 line.Plain(" ").Muted("[options]");
             }
         });
     }
+
+    private static IEnumerable<Option> GetHelpOptions(Command command)
+        => (command as FuncCliCommand)?.GetHelpOptions() ?? command.Options;
 
     /// <summary>
     /// Builds the full command path from the root, e.g. <c>func workload install</c>
