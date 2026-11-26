@@ -31,9 +31,7 @@ public class ForceConfirmationCancellationTests
         });
 
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns("python");
-        initializer.DisplayName.Returns("Python");
-        initializer.SupportedLanguages.Returns(["python"]);
+        initializer.Stack.Returns(new TestProjectStack("python", "Python", languages: [new("python", "Python")]));
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         string root = Path.Combine(Path.GetTempPath(), $"func-force-template-cancel-{Guid.NewGuid():N}");
         string directory = Path.Combine(root, "App");
@@ -47,13 +45,16 @@ public class ForceConfirmationCancellationTests
             await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
             var bundles = Substitute.For<IInstalledBundleWorkloads>();
             bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
+            var localSettings = Substitute.For<ILocalSettingsProvider>();
+            localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
             InitCommand command = new(
                 interaction,
                 Substitute.For<IWorkloadHintRenderer>(),
-                Substitute.For<ILocalSettingsProvider>(),
+                new ProjectStackConfiguration(new PhysicalFileSystem(), localSettings),
                 Substitute.For<IFunctionsProjectResolver>(),
                 Substitute.For<IHostJsonBundleSectionReader>(),
                 new InstalledBundleScanner(bundles),
+                new InstalledProjectStackCatalog([initializer.Stack]),
                 TemplateFixtures.CreateTemplaterFactory(home),
                 [initializer]);
             ParseResult parsed = command.Parse([directory, "--stack", "python", "--language", "python", "--force"]);

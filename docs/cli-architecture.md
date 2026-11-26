@@ -391,7 +391,7 @@ If a newer version is found, a notice is printed after the command completes.
 3. If all selectors and project signals agree:
    ├── .func/config.json present → complete a missing language on a multi-language stack; otherwise refuse
    ├── host.json only            → adopt; write CLI config and skip scaffolding
-   └── new project              → write CLI config and scaffold with the resolved InitContext
+   └── new project              → scaffold with the resolved InitContext, run stack setup, then write CLI config
 ```
 
 **Adopt mode** (host.json present, no `.func/config.json`):

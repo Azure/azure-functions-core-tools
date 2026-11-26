@@ -45,10 +45,8 @@ public class PathArgumentTests
     [InlineData(new[] { "--bogus" }, new[] { "--bogus" }, null)]
     [InlineData(new[] { "MyApp", "--bogus" }, new[] { "--bogus" }, "MyApp")]
     [InlineData(new[] { "--bogus", "MyApp" }, new[] { "--bogus", "MyApp" }, null)]
-    public void DashPrefix_IsLeftUnmatchedAndSurfacesAsUnrecognized(
-        string[] args,
-        string[] expectedUnmatched,
-        string? expectedPath)
+    public void DashPrefix_IsLeftUnmatchedAndSurfacesAsUnrecognized(string[] args,
+        string[] expectedUnmatched, string? expectedPath)
     {
         var cmd = new TestableCommand();
         var parseResult = cmd.Parse(args);

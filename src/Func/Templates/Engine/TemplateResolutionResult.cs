@@ -37,7 +37,9 @@ internal sealed class TemplateResolutionResult
                 ReferenceEqualityComparer.Instance);
     }
 
-    /// <summary>The candidates, in the order the engine returned them. The caller selects among them.</summary>
+    /// <summary>
+    /// The candidates, in the order the engine returned them. The caller selects among them.
+    /// </summary>
     public IReadOnlyList<FuncTemplateInfo> Templates { get; }
 
     /// <summary>

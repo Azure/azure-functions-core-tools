@@ -5,7 +5,6 @@ using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Init;
 using Azure.Functions.Cli.Commands.Templating;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
@@ -43,10 +42,7 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         Description = "The name of the Function App project"
     };
 
-    public Option<string?> LanguageOption { get; } = new("--language", "-l")
-    {
-        Description = "The programming language (e.g., C#, F#, JavaScript, TypeScript, Python)"
-    };
+    public Option<string?> LanguageOption { get; } = new("--language", "-l");
 
     public Option<bool> ForceOption { get; } = new("--force")
     {
@@ -65,20 +61,22 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
     public InitCommand(
         IInteractionService interaction,
         IWorkloadHintRenderer hintRenderer,
-        ILocalSettingsProvider localSettingsProvider,
+        IProjectStackConfiguration configuration,
         IFunctionsProjectResolver projectResolver,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
+        InstalledProjectStackCatalog catalog,
         ITemplaterFactory templaterFactory,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
-        ArgumentNullException.ThrowIfNull(localSettingsProvider);
+        ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
+        ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(templaterFactory);
         ArgumentNullException.ThrowIfNull(initializers);
 
@@ -86,7 +84,8 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         _workflow = new InitWorkflow(
             interaction,
             hintRenderer,
-            localSettingsProvider,
+            configuration,
+            catalog,
             projectResolver,
             bundleSectionReader,
             bundleScanner,
@@ -94,8 +93,11 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         _templatedInit = new TemplatedInitHandler(_workflow, templaterFactory);
         _legacyInit = new LegacyInitCommand(_workflow);
 
-        StackOption.Description = BuildStackOptionDescription(_initializers);
-        LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
+        StackOption.Description = BuildOptionDescription(
+            "The stack to use", _initializers.Select(i => i.Stack.Descriptor.Identifier));
+        LanguageOption.Description = BuildOptionDescription(
+            "The programming language",
+            _initializers.SelectMany(i => i.Stack.SupportedLanguages).Select(l => l.LanguageIdentifier));
 
         AddPathArgument();
         Options.Add(StackOption);
@@ -108,10 +110,11 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
         InitOptionRegistry registry = new(_stackOptionsCommand);
         foreach (IProjectInitializer initializer in _initializers)
         {
-            registry.SetActiveStack(initializer.Stack);
+            StackDescriptor descriptor = initializer.Stack.Descriptor;
+            registry.SetActiveStack(descriptor.Identifier);
             IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
             // Bundle options stay general even when only one bundle-using stack is installed.
-            RegisterStackOptionHelp(initializer.Stack, initializer.DisplayName,
+            RegisterStackOptionHelp(descriptor,
                 options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
                     && option.Name != CommonInitOptions.BundlesChannelOptionName));
         }
@@ -125,142 +128,48 @@ internal class InitCommand : TemplateCommand, IBuiltInCommand
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        // Two workloads claiming the same stack is unrecoverable: `--stack`
-        // would be ambiguous and auto-select would silently pick whichever
-        // DI returned first. Validated lazily here (rather than in the ctor)
-        // so an init-side conflict doesn't break unrelated commands like
-        // `func start`.
-        var dupes = _initializers
-            .GroupBy(i => i.Stack, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-        if (dupes.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"Two installed workloads both claim the '{string.Join("', '", dupes)}' stack. " +
-                "Run `func workload list` to see them, then `func workload uninstall <name>` to remove one.");
-        }
-
         InitRequest request = CreateRequest(parseResult);
-        InitializationState state = InitWorkflow.DetectInitializationState(request.WorkingDirectory.Info);
-        string? existingRuntime = null;
-
-        // Heal one specific partial state: config exists with a runtime but no
-        // language on a multi-language stack. Detection here happens before the
-        // FullyInitialized refuse so the user doesn't have to reach for --force
-        // (which would wipe profiles, custom keys, etc.) just to fill in a
-        // missing language field. Other partial shapes still require --force.
-        if (state == InitializationState.FullyInitialized
-            && !request.Force
-            && InitWorkflow.TryReadExistingStack(request.WorkingDirectory.Info) is { } snapshot
-            && !string.IsNullOrWhiteSpace(snapshot.Runtime)
-            && string.IsNullOrWhiteSpace(snapshot.Language)
-            && _workflow.FindInitializerForCandidate(snapshot.Runtime) is { SupportedLanguages.Count: > 1 })
+        try
         {
-            state = InitializationState.PartiallyInitialized;
-            existingRuntime = snapshot.Runtime;
+            // Every route receives a validated stack and language, so a bad value never leaves files behind.
+            InitResolution? resolution = await _workflow.ResolveAsync(request, cancellationToken);
+            if (resolution is null)
+            {
+                return 1;
+            }
+
+            if (resolution.Mode != InitMode.Create)
+            {
+                return await _templatedInit.ReconcileExistingAsync(request, resolution, cancellationToken);
+            }
+
+            return await _templatedInit.TryCreateAsync(request, resolution, cancellationToken)
+                ?? await _legacyInit.CreateAsync(request, resolution, cancellationToken);
         }
-
-        // .func/config.json already present means the project has been fully
-        // initialized by v5; re-running without --force would silently no-op
-        // the config write and re-scaffold on top of the user's code.
-        if (state == InitializationState.FullyInitialized && !request.Force)
+        catch (Exception ex) when (ex is ProjectStackResolutionException or ProjectStackConfigurationException)
         {
-            _workflow.Interaction.WriteError(
-                "This directory already contains a Functions project " +
-                $"('{CliConfigurationPathsOptions.ProjectConfigDisplayPath}' is present). " +
-                "Pass --force to re-initialize.");
+            _workflow.Interaction.WriteError(ex.Message);
             return 1;
         }
-
-        // host.json without .func/config.json means a pre-existing Functions
-        // project that predates the v5 CLI config. Adopt it without creating
-        // content. --force still means "wipe and re-create".
-        if (!request.Force
-            && state is InitializationState.AdoptableExistingProject or InitializationState.PartiallyInitialized)
-        {
-            return await _templatedInit.ReconcileExistingAsync(request, state, existingRuntime, cancellationToken);
-        }
-
-        IProjectInitializer? initializer = await _workflow.SelectInitializerAsync(
-            request.RequestedStack, cancellationToken);
-        if (initializer is null)
-        {
-            return 1;
-        }
-
-        (string? language, int? errorCode) = await _workflow.ResolveLanguageAsync(
-            request.Language, initializer, cancellationToken);
-        if (errorCode is int code)
-        {
-            return code;
-        }
-
-        if (!string.IsNullOrWhiteSpace(language)
-            && await _templatedInit.TryCreateAsync(request, initializer, language, cancellationToken)
-                is int templateExitCode)
-        {
-            return templateExitCode;
-        }
-
-        return await _legacyInit.CreateAsync(request, initializer, language, cancellationToken);
     }
 
     private InitRequest CreateRequest(ParseResult parseResult)
-    {
-        string? language = parseResult.GetValue(LanguageOption);
-        if (!string.IsNullOrWhiteSpace(language))
-        {
-            language = language.Trim().ToLowerInvariant();
-        }
-
-        return new InitRequest(
+        => new(
             parseResult.GetValue(PathArgument!)!,
             parseResult.GetValue(NameOption),
             parseResult.GetValue(StackOption),
-            language,
+            parseResult.GetValue(LanguageOption),
             parseResult.GetValue(ForceOption),
             _stackOptionsCommand,
             GetReservedOptions([]),
             GetTemplateTokens(parseResult, []));
-    }
 
-    // Builds the help text for `--stack`. Stacks come from installed
-    // initializers' Stack ids, lowercased and sorted for a stable
-    // presentation. Matching in SelectInitializerAsync is already
-    // case-insensitive, so we surface the canonical lowercase form.
-    private static string BuildStackOptionDescription(IReadOnlyList<IProjectInitializer> initializers)
+    private static string BuildOptionDescription(string description, IEnumerable<string> values)
     {
-        var stacks = initializers
-            .Select(i => i.Stack)
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(s => s, StringComparer.Ordinal)
-            .ToList();
-
-        return stacks.Count == 0
-            ? "The stack to use. Set up a stack (`func setup --features <id>`) to see supported values."
-            : "The stack to use. Supported values: " + string.Join(", ", stacks) + ".";
-    }
-
-    // Builds the help text for `--language`. Languages are pulled from
-    // installed initializers' SupportedLanguages, lowercased and sorted for
-    // a stable, consistent presentation. The `--language` value itself is
-    // normalized to lower case in ExecuteAsync, so matching is case-insensitive.
-    private static string BuildLanguageOptionDescription(IReadOnlyList<IProjectInitializer> initializers)
-    {
-        var languages = initializers
-            .SelectMany(i => i.SupportedLanguages)
-            .Where(l => !string.IsNullOrWhiteSpace(l))
-            .Select(l => l.Trim().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(l => l, StringComparer.Ordinal)
-            .ToList();
-
-        return languages.Count == 0
-            ? "The programming language. Set up a stack (`func setup --features <id>`) to see supported values."
-            : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
+        string supported = string.Join(", ",
+            values.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase));
+        return supported.Length == 0
+            ? $"{description}. Set up a stack (`func setup --features <id>`) to see supported values."
+            : $"{description}. Supported values: {supported}.";
     }
 }

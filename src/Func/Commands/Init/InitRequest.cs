@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Commands.Init;
 /// <param name="WorkingDirectory">The project directory.</param>
 /// <param name="ProjectName">The requested project name, if any.</param>
 /// <param name="RequestedStack">The requested stack, if any.</param>
-/// <param name="Language">The requested language, normalized to lower case, if any.</param>
+/// <param name="Language">The requested language as given, if any; resolved against the stack's languages.</param>
 /// <param name="Force">Whether the directory may be re-initialized.</param>
 /// <param name="StackOptionsCommand">
 /// The command holding the options contributed by installed stacks. Only routes that consume stack options parse
