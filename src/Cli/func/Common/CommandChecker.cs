@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -32,7 +33,25 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                return CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+                // Not every system has /bin/bash (for example NixOS) or /bin/sh. Try /bin/sh first, then /bin/bash
+                // (the previous behavior), and only then resolve "sh" through PATH.
+                return UnixCommandExists(command, ["/bin/sh", "/bin/bash"], "sh");
+            }
+        }
+
+        internal static bool UnixCommandExists(string command, IEnumerable<string> shellPaths, string pathShell)
+        {
+            var shell = shellPaths.FirstOrDefault(File.Exists) ?? pathShell;
+
+            try
+            {
+                return CheckExitCode(shell, $"-c \"command -v {command}\"");
+            }
+            catch (Win32Exception)
+            {
+                // No usable shell on this system, so the command cannot be confirmed.
+                ColoredConsole.WriteLine(WarningColor($"Could not find a shell (/bin/sh, /bin/bash or 'sh' on PATH) to check whether '{command}' exists."));
+                return false;
             }
         }
 
