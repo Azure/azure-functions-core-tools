@@ -29,7 +29,8 @@ internal sealed record StartCommandOptions(
     double DemoSpeedMultiplier,
     bool DemoAutoExit,
     bool NoAzurite = false,
-    IReadOnlyDictionary<IProjectStack, StartHostConfiguration>? StackHostConfigurations = null)
+    IReadOnlyDictionary<IProjectStack, StartHostConfiguration>? StackHostConfigurations = null,
+    string? Address = null)
 {
     /// <summary>
     /// Host run adjustments keyed by the owning installed stack.

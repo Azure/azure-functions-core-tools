@@ -9,6 +9,8 @@ internal sealed class HostStartupOptions
 
     public int? Port { get; set; }
 
+    public string? Address { get; set; }
+
     public string? Cors { get; set; }
 
     public bool? CorsCredentials { get; set; }

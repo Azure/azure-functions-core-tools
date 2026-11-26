@@ -7,6 +7,8 @@ internal sealed class LocalSettingsHostSnapshot
 {
     public int? LocalHttpPort { get; init; }
 
+    public string? LocalHttpAddress { get; init; }
+
     public string? Cors { get; init; }
 
     public bool? CorsCredentials { get; init; }

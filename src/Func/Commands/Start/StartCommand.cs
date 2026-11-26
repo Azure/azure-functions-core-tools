@@ -38,6 +38,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "A comma-separated list of CORS origins"
     };
 
+    public Option<string?> AddressOption { get; } = new("--address")
+    {
+        Description = "The local IP address to bind to (default: 127.0.0.1)"
+    };
+
     public Option<bool> CorsCredentialsOption { get; } = new("--cors-credentials")
     {
         Description = "Allow cross-origin authenticated requests"
@@ -173,6 +178,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         AddPathArgument();
         Options.Add(PortOption);
+        Options.Add(AddressOption);
         Options.Add(CorsOption);
         Options.Add(CorsCredentialsOption);
         Options.Add(FunctionsOption);
@@ -382,7 +388,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
             ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")),
             parseResult.GetValue(NoAzuriteOption),
-            BuildStackHostConfigurations(parseResult));
+            BuildStackHostConfigurations(parseResult),
+            parseResult.GetValue(AddressOption) ?? hostStartupOptions.Address);
 
     private IReadOnlyDictionary<IProjectStack, StartHostConfiguration> BuildStackHostConfigurations(ParseResult parseResult)
     {

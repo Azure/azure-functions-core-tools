@@ -14,6 +14,10 @@ Full-screen dashboard interaction does not change this output contract.
 Programmatic consumers should explicitly select JSON rather than consume
 interactive dashboard output.
 
+The JSON renderer consumes real Host events during normal runs. `--demo`
+uses a scripted in-memory event source, so its values are synthetic. This
+document describes the JSON output contract.
+
 ## Top-level invariants
 
 - **One JSON object per line.** Lines are terminated with `\n` (LF). Records
@@ -120,6 +124,13 @@ Kinds:
 
 A verbatim host log record. This is the lowest-level form and is emitted
 for every entry the host produces.
+
+For `func run . --port 0 --format json` (also available through `func start`),
+wait for the `log` record with `event_name: "HostListening"`. Its
+`attributes["host.listen_uri"]` contains the actual local base URL, including
+the nonzero port assigned by the OS. The host emits this record after binding
+and before its function metadata snapshot; the initial process-start record
+does not advertise a listening URL for port `0`.
 
 ```json
 {

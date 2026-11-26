@@ -1,5 +1,9 @@
 # Azure.Functions.Cli.Workloads.Host
 
+## Unreleased
+
+- Report actual bound listening URLs after startup so the Azure Functions CLI can display the OS-assigned port for local runs using `--port 0`. (#5861)
+
 ## 4.1055.100-preview.2
 
 - Retarget the host workload to `net11.0` and rebuild the host executable; the WebHost dependency remains at 4.1055.100. (#5928)
