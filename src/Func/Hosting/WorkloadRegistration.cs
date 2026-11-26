@@ -9,7 +9,6 @@ using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -89,7 +88,7 @@ internal static class WorkloadRegistration
             allEntries,
             runtimeIdentifierProvider.Current,
             interaction);
-        IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveRuntimeEntries(compatibleEntries);
+        IReadOnlyList<WorkloadEntry> liveEntries = WorkloadActivation.SelectLiveRuntimeEntries(compatibleEntries);
         IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(compatibleEntries);
 
         var runtimeWorkloads = new List<RuntimeWorkloadInfo>(liveEntries.Count);
@@ -154,8 +153,7 @@ internal static class WorkloadRegistration
         List<WorkloadEntry> compatible = [];
         foreach (WorkloadEntry entry in entries)
         {
-            if (entry.RuntimeIdentifier is null
-                || string.Equals(entry.RuntimeIdentifier, currentRuntimeIdentifier, StringComparison.OrdinalIgnoreCase))
+            if (WorkloadActivation.IsCompatible(entry.RuntimeIdentifier, currentRuntimeIdentifier))
             {
                 compatible.Add(entry);
                 continue;
@@ -169,26 +167,6 @@ internal static class WorkloadRegistration
         }
 
         return compatible;
-    }
-
-    /// <summary>
-    /// Skips non-runtime entries and keeps only the
-    /// highest installed semver per <c>packageId</c>. Older versions stay on
-    /// disk for rollback but don't go live in the process.
-    /// </summary>
-    private static IReadOnlyList<WorkloadEntry> SelectLiveRuntimeEntries(IReadOnlyList<WorkloadEntry> entries)
-    {
-        if (entries.Count == 0)
-        {
-            return [];
-        }
-
-        return [.. entries
-            .Where(e => e.Kind == WorkloadKind.Workload)
-            .GroupBy(e => e.PackageId, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group
-                .OrderByDescending(e => ParseVersionOrZero(e.PackageVersion))
-                .First())];
     }
 
     private static IReadOnlyList<ContentWorkloadInfo> CreateContentWorkloads(IReadOnlyList<WorkloadEntry> entries)
@@ -210,12 +188,4 @@ internal static class WorkloadRegistration
 
     private static string GetDisplayName(WorkloadEntry entry)
         => string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PackageId : entry.DisplayName;
-
-    /// <summary>
-    /// Parses a registry version string, falling back to 0.0.0 on failure so
-    /// the "highest semver wins" sort stays deterministic instead of throwing
-    /// at boot. The malformed entry surfaces its own loader warning later.
-    /// </summary>
-    private static NuGetVersion ParseVersionOrZero(string version)
-        => NuGetVersion.TryParse(version, out NuGetVersion? parsed) ? parsed : new NuGetVersion(0, 0, 0);
 }

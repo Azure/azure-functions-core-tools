@@ -53,7 +53,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 stream,
                 WorkloadJsonContext.Default.WorkloadMetadata);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or ArgumentException)
         {
             throw new InvalidWorkloadException(
                 $"Failed to parse '{metadataPath}': {ex.Message}",
@@ -85,6 +85,11 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 + Environment.NewLine
                 + Environment.NewLine
                 + "Check for spelling or try updating the CLI to the latest version.");
+        }
+
+        if (metadata.Stack is not null && metadata.Kind is not (WorkloadKind.Workload or WorkloadKind.RidPointer))
+        {
+            throw new InvalidWorkloadException($"'{metadataPath}' defines a stack for unsupported kind '{metadata.Kind.ToWireValue()}'.");
         }
 
         ValidateTemplateRoot(metadata, metadataPath, packageDirectory);

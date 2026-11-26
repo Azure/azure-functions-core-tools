@@ -19,6 +19,7 @@
   <PropertyGroup>
     <!-- constants -->
     <_FuncWorkloadSchema>https://aka.ms/func-workloads/package/v1/schema.json</_FuncWorkloadSchema>
+    <WorkerRuntime Condition="'$(StackIdentifier)' != '' AND '$(WorkerRuntime)' == ''">$(StackIdentifier)</WorkerRuntime>
 
     <!-- This is a multi-RID package. The outer package will become 'rid-pointer' and each inner package will keep the original kind. -->
     <_WorkloadOriginalKind>$(WorkloadKind)</_WorkloadOriginalKind>
@@ -79,6 +80,8 @@
       <_WorkloadJsonInputCacheToHash Include="$(_FuncWorkloadSchema)" />
       <_WorkloadJsonInputCacheToHash Include="$(_WorkloadManifestRuntimeIdentifier)" />
       <_WorkloadJsonInputCacheToHash Include="$(_WorkloadManifestTemplateRoot)" />
+      <_WorkloadJsonInputCacheToHash Include="StackIdentifier=$(StackIdentifier);WorkerRuntime=$(WorkerRuntime)" />
+      <_WorkloadJsonInputCacheToHash Include="Title=$([MSBuild]::Escape('$(Title)'));Description=$([MSBuild]::Escape('$(Description)'))" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(WorkloadKind)' == 'workload'">
@@ -111,6 +114,8 @@
       Schema="$(_FuncWorkloadSchema)"
       Kind="$(WorkloadKind)"
       PackageId="$(PackageId)"
+      StackIdentifier="$(StackIdentifier)"
+      WorkerRuntime="$(WorkerRuntime)"
       DisplayName="$(Title)"
       Description="$(Description)"
       RuntimeIdentifier="$(_WorkloadManifestRuntimeIdentifier)"

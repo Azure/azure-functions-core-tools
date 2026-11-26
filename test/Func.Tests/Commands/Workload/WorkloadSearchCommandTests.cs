@@ -3,8 +3,10 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Catalog;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
 
@@ -31,23 +33,23 @@ public class WorkloadSearchCommandTests
     }
 
     [Fact]
-    public async Task Search_StackOption_FiltersToWorkloadKind()
+    public async Task Search_StackOption_FiltersToDeclaredStacksUsingActualPackageIds()
     {
         StubSearch(
             new CatalogSearchResult(
-                "workloads.python",
+                "Contoso.DevKit",
                 NuGetVersion.Parse("1.0.0"),
-                Title: "Python",
+                Title: "Package title",
                 Description: null,
-                Aliases: ["python"],
-                Source: _stubSource) { Kind = "workload" },
+                Aliases: ["preview", "comet"],
+                Source: _stubSource) { Stack = new("comet", "native", "Comet SDK") },
             new CatalogSearchResult(
-                "workloads.host",
+                "workloads.comet",
                 NuGetVersion.Parse("1.0.0"),
                 Title: "Host",
                 Description: null,
-                Aliases: ["host"],
-                Source: _stubSource) { Kind = "content" },
+                Aliases: ["comet"],
+                Source: _stubSource) { Kind = "workload" },
             new CatalogSearchResult(
                 "workloads.nokind",
                 NuGetVersion.Parse("1.0.0"),
@@ -61,9 +63,11 @@ public class WorkloadSearchCommandTests
 
         exit.Should().Be(0);
         // Stack workload's display name appears as a card heading.
-        _interaction.Lines.Should().Contain("Python");
+        _interaction.Lines.Should().Contain("Comet SDK");
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Stack ID:") && l.EndsWith("comet"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Package ID:") && l.EndsWith("Contoso.DevKit"));
         // Filtered-out packages don't appear anywhere.
-        _interaction.Lines.Should().NotContain(l => l.Contains("workloads.host"));
+        _interaction.Lines.Should().NotContain(l => l.Contains("workloads.comet"));
         _interaction.Lines.Should().NotContain(l => l.Contains("workloads.nokind"));
     }
 
@@ -102,7 +106,7 @@ public class WorkloadSearchCommandTests
         _interaction.Lines.Should().Contain(l => l.StartsWith("Alias:") && l.EndsWith("python"));
         _interaction.Lines.Should().Contain(l => l.StartsWith("Description:") && l.EndsWith("Python workload"));
         _interaction.Lines.Should().Contain("HINT: Showing 1 result.");
-        _interaction.Lines.Should().Contain("HINT: Run 'func workload install <alias | package id>' to install one (stable by default).");
+        _interaction.Lines.Should().Contain("HINT: Run 'func workload install <package-id> --exact' to install a package by ID.");
         _interaction.Lines.Should().Contain("HINT: When several versions or channels exist, pass --version (-v) to install a specific one.");
     }
 
@@ -187,9 +191,9 @@ public class WorkloadSearchCommandTests
     }
 
     [Fact]
-    public async Task Search_AtPageLimit_FooterAdvisesRefining()
+    public async Task Search_BeyondFirstPage_RendersAllResults()
     {
-        var stubs = Enumerable.Range(0, 20)
+        var stubs = Enumerable.Range(0, 21)
             .Select(i => new CatalogSearchResult(
                 $"pkg.{i}",
                 NuGetVersion.Parse("1.0.0"),
@@ -203,14 +207,15 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
-        _interaction.Lines.Should().Contain("HINT: Showing 20 results. More may be available, refine your query.");
+        _interaction.Lines.Should().Contain("HINT: Showing 21 results.");
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Package ID:") && l.EndsWith("pkg.20"));
     }
 
     [Fact]
     public async Task Search_ForwardsQuerySourceAndPrerelease()
     {
         CatalogSearchQuery? captured = null;
-        _catalog.SearchAsync(Arg.Do<CatalogSearchQuery>(q => captured = q), Arg.Any<CancellationToken>())
+        _catalog.SearchVersionsAsync(Arg.Do<CatalogSearchQuery>(q => captured = q), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<CatalogSearchResult>());
 
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
@@ -231,10 +236,8 @@ public class WorkloadSearchCommandTests
     [Fact]
     public async Task Search_DefaultsPageSize20()
     {
-        // Per spec §4.1 the CLI surface has no pagination flags; the
-        // command always asks the catalog for a page of 20.
         CatalogSearchQuery? captured = null;
-        _catalog.SearchAsync(Arg.Do<CatalogSearchQuery>(q => captured = q), Arg.Any<CancellationToken>())
+        _catalog.SearchVersionsAsync(Arg.Do<CatalogSearchQuery>(q => captured = q), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<CatalogSearchResult>());
 
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
@@ -276,21 +279,11 @@ public class WorkloadSearchCommandTests
     [Fact]
     public async Task Search_Prerelease_ExpandsResultsByChannel()
     {
-        // Search returns the highest prerelease per package, we expand into
-        // one row per channel by listing every version of the package.
+        const string id = "Contoso.DevKit";
         StubSearch(
-            new CatalogSearchResult(
-                "func.workload.bundles",
-                NuGetVersion.Parse("4.42.0-preview.1"),
-                Title: "Extension Bundles",
-                Description: "Bundles",
-                Aliases: ["bundles"],
-                Source: _stubSource));
-        StubVersions(
-            "func.workload.bundles",
-            NuGetVersion.Parse("4.35.0"),
-            NuGetVersion.Parse("4.40.0-experimental.2"),
-            NuGetVersion.Parse("4.42.0-preview.1"));
+            Row(id, "4.35.0", "Stable label"),
+            Row(id, "4.40.0-experimental.2", "Experimental label"),
+            Row(id, "4.42.0-preview.1", "Preview label"));
 
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--prerelease");
@@ -304,27 +297,15 @@ public class WorkloadSearchCommandTests
         _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("preview"));
         _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("experimental"));
         _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("stable"));
+        _interaction.Lines.Should().ContainInOrder("Preview label", "Experimental label", "Stable label");
         _interaction.Lines.Should().Contain("HINT: Showing 3 results.");
     }
 
     [Fact]
     public async Task Search_Prerelease_PicksLatestPerChannel()
     {
-        StubSearch(
-            new CatalogSearchResult(
-                "pkg",
-                NuGetVersion.Parse("2.0.0-preview.5"),
-                Title: "Pkg",
-                Description: null,
-                Aliases: [],
-                Source: _stubSource));
-        StubVersions(
-            "pkg",
-            NuGetVersion.Parse("1.5.0"),
-            NuGetVersion.Parse("2.0.0"),
-            NuGetVersion.Parse("2.0.0-preview.1"),
-            NuGetVersion.Parse("2.0.0-preview.5"),
-            NuGetVersion.Parse("2.1.0-preview.2"));
+        StubSearch(Row("pkg", "1.5.0"), Row("pkg", "2.0.0"), Row("pkg", "2.0.0-preview.1"),
+            Row("pkg", "2.0.0-preview.5"), Row("pkg", "2.1.0-preview.2"));
 
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd, "--prerelease");
@@ -352,35 +333,20 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
-        // ListVersionsAsync is not called when prerelease is off, the
-        // server-side search filter already gives us the stable row.
-        await _catalog.DidNotReceiveWithAnyArgs().ListVersionsAsync(
-            default!,
-            default,
-            TestContext.Current.CancellationToken);
         _interaction.Lines.Should().NotContain(l => l.StartsWith("Channel:"));
     }
 
     [Fact]
-    public async Task Search_Prerelease_ListVersionsFailure_FallsBackToOriginalRow()
+    public async Task Search_DiscoveryFailure_IsNotAnEmptySuccessfulResult()
     {
-        StubSearch(
-            new CatalogSearchResult(
-                "pkg",
-                NuGetVersion.Parse("1.0.0-preview"),
-                Title: "Pkg",
-                Description: null,
-                Aliases: [],
-                Source: _stubSource));
-        _catalog.ListVersionsAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns<Task<IReadOnlyList<NuGetVersion>>>(_ => throw new InvalidOperationException("feed down"));
+        _catalog.SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>()).ThrowsAsync(new WorkloadCatalogException("feed down"));
 
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
-        int exit = await InvokeAsync(cmd, "--prerelease");
+        var error = await FluentActions.Awaiting(() => InvokeAsync(cmd, "--stack")).Should().ThrowAsync<GracefulException>();
 
-        exit.Should().Be(0);
-        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("1.0.0-preview"));
-        _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("preview"));
+        error.Which.IsUserError.Should().BeTrue();
+        error.Which.Message.Should().Contain("discovery is unavailable").And.Contain("feed down");
+        _interaction.Lines.Should().NotContain(l => l.Contains("No workloads found"));
     }
 
     [Theory]
@@ -396,15 +362,12 @@ public class WorkloadSearchCommandTests
 
     private void StubSearch(params CatalogSearchResult[] results)
     {
-        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+        _catalog.SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
             .Returns(results);
     }
 
-    private void StubVersions(string packageId, params NuGetVersion[] versions)
-    {
-        _catalog.ListVersionsAsync(packageId, Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyList<NuGetVersion>)versions);
-    }
+    private static CatalogSearchResult Row(string id, string version, string label = "Comet")
+        => new(id, NuGetVersion.Parse(version), label, null, [], _stubSource) { Stack = new("comet", "worker", label) };
 
     private static Task<int> InvokeAsync(WorkloadSearchCommand cmd, params string[] args)
     {

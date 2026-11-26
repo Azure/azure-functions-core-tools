@@ -18,11 +18,18 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 internal interface IWorkloadCatalog
 {
     /// <summary>
-    /// Searches the configured source for workload packages.
+    /// Searches all pages of the configured source for the latest matching workload packages.
     /// </summary>
     /// <param name="query">Filter, paging, and source-override bag.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads all pages of matching packages and returns the metadata of each listed version allowed by the prerelease policy.
+    /// <see cref="CatalogSearchQuery.Skip"/> and <see cref="CatalogSearchQuery.Take"/> are the initial package offset and upstream page size.
+    /// </summary>
+    /// <exception cref="WorkloadCatalogException">The selected source or its version metadata could not be read.</exception>
+    public Task<IReadOnlyList<CatalogSearchResult>> SearchVersionsAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the highest installable version of <paramref name="packageId"/>

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json.Serialization;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Storage;
 
@@ -61,6 +62,12 @@ internal sealed class WorkloadEntry
     /// ships files only. Meta packages live in <see cref="WorkloadRegistry.Metas"/>.
     /// </summary>
     public WorkloadKind Kind { get; init; } = WorkloadKind.Workload;
+
+    /// <summary>
+    /// Stack declaration captured from this package version's manifest.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StackDescriptor? Stack { get; init; }
 
     /// <summary>
     /// Short aliases accepted by <c>func workload install/uninstall</c>

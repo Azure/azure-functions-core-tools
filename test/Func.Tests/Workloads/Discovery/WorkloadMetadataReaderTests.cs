@@ -50,6 +50,23 @@ public class WorkloadMetadataReaderTests : IDisposable
         metadata.Kind.Should().Be(WorkloadKind.Workload);
         metadata.EntryPoint!.AssemblyPath.Should().Be("Foo.dll");
         metadata.EntryPoint.Type.Should().Be("Foo.MyWorkload");
+        metadata.Stack.Should().BeNull();
+    }
+
+    [Fact]
+    public void Read_RejectsAnUnresolvedStackDescriptor()
+    {
+        WriteMetadata($$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "entryPoint": { "assemblyPath": "DevKit.dll", "type": "Fixture.Stub" },
+              "stack": { "stackIdentifier": "comet", "displayName": "Comet" }
+            }
+            """);
+
+        var act = () => _reader.Read(_tempDir);
+
+        act.Should().ThrowExactly<InvalidWorkloadException>().WithMessage("*workerRuntime*");
     }
 
     [Theory]

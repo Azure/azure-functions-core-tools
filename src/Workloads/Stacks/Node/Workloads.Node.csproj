@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Title>Node.js Stack</Title>
+    <Title>Node.js</Title>
     <Description>Azure Functions CLI tooling for Node.js projects.</Description>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
-    <WorkloadAlias>node</WorkloadAlias>
+    <StackIdentifier>node</StackIdentifier>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
     <NoDefaultExcludes>true</NoDefaultExcludes>
   </PropertyGroup>

@@ -20,7 +20,7 @@ internal sealed class WorkloadPackageInspector(IWorkloadMetadataReader metadataR
         using PackageArchiveReader reader = OpenPackage(path);
         NuspecReader nuspec = reader.NuspecReader;
         WorkloadPackageIdentity identity = new(
-            nuspec.GetId().ToLowerInvariant(),
+            nuspec.GetId(),
             nuspec.GetVersion().ToNormalizedString(),
             [.. nuspec.GetPackageTypes().Select(t => t.Name)],
             WorkloadPackageTags.ParseValues(nuspec.GetTags(), WorkloadPackageTags.AliasPrefix),

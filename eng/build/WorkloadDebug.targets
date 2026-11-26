@@ -23,22 +23,30 @@
     No-op for non-workload projects so it's safe to invoke from a solution-wide
     build target.
   -->
-  <Target Name="DeployForDebug" DependsOnTargets="Build">
+  <Target Name="_ValidateWorkloadDebugRid" Condition="'$(PackAsWorkload)' == 'true' AND '$(WorkloadKind)' == 'rid-pointer'">
+    <Error Text="DeployForDebug: '$(PackageId)' is a RID pointer. Pass -r &lt;rid&gt; to deploy its implementation for a specific runtime. Supported RIDs: $(RuntimeIdentifiers)." />
+  </Target>
 
-    <Message Condition="'$(PackageType)' != 'FuncCliWorkload'"
+  <Target Name="DeployForDebug" DependsOnTargets="_ValidateWorkloadDebugRid;Build">
+
+    <Message Condition="'$(PackAsWorkload)' != 'true'"
              Importance="High"
-             Text="DeployForDebug: skipping '$(MSBuildProjectName)' (PackageType='$(PackageType)', expected 'FuncCliWorkload')." />
+             Text="DeployForDebug: skipping non-workload project '$(MSBuildProjectName)'." />
+    <CallTarget Targets="_DeployInstalledWorkloadForDebug" Condition="'$(PackAsWorkload)' == 'true'" />
+  </Target>
 
-    <PropertyGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
+  <Target Name="_DeployInstalledWorkloadForDebug" DependsOnTargets="GenerateWorkloadJson">
+    <PropertyGroup>
       <_DeployForDebugHome Condition="'$(FuncCliWorkloadsHome)' != ''">$(FuncCliWorkloadsHome)</_DeployForDebugHome>
       <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(FUNC_CLI_WORKLOADS_HOME)</_DeployForDebugHome>
       <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(RepoRoot).debug-workloads</_DeployForDebugHome>
       <_DeployForDebugHome>$([System.IO.Path]::GetFullPath('$(_DeployForDebugHome)'))</_DeployForDebugHome>
       <!-- func workload install normalises the package id to lowercase on disk. -->
       <_DeployForDebugPackageIdLower>$(PackageId.ToLowerInvariant())</_DeployForDebugPackageIdLower>
-      <_DeployForDebugTargetDir>$(_DeployForDebugHome)/workloads/$(_DeployForDebugPackageIdLower)/$(PackageVersion)/tools/any</_DeployForDebugTargetDir>
       <_DeployForDebugInstallVersionDir>$(_DeployForDebugHome)/workloads/$(_DeployForDebugPackageIdLower)/$(PackageVersion)</_DeployForDebugInstallVersionDir>
-      <_DeployForDebugFuncDll>$(RepoRoot)out/bin/Func/debug/func.dll</_DeployForDebugFuncDll>
+      <_DeployForDebugTargetDir>$(_DeployForDebugInstallVersionDir)/$(_WorkloadPackageContentRoot)</_DeployForDebugTargetDir>
+      <_DeployForDebugInstalledManifest>$(_DeployForDebugInstallVersionDir)/workload.json</_DeployForDebugInstalledManifest>
+      <_DeployForDebugFuncDll>$(ArtifactsPath)/bin/Func/$(Configuration.ToLowerInvariant())/func.dll</_DeployForDebugFuncDll>
       <_DeployForDebugPackOutput>$(_DeployForDebugHome)/.pack-cache</_DeployForDebugPackOutput>
       <_DeployForDebugNupkg>$(_DeployForDebugPackOutput)/$(PackageId).$(PackageVersion).nupkg</_DeployForDebugNupkg>
       <_DeployForDebugNeedsInstall Condition="!Exists('$(_DeployForDebugInstallVersionDir)')">true</_DeployForDebugNeedsInstall>
@@ -52,36 +60,46 @@
     <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' != 'true'"
            Text="DeployForDebug: '$(PackageId)' $(PackageVersion) is not installed at '$(_DeployForDebugInstallVersionDir)'. Either rerun with -p:FuncCliEnsureWorkloadInstalled=true to auto-install (the &quot;auto-install&quot; VS Code launch config does this), or run `func workload install &lt;nupkg-or-id&gt;` against the same home first." />
 
-    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
-           Text="DeployForDebug: '$(PackageId)' isn't installed yet and func.dll wasn't found at '$(_DeployForDebugFuncDll)'. Build Func.csproj first." />
+    <!-- The installer loads active workload DLLs. Do not replace an installed version to refresh its registry metadata. -->
+    <GetFileHash Files="$(_WorkloadJsonFile)" Condition="'$(_DeployForDebugNeedsInstall)' != 'true'">
+      <Output TaskParameter="Hash" PropertyName="_DeployForDebugBuiltHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(_DeployForDebugInstalledManifest)" Condition="Exists('$(_DeployForDebugInstalledManifest)')">
+      <Output TaskParameter="Hash" PropertyName="_DeployForDebugInstalledHash" />
+    </GetFileHash>
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' != 'true' AND '$(_DeployForDebugBuiltHash)' != '$(_DeployForDebugInstalledHash)'"
+           Text="DeployForDebug: the installed manifest for '$(PackageId)' $(PackageVersion) is missing or differs from the build. Use a new package version or set FuncCliWorkloadsHome to a fresh debug home. The existing installation was not changed." />
 
-    <MSBuild Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true'"
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
+           Text="DeployForDebug: func.dll wasn't found at '$(_DeployForDebugFuncDll)'. Build Func.csproj first." />
+
+    <MSBuild Condition="'$(_DeployForDebugNeedsInstall)' == 'true'"
              Projects="$(MSBuildProjectFullPath)"
              Targets="Pack"
              Properties="Configuration=$(Configuration);PackageOutputPath=$(_DeployForDebugPackOutput)" />
 
-    <Exec Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true'"
-          Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)" --force'
+    <Exec Condition="'$(_DeployForDebugNeedsInstall)' == 'true'"
+          Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)"'
           EnvironmentVariables="FUNC_CLI_WORKLOADS_HOME=$(_DeployForDebugHome)" />
 
-    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugInstallVersionDir)')"
+    <Error Condition="!Exists('$(_DeployForDebugInstalledManifest)')"
            Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugInstallVersionDir)'. Check the func workload install output above." />
 
-    <Message Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(_DeployForDebugNeedsInstall)' != 'true'"
+    <Message Condition="'$(_DeployForDebugNeedsInstall)' != 'true'"
              Importance="High"
              Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugInstallVersionDir)." />
 
-    <ItemGroup Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(IncludeBuildOutput)' != 'false'">
+    <ItemGroup Condition="'$(WorkloadKind)' == 'workload'">
       <_DeployForDebugPayload Include="$(TargetPath)" />
       <_DeployForDebugPayload Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     </ItemGroup>
 
-    <Copy Condition="'$(PackageType)' == 'FuncCliWorkload' AND '@(_DeployForDebugPayload)' != ''"
+    <Copy Condition="'@(_DeployForDebugPayload)' != ''"
           SourceFiles="@(_DeployForDebugPayload)"
           DestinationFolder="$(_DeployForDebugTargetDir)"
           SkipUnchangedFiles="false" />
 
-    <Message Condition="'$(PackageType)' == 'FuncCliWorkload' AND '@(_DeployForDebugPayload)' != ''"
+    <Message Condition="'@(_DeployForDebugPayload)' != ''"
              Importance="High"
              Text="DeployForDebug: copied @(_DeployForDebugPayload->'%(Filename)%(Extension)', ', ') -> $(_DeployForDebugTargetDir)" />
   </Target>

@@ -2,11 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Title>Go Stack</Title>
+    <Title>Go</Title>
     <Description>Azure Functions CLI tooling for Go projects.</Description>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
-    <WorkloadAlias>go</WorkloadAlias>
+    <StackIdentifier>go</StackIdentifier>
+    <WorkerRuntime>native</WorkerRuntime>
     <WorkloadTemplateRoot>content/templates</WorkloadTemplateRoot>
   </PropertyGroup>
 
