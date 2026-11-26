@@ -32,7 +32,7 @@ internal sealed class SetupFeatureResolver(
             string[] requested = [.. options.Features.Select(Normalize).Distinct(StringComparer.OrdinalIgnoreCase)];
             string[] names = [.. requested.Where(f => !IsCoreFeature(f))];
             IReadOnlyList<StackPackage> packages = names.Length == 0 ? [] : await GetPackagesAsync(names, options, byRuntime: false, cancellationToken);
-            return BuildPlan(requested, packages, allowWorkerOnly: true);
+            return await BuildPlanAsync(requested, packages, options, allowWorkerOnly: true, workerRuntime: null, cancellationToken);
         }
 
         ProjectStackSettings settings = _configuration.Read(options.WorkingDirectory);
@@ -45,7 +45,7 @@ internal sealed class SetupFeatureResolver(
             string source = byRuntime ? ProjectStackSettings.WorkerRuntimeSource : ProjectStackSettings.StackSource;
             StackPackage selected = FindUnique(packages, value, byRuntime)
                 ?? throw new SetupConfigurationException($"No stack matches {source} '{value}'. Run 'func workload search --stack' to discover stacks.");
-            return BuildPlan([selected.Stack.Identifier], packages, allowWorkerOnly: false);
+            return await BuildPlanAsync([selected.Stack.Identifier], packages, options, allowWorkerOnly: false, hostRuntime, cancellationToken);
         }
 
         if (!options.NonInteractive && !options.AssumeYes && options.OutputMode != SetupOutputMode.Json && _interaction.IsInteractive)
@@ -53,7 +53,7 @@ internal sealed class SetupFeatureResolver(
             InstalledStackInventory installed = await _packages.GetInstalledAsync(cancellationToken);
             IReadOnlyList<StackPackage> inventory = await _packages.DiscoverAsync(installed.Stacks, options.Source, options.IncludePrerelease, cancellationToken);
             IReadOnlyList<string>? picked = await PromptAsync(inventory, cancellationToken);
-            return picked is null ? null : BuildPlan(picked, inventory, allowWorkerOnly: false);
+            return picked is null ? null : await BuildPlanAsync(picked, inventory, options, allowWorkerOnly: false, workerRuntime: null, cancellationToken);
         }
 
         if (options.AssumeYes && options.OutputMode == SetupOutputMode.Plain)
@@ -63,7 +63,7 @@ internal sealed class SetupFeatureResolver(
                 + "For language-specific setup, run `func setup --yes --features <stack>`.");
         }
 
-        return BuildPlan(["runtime"], [], allowWorkerOnly: false);
+        return await BuildPlanAsync(["runtime"], [], options, allowWorkerOnly: false, workerRuntime: null, cancellationToken);
     }
 
     private async Task<IReadOnlyList<StackPackage>> GetPackagesAsync(
@@ -139,7 +139,8 @@ internal sealed class SetupFeatureResolver(
             "Select stacks to install (SPACE to toggle, ENTER to confirm; CTRL+C to cancel):", choices, cancellationToken);
     }
 
-    private static SetupFeaturePlan BuildPlan(IReadOnlyList<string> requested, IReadOnlyList<StackPackage> packages, bool allowWorkerOnly)
+    private async Task<SetupFeaturePlan> BuildPlanAsync(IReadOnlyList<string> requested, IReadOnlyList<StackPackage> packages, SetupCommandOptions options,
+        bool allowWorkerOnly, string? workerRuntime, CancellationToken cancellationToken)
     {
         if (requested.Count == 0)
         {
@@ -176,6 +177,11 @@ internal sealed class SetupFeatureResolver(
                 continue;
             }
 
+            if (package.Installed && SetupDependency.SupportsStack(package.Stack.Identifier))
+            {
+                package = await SelectInstalledTargetAsync(package, workerRuntime, options, cancellationToken);
+            }
+
             SetupRuntimeFeature recipe = SetupFeatureCatalog.GetStackRecipe(package) ?? throw new SetupConfigurationException(NoRecipeMessage(package));
             features.Add(recipe.Name);
             runtimes.Add(recipe);
@@ -184,6 +190,34 @@ internal sealed class SetupFeatureResolver(
 
         return new SetupFeaturePlan(features, runtimes,
             [.. runtimes.Where(r => r.InstallWorker).Select(r => r.Name).Order(StringComparer.OrdinalIgnoreCase)], includeBundle);
+    }
+
+    private async Task<StackPackage> SelectInstalledTargetAsync(StackPackage installed, string? workerRuntime, SetupCommandOptions options, CancellationToken cancellationToken)
+    {
+        bool usable = options.IncludePrerelease || !installed.Version.IsPrerelease;
+        if (usable && options.InstallPolicy == SetupInstallPolicy.IfNeeded)
+        {
+            return installed;
+        }
+
+        StackPackage? latest;
+        try
+        {
+            latest = await _packages.FindLatestAsync(installed, workerRuntime, options.Source, options.IncludePrerelease, cancellationToken);
+        }
+        catch (WorkloadCatalogException ex) when (usable)
+        {
+            new SetupRenderer(_interaction, options.OutputMode).Warning($"Stack discovery is unavailable; using installed {installed.PackageId} {installed.Version}: {ex.Message}");
+            return installed;
+        }
+
+        if (latest is not null && latest.Version > installed.Version)
+        {
+            return latest;
+        }
+
+        return usable ? installed : throw new SetupConfigurationException(
+            $"No compatible stable version can replace installed {installed.PackageId} {installed.Version} for stack '{installed.Stack.Identifier}'. Include prerelease workloads with --prerelease.");
     }
 
     private static StackPackage? FindUnique(IReadOnlyList<StackPackage> packages, string value, bool byRuntime)

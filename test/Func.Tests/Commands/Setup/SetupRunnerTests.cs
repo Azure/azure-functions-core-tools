@@ -1023,9 +1023,11 @@ public sealed class SetupRunnerTests : IDisposable
     [Fact]
     public async Task RunAsync_RecipeStackWithUnrelatedPackageId_InstallsDeclaredOwner()
     {
+        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "unrelated-worker", "Custom node", "2.0.0");
         FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0")
-            .WithStack(SetupTestInventory.Row("Contoso.DevKit", "node", "unrelated-worker", "Custom node", "2.0.0"))
+            .WithStack(node)
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.0.0");
+        ReturnStackInstallation(node);
 
         SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["node"]), TestContext.Current.CancellationToken);
 
@@ -1035,6 +1037,111 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "2.0.0"), Arg.Any<string?>(),
             Arg.Any<bool?>(), true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
         _interaction.AllOutput.Should().Contain("Installed Custom node stack");
+    }
+
+    [Theory]
+    [InlineData("comet")]
+    [InlineData(null)]
+    public async Task RunAsync_InstalledStack_NewerVersionNoLongerDeclaresRequestedStack_KeepsUsableVersion(string? replacement)
+    {
+        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "node", "Node");
+        var newer = SetupTestInventory.Row(node.PackageId, replacement ?? "node", "host-v2", "Changed", "2.0.0");
+        if (replacement is null)
+        {
+            newer = newer with { Stack = null };
+        }
+        SeedNodeDependencies(StackEntry(node));
+        var catalog = Catalog().WithStack(node).WithStack(newer);
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["node"]), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("Node stack 1.0.0 is already installed.");
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false, false, "2.0.0")]
+    [InlineData(true, false, "2.0.0")]
+    [InlineData(false, true, "4.0.0-preview.1")]
+    public async Task RunAsync_InstalledStack_TargetsNewestMatchingOwnerStackAndRid(bool check, bool prerelease, string expected)
+    {
+        const string source = "https://example.test/other/index.json";
+        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "node", "Node");
+        var stable = node with { LatestVersion = NuGetVersion.Parse("2.0.0") };
+        var preview = node with { LatestVersion = NuGetVersion.Parse("4.0.0-preview.1") };
+        SeedNodeDependencies(StackEntry(node));
+        FakeCatalog catalog = Catalog().WithStack(stable).WithStack(preview)
+            .WithStack(SetupTestInventory.Row(node.PackageId, "comet", "native", "Comet", "3.0.0"))
+            .WithStack(node with { LatestVersion = NuGetVersion.Parse("8.0.0"), Rid = "linux-arm64" })
+            .WithStack(SetupTestInventory.Row("Other.Tools", "node", "node", "Other Node", "9.0.0"));
+        ReturnStackInstallation(prerelease ? preview : stable);
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["node"], source: source, includePrerelease: prerelease, check: check), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(check ? 1 : 0);
+        catalog.SearchSources.Should().Equal(source);
+        if (check)
+        {
+            _interaction.AllOutput.Should().Contain($"Node stack {expected} is not installed.");
+            _installer.ReceivedCalls().Should().BeEmpty();
+        }
+        else
+        {
+            await _installer.Received(1).InstallFromCatalogAsync(Arg.Is<string>(id => id.Equals(node.PackageId, StringComparison.OrdinalIgnoreCase)), NuGetVersion.Parse(expected), source, prerelease,
+                exact: true, force: false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_InstalledStack_StaysUsableOffline(bool ifNeeded)
+    {
+        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "node", "Node");
+        SeedNodeDependencies(StackEntry(node));
+        var catalog = Substitute.For<IWorkloadCatalog>();
+        catalog.SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>()).ThrowsAsync(new WorkloadCatalogException("feed offline"));
+
+        SetupInstallPolicy policy = ifNeeded ? SetupInstallPolicy.IfNeeded : SetupInstallPolicy.LatestCompatible;
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["node"], installPolicy: policy), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(0);
+        await catalog.Received(ifNeeded ? 0 : 1).SearchVersionsAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+        if (!ifNeeded)
+        {
+            _interaction.AllOutput.Should().Contain("feed offline");
+        }
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_InstalledStack_OlderMatchingVersionIsNotActive_DoesNotReportSuccess()
+    {
+        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "node", "Node");
+        var newer = SetupTestInventory.Row(node.PackageId, "comet", "native", "Comet", "2.0.0");
+        SeedNodeDependencies(StackEntry(node), StackEntry(newer));
+        var catalog = Catalog().WithStack(node).WithStack(newer);
+
+        SetupRunResult result = await CreateRunner(catalog).RunAsync(Options(features: ["node"], installPolicy: SetupInstallPolicy.IfNeeded), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("would not activate stack 'node'").And.Contain("2.0.0 is active");
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_StackUpgrade_InstalledManifestDisagreesWithCatalog_DoesNotReportSuccess()
+    {
+        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "node", "Node");
+        var upgrade = node with { LatestVersion = NuGetVersion.Parse("2.0.0") };
+        SeedNodeDependencies(StackEntry(node));
+        ReturnStackInstallation(upgrade with { Stack = null });
+
+        SetupRunResult result = await CreateRunner(Catalog().WithStack(upgrade)).RunAsync(Options(features: ["node"]), TestContext.Current.CancellationToken);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("does not provide stack 'node' for win-x64");
     }
 
     [Theory]
@@ -1155,7 +1262,7 @@ public sealed class SetupRunnerTests : IDisposable
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(interactive, _store, catalog, _installer));
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer, SetupTestInventory.RuntimeIdentifiers()));
 
         SetupRunResult result = await runner.RunAsync(
             new SetupCommandOptions(
@@ -1228,7 +1335,7 @@ public sealed class SetupRunnerTests : IDisposable
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(interactive, _store, catalog, _installer));
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer, SetupTestInventory.RuntimeIdentifiers()));
 
         _ = await runner.RunAsync(
             new SetupCommandOptions(
@@ -1269,7 +1376,7 @@ public sealed class SetupRunnerTests : IDisposable
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(_interaction, _store, catalog, _installer),
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer, SetupTestInventory.RuntimeIdentifiers()),
             firstRunStore);
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
@@ -1291,7 +1398,7 @@ public sealed class SetupRunnerTests : IDisposable
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(_interaction, _store, catalog, _installer));
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer, SetupTestInventory.RuntimeIdentifiers()));
 
     private SetupCommandOptions Options(
         IReadOnlyList<string>? features = null,
@@ -1314,6 +1421,17 @@ public sealed class SetupRunnerTests : IDisposable
             outputMode);
 
     private static FakeCatalog Catalog() => new();
+
+    private void SeedNodeDependencies(params WorkloadEntry[] stacks) =>
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([Entry(_hostPackageId, "1.0.0"), Entry(WorkerPackage("node"), "1.0.0"),
+            Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "1.0.0"), .. stacks]);
+
+    private static WorkloadEntry StackEntry(CatalogSearchResult row) => new() { PackageId = row.PackageId, PackageVersion = row.LatestVersion.ToNormalizedString(), Stack = row.Stack };
+
+    private void ReturnStackInstallation(CatalogSearchResult row) =>
+        _installer.InstallFromCatalogAsync(Arg.Is<string>(id => id.Equals(row.PackageId, StringComparison.OrdinalIgnoreCase)), row.LatestVersion, Arg.Any<string?>(), Arg.Any<bool?>(), true, false,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(new WorkloadInstallResult(StackEntry(row), AlreadyInstalled: false));
 
     private static string WorkerPackage(string runtime) => $"Azure.Functions.Cli.Workloads.Workers.{runtime}";
 
@@ -1448,9 +1566,8 @@ public sealed class SetupRunnerTests : IDisposable
             ResolveLatestCallCount++;
             ResolveSources.Add(source);
             RangeResolutions.Add((packageId, versionRange));
-            NuGetVersion? version = _latest.TryGetValue(packageId, out NuGetVersion? candidate) && versionRange.Satisfies(candidate)
-                ? candidate
-                : null;
+            NuGetVersion? version = _versions.TryGetValue(packageId, out List<NuGetVersion>? versions)
+                ? versions.Where(v => (includePrerelease == true || !v.IsPrerelease) && versionRange.Satisfies(v)).Max() : null;
             return Task.FromResult(CreateResolved(packageId, version));
         }
 

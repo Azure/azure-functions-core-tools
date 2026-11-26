@@ -415,6 +415,13 @@ and extension bundle, or a stack's CLI identifier for its setup recipe. Installe
 manifests and the selected workload source supply the stack-to-package association;
 display names, install aliases, and package naming conventions do not.
 
+For an installed stack, the default `latest-compatible` policy upgrades only to
+a version of its owning package that still declares that stack for the current
+platform and prerelease policy. `--check` uses the same target without installing
+it. `--install-policy if-needed` keeps a usable installed stack without querying
+the feed for it; if discovery is offline, `latest-compatible` can also keep that
+stack and reports why.
+
 If a stack has no setup recipe, setup fails before installing any dependencies and
 suggests `func workload install <package-id> --exact`. Use `func workload search
 --stack` to list packages that declare a stack. Standalone worker features remain

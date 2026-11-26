@@ -318,7 +318,7 @@ public sealed class SetupRunnerProfileLifecycleTests
         public SetupRunner Runner(ISetupProfileScopeResolver? profiles = null)
             => new(Interaction, new SetupFeatureResolver(Interaction, SetupTestInventory.StackPackages(Store, Catalog), SetupTestInventory.Configuration()),
                 profiles ?? Profiles, new SetupDependencyPlanBuilder(BundleReader),
-                new SetupDependencyInstaller(Interaction, Store, Catalog, PackageInstaller), FirstRun);
+                new SetupDependencyInstaller(Interaction, Store, Catalog, PackageInstaller, SetupTestInventory.RuntimeIdentifiers()), FirstRun);
 
         public SetupCommandOptions Options(bool check = false, IReadOnlyList<string>? features = null)
             => new(new DirectoryInfo(Paths.Home), features ?? ["dotnet", "runtime"], ["p1", "p2", "p3"], null,

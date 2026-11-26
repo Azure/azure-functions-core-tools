@@ -44,18 +44,31 @@ internal sealed class StackPackageCatalog(IWorkloadStore store, IWorkloadCatalog
     public async Task<IReadOnlyList<StackPackage>> DiscoverAsync(
         IReadOnlyList<StackPackage> installed, string? source, bool includePrerelease, CancellationToken cancellationToken)
     {
-        IReadOnlyList<CatalogSearchResult> rows = await _catalog.SearchVersionsAsync(
-            new CatalogSearchQuery { Source = source, IncludePrerelease = includePrerelease }, cancellationToken);
-
-        string rid = _runtimeIdentifierProvider.Current;
-        IEnumerable<StackPackage> available = rows.Where(r => r.Stack is not null && WorkloadActivation.IsCompatible(r.Rid, rid))
-            .OrderByDescending(r => r.LatestVersion)
-            .Select(r => new StackPackage(r.Stack!, r.PackageId, r.LatestVersion, r.Source.Source, Installed: false));
+        IReadOnlyList<StackPackage> available = await ReadAvailableAsync(null, source, includePrerelease, cancellationToken);
 
         // Prefer a local declaration to a renamed feed label. Otherwise use the latest
         // version that actually declares this ID, keeping competing owners separate.
         return [.. installed.Concat(available)
             .GroupBy(p => p.PackageId, StringComparer.OrdinalIgnoreCase)
             .SelectMany(owner => owner.DistinctBy(p => p.Stack.Identifier, StringComparer.OrdinalIgnoreCase))];
+    }
+
+    public async Task<StackPackage?> FindLatestAsync(StackPackage owner, string? workerRuntime, string? source, bool includePrerelease, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        IReadOnlyList<StackPackage> available = await ReadAvailableAsync(owner.PackageId, source, includePrerelease, cancellationToken);
+        return available.FirstOrDefault(p => string.Equals(p.PackageId, owner.PackageId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(p.Stack.Identifier, owner.Stack.Identifier, StringComparison.OrdinalIgnoreCase)
+            && (workerRuntime is null || string.Equals(p.Stack.WorkerRuntime, workerRuntime, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private async Task<IReadOnlyList<StackPackage>> ReadAvailableAsync(string? packageId, string? source, bool includePrerelease, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CatalogSearchResult> rows = await _catalog.SearchVersionsAsync(
+            new CatalogSearchQuery { Filter = packageId, Source = source, IncludePrerelease = includePrerelease }, cancellationToken);
+        string rid = _runtimeIdentifierProvider.Current;
+        return [.. rows.Where(r => r.Stack is not null && WorkloadActivation.IsCompatible(r.Rid, rid) && (includePrerelease || !r.LatestVersion.IsPrerelease))
+            .OrderByDescending(r => r.LatestVersion)
+            .Select(r => new StackPackage(r.Stack!, r.PackageId, r.LatestVersion, r.Source.Source, Installed: false))];
     }
 }

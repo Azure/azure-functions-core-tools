@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -30,12 +31,14 @@ internal sealed class SetupDependencyInstaller(
     IInteractionService interaction,
     IWorkloadStore workloadStore,
     IWorkloadCatalog workloadCatalog,
-    IWorkloadInstaller workloadInstaller) : ISetupDependencyInstaller
+    IWorkloadInstaller workloadInstaller,
+    IWorkloadRuntimeIdentifierProvider runtimeIdentifierProvider) : ISetupDependencyInstaller
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
+    private readonly IWorkloadRuntimeIdentifierProvider _runtimeIdentifierProvider = runtimeIdentifierProvider ?? throw new ArgumentNullException(nameof(runtimeIdentifierProvider));
 
     public async Task<SetupDependencyResult> EnsureDependencyAsync(
         SetupCommandOptions options,
@@ -46,6 +49,24 @@ internal sealed class SetupDependencyInstaller(
         ArgumentNullException.ThrowIfNull(dependency);
 
         IReadOnlyList<WorkloadEntry> installed = await _workloadStore.GetWorkloadsAsync(cancellationToken);
+        if (dependency.Kind == SetupDependencyKind.Stack)
+        {
+            NuGetVersion target = dependency.VersionRange?.MinVersion ?? throw new InvalidOperationException("Stack setup requires a version selected from stack metadata.");
+            string rid = _runtimeIdentifierProvider.Current;
+            IReadOnlyList<WorkloadEntry> live = WorkloadActivation.SelectLiveRuntimeEntries(installed.Where(e => WorkloadActivation.IsCompatible(e.RuntimeIdentifier, rid)));
+            InstalledCandidate? active = live.Where(e => MatchesPackageId(e, dependency.PackageId))
+                .Select(e => new InstalledCandidate(e, WorkloadActivation.ParseVersionOrZero(e.LogicalPackage?.PackageVersion ?? e.PackageVersion)))
+                .MaxBy(candidate => candidate.Version);
+            bool providesStack = string.Equals(active?.Entry.Stack?.Identifier, dependency.Name, StringComparison.OrdinalIgnoreCase);
+            if (active is not null && (active.Version > target || (active.Version == target && !providesStack)))
+            {
+                return SetupDependencyResult.Failed(dependency, $"Installing {dependency.PackageId} {target} would not activate stack '{dependency.Name}': version {active.Version} is active for {rid}. Run 'func workload list' to review installed versions.");
+            }
+
+            // An older side-by-side copy or a package for another RID cannot satisfy the requested stack.
+            installed = active is not null && providesStack ? [active.Entry] : [];
+        }
+
         IReadOnlyList<InstalledCandidate> compatibleInstalled = GetInstalledCandidates(installed, dependency, options.IncludePrerelease)
             .Where(candidate => dependency.VersionRange is null || dependency.VersionRange.Satisfies(candidate.Version))
             .OrderByDescending(static candidate => candidate.Version)
@@ -146,6 +167,13 @@ internal sealed class SetupDependencyInstaller(
                     writeCompletion: false);
 
             string installedVersion = installResult.Entry.PackageVersion;
+            if (dependency.Kind == SetupDependencyKind.Stack
+                && (installResult.Entry.Kind != WorkloadKind.Workload || !WorkloadActivation.IsCompatible(installResult.Entry.RuntimeIdentifier, _runtimeIdentifierProvider.Current)
+                    || !string.Equals(installResult.Entry.Stack?.Identifier, dependency.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                return SetupDependencyResult.Failed(dependency, $"The installed workload {package.PackageId} {installedVersion} does not provide stack '{dependency.Name}' for {_runtimeIdentifierProvider.Current}.");
+            }
+
             return installResult.AlreadyInstalled
                 ? SetupDependencyResult.Satisfied(
                     dependency,

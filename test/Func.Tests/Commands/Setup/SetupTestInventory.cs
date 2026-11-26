@@ -37,12 +37,15 @@ internal static class SetupTestInventory
         return catalog;
     }
 
-    public static StackPackageCatalog StackPackages(IWorkloadStore store, IWorkloadCatalog catalog, string rid = "win-x64")
+    public static IWorkloadRuntimeIdentifierProvider RuntimeIdentifiers(string rid = "win-x64")
     {
         IWorkloadRuntimeIdentifierProvider runtimeIdentifiers = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
         runtimeIdentifiers.Current.Returns(rid);
-        return new StackPackageCatalog(store, catalog, runtimeIdentifiers);
+        return runtimeIdentifiers;
     }
+
+    public static StackPackageCatalog StackPackages(IWorkloadStore store, IWorkloadCatalog catalog, string rid = "win-x64")
+        => new(store, catalog, RuntimeIdentifiers(rid));
 
     public static IProjectStackConfiguration Configuration(string? stackIdentifier = null, string? workerRuntime = null)
     {
