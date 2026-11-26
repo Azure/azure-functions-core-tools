@@ -18,4 +18,25 @@ public class DescriptorTests
         (stable != other).Should().BeTrue();
         new HashSet<StackDescriptor> { stable, preview, other }.Should().HaveCount(2);
     }
+
+    [Fact]
+    public void LanguageMatchesOnlyItsIdentifierAndSnapshotOfExplicitAliases()
+    {
+        string[] input = ["c#"];
+        LanguageDescriptor language = new("csharp", "Renamed language", input);
+        LanguageDescriptor renamed = new("CSharp", "C#", "cs");
+        input[0] = "changed";
+
+        (language == renamed).Should().BeTrue();
+        (language != new LanguageDescriptor("cs", "Renamed language", "c#")).Should().BeTrue();
+        new HashSet<LanguageDescriptor> { language, renamed }.Should().ContainSingle();
+        language.IsMatch(" CSharp ").Should().BeTrue();
+        language.IsMatch(" C# ").Should().BeTrue();
+        language.IsMatch("Renamed language").Should().BeFalse();
+        language.IsMatch("changed").Should().BeFalse();
+        language.IsMatch(null).Should().BeFalse();
+        language.IsMatch("  ").Should().BeFalse();
+        Action mutateSnapshot = () => ((IList<string>)language.Aliases)[0] = "changed";
+        mutateSnapshot.Should().Throw<NotSupportedException>();
+    }
 }

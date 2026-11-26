@@ -30,12 +30,12 @@ public class DotNetProjectInitializerTests : IDisposable
         }
     }
 
-    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, new DotNetProjectStack());
+    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, DotNetWorkloadTests.Stack);
 
     [Fact]
     public void Stack_IsDotNet()
     {
-        CreateInitializer().Stack.Should().Be("dotnet");
+        CreateInitializer().Stack.Descriptor.Identifier.Should().Be("dotnet");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void SupportedLanguages_ReturnsExpectedLanguages()
     {
-        CreateInitializer().SupportedLanguages.Should().Equal(["C#", "F#"]);
+        CreateInitializer().Stack.SupportedLanguages.Select(l => l.DisplayName).Should().Equal(["C#", "F#"]);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class DotNetProjectInitializerTests : IDisposable
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
         string projectPath = Path.Combine(_hivePath, "project");
-        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", language, Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", initializer.Stack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
         using CancellationTokenSource cts = new();
         string[] expectedArguments =
         [
@@ -120,7 +120,7 @@ public class DotNetProjectInitializerTests : IDisposable
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
         string projectPath = Path.Combine(_hivePath, "project");
-        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", language, Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(projectPath), "MyApp", initializer.Stack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
 
         await initializer.InitializeAsync(context, root.Parse([]), CancellationToken.None);
 
@@ -140,7 +140,7 @@ public class DotNetProjectInitializerTests : IDisposable
         DotNetProjectInitializer initializer = CreateInitializer();
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
-        InitContext context = new(WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")), "MyApp", language, Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")), "MyApp", initializer.Stack.SupportedLanguages.Single(l => l.IsMatch(language)), Force: false);
 
         GracefulException exception = (await FluentActions.Awaiting(() => initializer.InitializeAsync(context, root.Parse([option, framework]), CancellationToken.None))
             .Should().ThrowAsync<GracefulException>()
@@ -162,7 +162,7 @@ public class DotNetProjectInitializerTests : IDisposable
         DotNetProjectInitializer initializer = CreateInitializer();
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
-        InitContext context = new(WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")), "MyApp", "C#", Force: false);
+        InitContext context = new(WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")), "MyApp", DotNetProjectStack.CSharp, Force: false);
 
         await FluentActions.Awaiting(() => initializer.InitializeAsync(context, root.Parse(["--target-framework", framework]), CancellationToken.None))
             .Should().ThrowAsync<ArgumentException>()
@@ -175,33 +175,17 @@ public class DotNetProjectInitializerTests : IDisposable
         Directory.Exists(_hivePath).Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(null, "C#")]
-    [InlineData("", "C#")]
-    [InlineData("  ", "C#")]
-    [InlineData("csharp", "C#")]
-    [InlineData("CSHARP", "C#")]
-    [InlineData("C#", "C#")]
-    [InlineData("fsharp", "F#")]
-    [InlineData("FSHARP", "F#")]
-    [InlineData("F#", "F#")]
-    [InlineData("unknown", "unknown")]
-    public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
-    {
-        CreateInitializer().NormalizeLanguage(input).Should().Be(expected);
-    }
-
     [Fact]
     public void Constructor_ThrowsOnNullRunner()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, new DotNetProjectStack()))
+        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, DotNetWorkloadTests.Stack))
             .Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullHivePathProvider()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, new DotNetProjectStack()))
+        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, DotNetWorkloadTests.Stack))
             .Should().ThrowExactly<ArgumentNullException>();
     }
 

@@ -140,7 +140,6 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         IPlatform platform,
         IEnumerable<IStartHostOptionContributor>? startOptionContributors = null,
         StartDashboardEventStreamFactory? eventStreamFactory = null,
-        IEnumerable<IProjectStack>? projectStacks = null,
         ITerminalSessionFactory? terminalFactory = null,
         IClipboardWriter? clipboard = null,
         ConsoleInterruptCoordinator? interrupts = null)
@@ -192,15 +191,13 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         // Contributors can reuse built-in options; those must remain in the general help section.
         Option[] builtInOptions = [.. Options];
-        IProjectStack[] installedStacks = [.. projectStacks ?? []];
         var registry = new StartOptionRegistry(this);
         foreach (IStartHostOptionContributor contributor in _startOptionContributors)
         {
-            registry.SetActiveStack(contributor.Stack);
+            StackDescriptor descriptor = contributor.Stack.Descriptor;
+            registry.SetActiveStack(descriptor.Identifier);
             IReadOnlyList<Option> options = contributor.GetStartOptions(registry);
-            string displayName = installedStacks.FirstOrDefault(
-                stack => string.Equals(stack.Stack, contributor.Stack, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? contributor.Stack;
-            RegisterStackOptionHelp(contributor.Stack, displayName, options.Except(builtInOptions));
+            RegisterStackOptionHelp(descriptor, options.Except(builtInOptions));
         }
     }
 
@@ -387,9 +384,9 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             parseResult.GetValue(NoAzuriteOption),
             BuildStackHostConfigurations(parseResult));
 
-    private IReadOnlyDictionary<string, StartHostConfiguration> BuildStackHostConfigurations(ParseResult parseResult)
+    private IReadOnlyDictionary<IProjectStack, StartHostConfiguration> BuildStackHostConfigurations(ParseResult parseResult)
     {
-        var configurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<IProjectStack, StartHostConfiguration> configurations = [with(ReferenceEqualityComparer.Instance)];
         foreach (IStartHostOptionContributor contributor in _startOptionContributors)
         {
             configurations[contributor.Stack] = contributor.Configure(parseResult);

@@ -3,7 +3,6 @@
 
 using System.Text.Json;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 using static Azure.Functions.Cli.Projects.ProjectCreationResults;
 
 namespace Azure.Functions.Cli.Workloads.Node;
@@ -11,11 +10,12 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// <summary>
 /// Creates Node Functions projects from Node-specific fingerprints.
 /// </summary>
-internal sealed class NodeProjectFactory : IFunctionsProjectFactory
+internal sealed class NodeProjectFactory(NodeProjectStack stack) : IFunctionsProjectFactory
 {
+    private readonly NodeProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+
     private const string FunctionsPackage = "@azure/functions";
 
-    private static readonly FunctionsWorkerId _workerId = new("node");
     private static readonly string[] _sourceFilePatterns = ["*.js", "*.mjs", "*.cjs", "*.ts"];
 
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
@@ -29,25 +29,25 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
             return Task.FromResult(NotCreated("directory does not exist"));
         }
 
-        (string? reason, string language) = Fingerprint(workingDirectory);
+        (string? reason, LanguageDescriptor language) = Fingerprint(workingDirectory);
         if (reason is null)
         {
             return Task.FromResult(NotCreated("no Node project fingerprint found"));
         }
 
-        FunctionsProject project = new NodeFunctionsProject(context.WorkingDirectory, language);
+        FunctionsProject project = new NodeFunctionsProject(context.WorkingDirectory, _stack, language);
         return Task.FromResult(Created(project, reason));
     }
 
     // Language defaults to JavaScript so a Node directory with only package.json
     // (no .ts files) still classifies cleanly.
-    private static (string? Reason, string Language) Fingerprint(DirectoryInfo workingDirectory)
+    private static (string? Reason, LanguageDescriptor Language) Fingerprint(DirectoryInfo workingDirectory)
     {
         string root = workingDirectory.FullName;
         bool hasTsConfig = File.Exists(Path.Combine(root, "tsconfig.json"));
         bool hasTopLevelTs = hasTsConfig
             || Directory.EnumerateFiles(root, "*.ts", SearchOption.TopDirectoryOnly).Any();
-        string language = hasTopLevelTs ? "TypeScript" : "JavaScript";
+        LanguageDescriptor language = hasTopLevelTs ? NodeProjectStack.TypeScript : NodeProjectStack.JavaScript;
 
         string packageJsonPath = Path.Combine(root, "package.json");
         if (File.Exists(packageJsonPath))

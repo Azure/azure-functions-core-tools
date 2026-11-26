@@ -13,18 +13,16 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// Entry-point for the Python workload. Registers Python-specific
 /// services (project initializer today; project factory / commands later).
 /// </summary>
-public sealed class PythonWorkload : Workload
+public sealed class PythonWorkload(StackDescriptor descriptor) : Workload
 {
-    public override string DisplayName => "Python Stack";
-
-    public override string Description => "Azure Functions CLI tooling for Python projects.";
+    private readonly PythonProjectStack _stack = new(descriptor);
 
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<PythonProjectStack>();
-        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PythonProjectStack>());
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
-        builder.AddProjectFactory(new PythonProjectFactory());
+        builder.AddProjectFactory(new PythonProjectFactory(_stack));
     }
 }

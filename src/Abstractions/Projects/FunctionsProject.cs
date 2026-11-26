@@ -13,15 +13,12 @@ public abstract class FunctionsProject
 {
     public abstract WorkingDirectory WorkingDirectory { get; }
 
-    public abstract string StackName { get; }
-
-    public abstract string StackDisplayName { get; }
+    public abstract IProjectStack Stack { get; }
 
     /// <summary>
-    /// Display name of the project's language (e.g. "C#", "TypeScript"), or
-    /// <c>null</c> for single-language stacks where the stack implies it.
+    /// Gets the detected language, or <c>null</c> if the project does not distinguish it.
     /// </summary>
-    public virtual string? Language => null;
+    public virtual LanguageDescriptor? Language => null;
 
     public abstract bool SupportsExtensionBundles { get; }
 

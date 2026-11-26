@@ -22,13 +22,12 @@ internal sealed class JavaFunctionsProject : FunctionsProject
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
 
-    public JavaFunctionsProject(WorkingDirectory workingDirectory)
+    public JavaFunctionsProject(WorkingDirectory workingDirectory, JavaProjectStack stack)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
 
-        // The Java worker's worker.config.json declares language "java", which matches the
-        // workload id, so no runtime override is needed (unlike the Go worker's "native").
-        _workerReference = FunctionsWorkerReference.FromWorkload("java");
+        Stack = stack ?? throw new ArgumentNullException(nameof(stack));
+        _workerReference = FunctionsWorkerReference.FromWorkload("java", stack.Descriptor.WorkerRuntime);
     }
 
     // Internal seams so tests can stub the Maven discovery/build without spawning real processes.
@@ -38,9 +37,7 @@ internal sealed class JavaFunctionsProject : FunctionsProject
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override string StackName => "java";
-
-    public override string StackDisplayName => "Java";
+    public override IProjectStack Stack { get; }
 
     public override bool SupportsExtensionBundles => true;
 

@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -16,6 +17,10 @@ namespace Azure.Functions.Cli.Tests.Commands;
 
 public class InitCommandTests
 {
+    private static readonly LanguageDescriptor _csharp = new("csharp", "C#", "c#");
+    private static readonly LanguageDescriptor _fsharp = new("fsharp", "F#", "f#");
+    private static readonly LanguageDescriptor _javascript = new("javascript", "JavaScript", "js");
+    private static readonly LanguageDescriptor _typescript = new("typescript", "TypeScript", "ts");
     private readonly TestInteractionService _interaction;
     private readonly RecordingWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettings;
@@ -43,8 +48,8 @@ public class InitCommandTests
             .Returns([]);
     }
 
-    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers, IInteractionService? interaction = null) =>
+        new(interaction ?? _interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -69,13 +74,13 @@ public class InitCommandTests
     }
 
     [Fact]
-    public void InitCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
+    public void InitCommand_StackOptionDescription_ListsCanonicalIdsSorted()
     {
         var cmd = CreateCommand(
             [new FakeProjectInitializer("Python"), new FakeProjectInitializer("dotnet"), new FakeProjectInitializer("node")]);
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        description.Should().Contain("Supported values: dotnet, node, python.");
+        description.Should().Contain("Supported values: dotnet, node, Python.");
     }
 
     [Fact]
@@ -150,7 +155,7 @@ public class InitCommandTests
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
             JsonElement stack = doc.RootElement.GetProperty("stack");
             stack.GetProperty("runtime").GetString().Should().Be("python");
-            stack.GetProperty("language").GetString().Should().Be("python");
+            stack.TryGetProperty("language", out _).Should().BeFalse();
         }
         finally
         {
@@ -392,14 +397,12 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_StackAlias_ResolvesToCanonicalInitializer()
+    public async Task InitCommand_HostRuntime_ResolvesToCanonicalInitializer()
     {
-        // --stack dotnet-isolated (an alias) should resolve to the dotnet
-        // initializer via WorkerRuntimeAliases rather than firing NoMatchingStack.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
-            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntime: "dotnet-isolated");
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet-isolated");
 
             exitCode.Should().Be(0);
@@ -446,7 +449,7 @@ public class InitCommandTests
 
             exitCode.Should().Be(0);
             initializer.WasInvoked.Should().BeTrue();
-            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: "python");
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
 
             // No hint rendered when --stack matched directly.
             _hintRenderer.Hints.Should().BeEmpty();
@@ -590,11 +593,8 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_SnapsViaRuntimeAlias()
+    public async Task InitCommand_Adopt_ConvertsHostRuntimeToCliId()
     {
-        // local.settings.json declares "dotnet-isolated" but the dotnet
-        // initializer owns that runtime as an alias. We should snap to the
-        // initializer's canonical stack id ("dotnet"), not error.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -602,7 +602,7 @@ public class InitCommandTests
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
             StubLocalSettingsRuntime("dotnet-isolated");
 
-            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntime: "dotnet-isolated");
             int exitCode = await RunInitAsync(newDir, [dotnet], language: null, stack: null);
 
             exitCode.Should().Be(0);
@@ -616,11 +616,8 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_StackOptionAgreesViaRuntimeAlias()
+    public async Task InitCommand_Adopt_ExplicitStackAgreesWithHostRuntime()
     {
-        // --stack dotnet against a project whose local.settings.json says
-        // "dotnet-isolated" should resolve via the alias and adopt
-        // (not flag a phantom conflict).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -628,7 +625,7 @@ public class InitCommandTests
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
             StubLocalSettingsRuntime("dotnet-isolated");
 
-            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntime: "dotnet-isolated");
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
 
             exitCode.Should().Be(0);
@@ -642,20 +639,16 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_StackOptionAlias_Recognized()
+    public async Task InitCommand_Adopt_StackOptionAcceptsHostRuntime()
     {
-        // The reverse direction: --stack dotnet-isolated (an alias) should
-        // resolve to the dotnet initializer when adopting an empty
-        // local.settings.json project.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
 
-            var interactive = new InteractiveTestInteractionService();
-            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntime: "dotnet-isolated");
+            var command = CreateCommand([dotnet], new InteractiveTestInteractionService());
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync(
@@ -820,7 +813,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = CreateCommand([python], interactive);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync(
@@ -945,7 +938,7 @@ public class InitCommandTests
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
-            var initializer = new FakeProjectInitializer("node", ["JavaScript", "TypeScript"]);
+            var initializer = new FakeProjectInitializer("node", [_javascript, _typescript]);
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "node");
 
             exitCode.Should().Be(1);
@@ -964,7 +957,7 @@ public class InitCommandTests
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
-            var initializer = new FakeProjectInitializer("python", ["Python"]);
+            var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
             exitCode.Should().Be(0);
@@ -985,7 +978,7 @@ public class InitCommandTests
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
-            var initializer = new FakeProjectInitializer("node", ["JavaScript", "TypeScript"]);
+            var initializer = new FakeProjectInitializer("node", [_javascript, _typescript]);
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "node");
 
             exitCode.Should().Be(1);
@@ -1102,22 +1095,15 @@ public class InitCommandTests
 
             _projectResolver
                 .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
-                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", _csharp), "stub"));
 
-            var dotnet = new FakeProjectInitializer(
-                "dotnet",
-                supportedLanguages: ["C#", "F#"],
-                aliases: new Dictionary<string, IReadOnlyList<string>>
-                {
-                    ["C#"] = ["csharp"],
-                    ["F#"] = ["fsharp"],
-                });
+            var dotnet = new FakeProjectInitializer("dotnet", [_csharp, _fsharp]);
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
 
             exitCode.Should().Be(0);
             dotnet.WasInvoked.Should().BeFalse();
-            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "csharp");
         }
         finally
         {
@@ -1138,7 +1124,7 @@ public class InitCommandTests
                 .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
                 .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: null), "stub"));
 
-            var dotnet = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#", "F#"]);
+            var dotnet = new FakeProjectInitializer("dotnet", [_csharp, _fsharp]);
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
 
@@ -1162,21 +1148,14 @@ public class InitCommandTests
 
             _projectResolver
                 .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
-                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", _csharp), "stub"));
 
-            var dotnet = new FakeProjectInitializer(
-                "dotnet",
-                supportedLanguages: ["C#", "F#"],
-                aliases: new Dictionary<string, IReadOnlyList<string>>
-                {
-                    ["C#"] = ["csharp"],
-                    ["F#"] = ["fsharp"],
-                });
+            var dotnet = new FakeProjectInitializer("dotnet", [_csharp, _fsharp]);
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: "F#", stack: "dotnet");
 
             exitCode.Should().Be(0);
-            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "f#");
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "fsharp");
         }
         finally
         {
@@ -1199,22 +1178,15 @@ public class InitCommandTests
 
             _projectResolver
                 .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
-                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", _csharp), "stub"));
 
-            var dotnet = new FakeProjectInitializer(
-                "dotnet",
-                supportedLanguages: ["C#", "F#"],
-                aliases: new Dictionary<string, IReadOnlyList<string>>
-                {
-                    ["C#"] = ["csharp"],
-                    ["F#"] = ["fsharp"],
-                });
+            var dotnet = new FakeProjectInitializer("dotnet", [_csharp, _fsharp]);
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
 
             exitCode.Should().Be(0);
             dotnet.WasInvoked.Should().BeFalse();
-            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "csharp");
 
             using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
             doc.RootElement.TryGetProperty("profiles", out JsonElement profiles).Should().BeTrue();
@@ -1240,7 +1212,7 @@ public class InitCommandTests
                 Path.Combine(newDir, ".func", "config.json"),
                 "{\"stack\":{\"runtime\":\"python\"}}");
 
-            var python = new FakeProjectInitializer("python", supportedLanguages: ["python"]);
+            var python = new FakeProjectInitializer("python");
 
             int exitCode = await RunInitAsync(newDir, python, language: null, stack: null);
 
@@ -1266,7 +1238,7 @@ public class InitCommandTests
                 Path.Combine(newDir, ".func", "config.json"),
                 "{\"stack\":{\"runtime\":\"dotnet\",\"language\":\"C#\"}}");
 
-            var dotnet = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#", "F#"]);
+            var dotnet = new FakeProjectInitializer("dotnet", [_csharp, _fsharp]);
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
 
@@ -1279,18 +1251,65 @@ public class InitCommandTests
         }
     }
 
-    private sealed class StubFunctionsProject(string stackName, string? language) : FunctionsProject
+    [Theory]
+    [InlineData("Fresh")]
+    [InlineData("Adopt")]
+    public async Task Picker_IdenticalLabels_ReturnsTheStackAndLanguageIdEvenIfLabelsAreNotAliases(string mode)
+    {
+        using TempDirectory directory = new PhysicalFileSystem().CreateTempDirectory();
+        if (mode == "Adopt")
+        {
+            File.WriteAllText(Path.Combine(directory.Path, "host.json"), "{}");
+        }
+
+        var left = new FakeProjectInitializer("left", displayName: "Comet");
+        var right = new FakeProjectInitializer("right", [new("type-a", "Script"), new("type-b", "Script")], displayName: "Comet");
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.IsInteractive.Returns(true);
+        string[] stackLabels = [];
+        string[] languageLabels = [];
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<StackDescriptor>>(), Arg.Any<Func<StackDescriptor, string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var choices = call.Arg<IEnumerable<StackDescriptor>>().ToList();
+                stackLabels = [.. choices.Select(call.Arg<Func<StackDescriptor, string>>())];
+                return choices[1];
+            });
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<LanguageDescriptor>>(), Arg.Any<Func<LanguageDescriptor, string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var choices = call.Arg<IEnumerable<LanguageDescriptor>>().ToList();
+                languageLabels = [.. choices.Select(call.Arg<Func<LanguageDescriptor, string>>())];
+                return choices[1];
+            });
+        var root = new RootCommand { CreateCommand([left, right], interaction) };
+
+        int result = await root.Parse(["init", directory.Path]).InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Should().Be(0);
+        stackLabels.Should().Equal("Comet (left)", "Comet (right)");
+        if (mode == "Fresh")
+        {
+            languageLabels.Should().Equal("Script (type-a)", "Script (type-b)");
+            AssertConfigJsonHasShape(directory.Path, "right", "type-b");
+            right.SelectedLanguage.Should().BeSameAs(right.Stack.SupportedLanguages[1]);
+        }
+        else
+        {
+            AssertConfigJsonHasShape(directory.Path, "right", null);
+        }
+    }
+
+    private sealed class StubFunctionsProject(string stackName, LanguageDescriptor? language) : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
         private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(stackName);
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public override string StackName { get; } = stackName;
+        public override IProjectStack Stack { get; } = new TestProjectStack(stackName, stackName, languages: language is null ? [] : [language]);
 
-        public override string StackDisplayName => StackName;
-
-        public override string? Language { get; } = language;
+        public override LanguageDescriptor? Language { get; } = language;
 
         public override bool SupportsExtensionBundles => false;
 
@@ -1299,22 +1318,17 @@ public class InitCommandTests
 
     private sealed class FakeProjectInitializer(
         string stack,
-        IReadOnlyList<string>? supportedLanguages = null,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
+        LanguageDescriptor[]? supportedLanguages = null,
         Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
         Action<FakeProjectInitializer, ParseResult>? onInitialize = null,
-        IReadOnlyList<string>? workerRuntimeAliases = null) : IProjectInitializer
+        string? workerRuntime = null,
+        string? displayName = null) : IProjectInitializer
     {
-        public string Stack { get; } = stack;
-
-        public IReadOnlyList<string> SupportedLanguages { get; } = supportedLanguages ?? [];
-
-        public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
-            aliases ?? new Dictionary<string, IReadOnlyList<string>>();
-
-        public IReadOnlyList<string> WorkerRuntimeAliases { get; } = workerRuntimeAliases ?? [];
+        public IProjectStack Stack { get; } = new TestProjectStack(stack, displayName ?? stack, workerRuntime, supportedLanguages ?? [new(stack, stack)]);
 
         public bool WasInvoked { get; private set; }
+
+        public LanguageDescriptor? SelectedLanguage { get; private set; }
 
         public IReadOnlyList<Option> ContributedOptions { get; private set; } = [];
 
@@ -1327,6 +1341,7 @@ public class InitCommandTests
         public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
         {
             WasInvoked = true;
+            SelectedLanguage = context.Language;
             onInitialize?.Invoke(this, parseResult);
             return Task.CompletedTask;
         }

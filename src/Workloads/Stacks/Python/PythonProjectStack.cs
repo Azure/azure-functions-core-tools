@@ -5,18 +5,9 @@ using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Python;
 
-internal sealed class PythonProjectStack : IProjectStack
+internal sealed class PythonProjectStack(StackDescriptor descriptor) : IProjectStack
 {
-    public string Stack => "python";
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    public string DisplayName => "Python";
-
-    public IReadOnlyList<string> WorkerRuntimeAliases => [];
-
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
-    {
-        { "Python", ["py"] }
-    };
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("python", "Python", "py")];
 }

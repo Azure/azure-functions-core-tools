@@ -33,6 +33,6 @@ internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjec
 
         context.State.Project = project;
 
-        return StartInitializationStepResult.Completed(project.StackDisplayName);
+        return StartInitializationStepResult.Completed(project.Stack.Descriptor.DisplayName);
     }
 }

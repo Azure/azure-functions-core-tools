@@ -173,10 +173,10 @@ AddPathArgument(); // adds optional [path] argument
 
 ## Stacks
 
-A "stack" describes a language/runtime target (`dotnet`, `node`, `python`, `java`, `powershell`, `custom`). The `Stacks` registry in `Common/Stacks.cs` is the single source of truth for stack identifiers and the languages each one supports.
+A stack is a workload-owned project target. Its manifest supplies the descriptor's `Identifier`, `WorkerRuntime`, and `DisplayName`; its `IProjectStack` supplies the ordered language descriptors.
 
-- `--stack` / `-s` is the user-facing option on `func init`.
-- `IProjectDetector` (registered by a workload through `FunctionsCliBuilder.RegisterDetector`) declares the project markers (e.g. `*.csproj`, `package.json`) and worker-runtime ids the workload claims, and returns a confidence verdict for a given directory. `IWorkloadResolver` runs the spec §5.2 algorithm (selector → `FUNCTIONS_WORKER_RUNTIME` lookup → detector pass) against those contributions to pick the workload that owns a directory.
+- `--stack` / `-s` on `func init` selects an installed initializer. Commands store the canonical CLI identifier; the host uses the worker runtime.
+- Each workload's project factory recognizes its own project markers and returns a project associated with that stack.
 
 ## Console / UI Layer
 
@@ -268,11 +268,11 @@ The abstractions library exposes the surface workload authors program against:
 
 | Type | Role |
 |------|------|
-| `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
-| `FunctionsCliBuilder` | The DI seam handed to a workload. Exposes `Services` for plain DI registrations and `RegisterCommand(...)` overloads (instance / type / factory) for contributing top-level commands. Abstract base so we can grow the surface without breaking workloads. |
-| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `DisplayName`, `SupportedLanguages`, registers init options via `IInitOptionRegistry`, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `Workload` | The entry point. Its `Configure(FunctionsCliBuilder)` method registers capabilities. Stack entry points opt in to their installed package's `StackDescriptor` through a constructor parameter; other entry points use a parameterless constructor. |
+| `FunctionsCliBuilder` | Supplies `Services` and methods to register commands and project factories. |
+| `IProjectInitializer` | Contributes initialization for its `Stack`. Registers init options via `IInitOptionRegistry` and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
 | `IInitOptionRegistry` / `CommonInitOptions` | The registry de-dupes options that multiple workloads contribute (e.g. `--no-bundles`) so each option appears once in `--help` and every workload reads the same parsed value. `CommonInitOptions` is a small factory of the shared options themselves (`NoBundle`, `BundlesChannel`). |
-| `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
+| `InitContext` | Carries the working directory, project name, resolved language descriptor, and force flag to an initializer. |
 | `FuncCommand` | Parser-independent base for workload-contributed top-level commands. Describes `Name`, `Description`, `Options`, `Arguments`, `Subcommands`, and an `ExecuteAsync(FuncCommandInvocationContext, CancellationToken)`. |
 | `FuncCommandOption` / `FuncCommandArgument` | Typed descriptors used by `FuncCommand`. Identity matters — pass the same descriptor instance to `context.GetValue(...)` to read parsed values. |
 | `FuncCommandInvocationContext` | Read parsed option / argument values without depending on `System.CommandLine`. |
@@ -386,14 +386,14 @@ If a newer version is found, a notice is printed after the command completes.
 
 ```
 1. Determine stack (--stack or, when multiple initializers are installed, prompt)
-2. Resolve the matching IProjectInitializer via CanHandle(stack)
-   ├── No initializers installed  → "No language workloads installed." (exit 1)
-   └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
+2. Select the matching IProjectInitializer using its Stack.Descriptor
+   ├── No initializers installed  → suggest searching for stack packages (exit 1)
+   └── No matching initializer    → show installed stack IDs and the discovery command (exit 1)
 3. Detect existing project state:
    ├── .func/config.json present  → fully initialized; refuse without --force
    ├── host.json only             → adopt mode (see below); skip scaffolding
    └── empty                      → scaffold via IProjectInitializer.InitializeAsync
-4. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
+4. Build InitContext (WorkingDirectory, ProjectName, resolved LanguageDescriptor, Force)
 5. Delegate to IProjectInitializer.InitializeAsync(context, parseResult) (skipped in adopt mode)
 ```
 
@@ -408,13 +408,13 @@ If a newer version is found, a notice is printed after the command completes.
    | installed | adopt + snap | adopt with `X` | refuse (use `--force`) |
    | uninstalled | refuse with `func setup --features <stack>` hint | refuse (same hint) | refuse |
 
-   Any candidate stack (from `--stack` or `local.settings.json`) that doesn't match an installed initializer (by canonical `Stack` id or by one of its `WorkerRuntimeAliases`) is refused. Aliases let runtime values like `dotnet-isolated` resolve to the `dotnet` stack and `native` to `go`. The hint uses a literal `<stack>` placeholder rather than the raw runtime value, because the value itself may not be a valid feature id (e.g. typos).
+   Candidate values from `--stack` and `local.settings.json` can match an initializer's `Stack.Descriptor.Identifier` or `WorkerRuntime`. For example, `dotnet-isolated` resolves to the `dotnet` stack and `native` to `go`.
 
 3. Write `.func/config.json` with the resolved stack. Skip scaffolding so user source is untouched. `--force` always bypasses adopt mode and takes the full scaffold path.
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
-Help groups stack-specific options under the initializer's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section, followed by stack headings sorted alphabetically using an ordinal, case-insensitive comparison. Options within each group retain their registration order. `func run` (alias `start`) follows the same grouping using the matching `IProjectStack.DisplayName`, falling back to the contributor's stack ID when no descriptor is registered. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
+Help groups stack-specific options under the owning descriptor's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section. `func run` (alias `start`) uses each contributor's owning descriptor in the same way. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
 
 ### `func setup`
 

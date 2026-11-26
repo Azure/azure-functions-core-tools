@@ -40,36 +40,19 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
 
     private void RenderNoWorkloadsInstalled(WorkloadHint hint)
     {
-        _interaction.WriteWarning("No stacks installed.");
-        _interaction.WriteBlankLine();
-        WriteSetupMenu(hint.ActionDescription, []);
+        _interaction.WriteWarning($"No installed stack is available to {hint.ActionDescription}.");
+        WriteDiscoveryHint();
     }
 
     private void RenderNoMatchingStack(WorkloadHint hint)
     {
-        _interaction.WriteError($"No installed stack matches '{hint.RequestedStack}'.");
-        WriteInstalledStacks(hint.InstalledStacks);
-
-        _interaction.WriteBlankLine();
-
-        if (hint.RequestedStack is not null
-            && KnownInstallableWorkloads.LanguageMap.ContainsKey(hint.RequestedStack))
+        _interaction.WriteError($"No installed stack matches --stack '{hint.RequestedStack}'.");
+        if (hint.InstalledStacks.Count > 0)
         {
-            _interaction.WriteHint("Install it with:");
-            _interaction.WriteLine(l => l
-                .Muted("  ")
-                .Command($"func setup --features {hint.RequestedStack}"));
-        }
-        else
-        {
-            WriteSetupMenu(hint.ActionDescription, hint.InstalledStacks);
+            WriteInstalledStacks(hint.InstalledStacks);
         }
 
-        _interaction.WriteBlankLine();
-        _interaction.WriteLine(l => l
-            .Muted("Run ")
-            .Command("func workload search")
-            .Muted(" to discover available stacks."));
+        WriteDiscoveryHint();
     }
 
     private void RenderAmbiguousStackChoice(WorkloadHint hint)
@@ -81,12 +64,12 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
     private void RenderAutoSelectedSoleWorkload(WorkloadHint hint)
     {
         _interaction.WriteHint(
-            $"Auto-selecting '{hint.RequestedStack}' (the only installed workload).");
+            $"Auto-selecting '{hint.RequestedStack}' (the only installed stack available to {hint.ActionDescription}).");
         _interaction.WriteLine(l => l
             .Muted("Install more with ")
             .Command("func setup")
             .Muted(" or run ")
-            .Command("func workload search")
+            .Command("func workload search --stack")
             .Muted(" to discover available stacks."));
     }
 
@@ -102,22 +85,14 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
         }
     }
 
-    private void WriteSetupMenu(string actionDescription, IReadOnlyList<string> installedStacks)
+    private void WriteDiscoveryHint()
     {
-        IEnumerable<KeyValuePair<string, string[]>> candidates = KnownInstallableWorkloads.LanguageMap
-            .Where(kvp => !installedStacks.Contains(kvp.Key, StringComparer.OrdinalIgnoreCase));
-
-        _interaction.WriteHint($"Set up a stack to {actionDescription}:");
-        _interaction.WriteBlankLine();
-
-        IEnumerable<DefinitionItem> items = candidates.Select(static kvp =>
-            new DefinitionItem($"func setup --features {kvp.Key}", string.Join(", ", kvp.Value)));
-        _interaction.WriteDefinitionList(items);
-
         _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
             .Muted("Run ")
-            .Command("func workload search")
-            .Muted(" to discover available stacks."));
+            .Command("func workload search --stack")
+            .Muted(" to find stack packages. Install one with ")
+            .Command("func workload install <package-id> --exact")
+            .Muted("."));
     }
 }

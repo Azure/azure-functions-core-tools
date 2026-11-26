@@ -101,13 +101,13 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
 </Project>
 ```
 
-`<StackIdentifier>` supplies `StackDescriptor.Identifier`, the stable CLI ID of the stack. `WorkerRuntime` defaults to this ID. Override it when the host uses a different name: the Go workload declares `<StackIdentifier>go</StackIdentifier>` and `<WorkerRuntime>native</WorkerRuntime>`. `Title` is a human label, never an input alias.
+`<StackIdentifier>` supplies `StackDescriptor.Identifier`, the stable spelling accepted by `func init --stack` and stored in `.func/config.json`. `WorkerRuntime` defaults to this ID. Override it when the host uses a different name: the Go workload declares `<StackIdentifier>go</StackIdentifier>` and `<WorkerRuntime>native</WorkerRuntime>`. `Title` is a human label, never an input alias.
 
 The SDK projects this declaration into NuGet (`stack:<id>`, `alias:<id>`, `worker-runtime:<runtime>`, title and description) and into the package's `workload.json`. The CLI associates it with the **evaluated NuGet package ID**, not a naming convention. For example, a project may declare `<StackIdentifier>comet</StackIdentifier>` and `<PackageId>Contoso.DevKit</PackageId>`. It appears in `func workload search --stack` and installs with `func workload install Contoso.DevKit --exact`. Declaring a stack does not create a `func setup` dependency recipe.
 
 Search uses the `FuncCliWorkload` package type, not the optional `func-workload` tag. For searches over 1,000 results, the feed needs to confirm the package type in its results. Otherwise the CLI reports an error rather than scanning the whole feed or returning a partial inventory. Narrow the search or install a known package ID with `--exact`.
 
-Search reads metadata for the exact version and source. Installation captures the actual package manifest in that version's registry entry. A preview can change its title while an installed stable version continues to show its own title.
+Search reads metadata for the exact version and source. Installation captures the actual package manifest in that version's registry entry. Help and project commands use the installed descriptor without querying the feed. A preview can change its title while an installed stable version continues to show its own title.
 
 ### Runtime-specific workload packages
 
@@ -153,7 +153,7 @@ And a `release_notes.md`:
 - Initial scaffold of the Node.js workload (entry point + stub project initializer).
 ```
 
-The SDK generates the manifest and packages the workload's publish output. The generated `entryPoint` and the assembly's `CliWorkload` attribute identify the workload to activate. Do not hand-author SDK-generated tags.
+The SDK generates the manifest and packages the workload's publish output. The generated `entryPoint` and the assembly's `CliWorkload` attribute identify the workload to activate. Do not maintain a second copy of the stack declaration in C# or hand-author SDK-generated tags.
 
 Runtime (`kind: workload`) manifests may also declare an optional single string
 `templateRoot`, such as `"content/templates"`, relative to the **physical package root**
@@ -195,11 +195,12 @@ Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<Package
 
 ## Step 2: Subclass `Workload`
 
-`Workload` is an abstract class in `Azure.Functions.Cli.Abstractions` (under `Azure.Functions.Cli.Workloads`). The CLI loader instantiates the type named in `workload.json` and calls `Configure`. **It must have a parameterless constructor.**
+`Workload` is an abstract class in `Azure.Functions.Cli.Abstractions` (under `Azure.Functions.Cli.Workloads`). The CLI loader instantiates the type named in `workload.json`, then calls `Configure(builder)`. Command-only workloads use a public parameterless constructor. A stack workload opts in to its package's descriptor by declaring a public constructor that takes exactly one `StackDescriptor`. If that constructor exists, the loader always uses it and reports a missing stack declaration rather than passing `null`.
 
 ```csharp
 // NodeWorkload.cs
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.DependencyInjection;
 
 [assembly: CliWorkload<Azure.Functions.Cli.Workloads.Node.NodeWorkload>()]
@@ -210,23 +211,34 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// Entry-point for the Node.js workload. Registers the project initializer
 /// and any Node-specific services.
 /// </summary>
-public sealed class NodeWorkload : Workloads.Workload
+public sealed class NodeWorkload(StackDescriptor descriptor) : Workload
 {
-    public override string DisplayName => "Node.js";
-
-    public override string Description => "Azure Functions CLI tooling for Node.js projects.";
+    private readonly NodeProjectStack _stack = new(descriptor);
 
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton(_stack);
+        builder.Services.AddSingleton<IProjectStack>(_stack);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         // builder.RegisterCommand<NodeTopLevelCommand>();
         // …any other services your providers depend on
     }
 }
+
+internal sealed class NodeProjectStack(StackDescriptor descriptor) : IProjectStack
+{
+    public StackDescriptor Descriptor { get; } = descriptor;
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } =
+        [new("javascript", "JavaScript", "js"), new("typescript", "TypeScript", "ts")];
+}
 ```
 
-For packages that declare a stack, `func workload list` uses the installed descriptor's display name and description. Other runtime workloads still use the entry point's `DisplayName` and `Description`. Package ID and version come from the package itself.
+The loader passes the descriptor from this package version's registry entry directly to the entry-point constructor. Share the resulting stack with this workload's initializers, project factories, and start option contributors. Lookups match CLI IDs case-insensitively, but an `IProjectStack` registration must preserve its package version's exact ID, runtime, display name, and description. A command-only package does not need to register a stack. Do not register an unkeyed `StackDescriptor` in the shared service collection: it cannot distinguish between installed owners.
+
+For a packaged worker, the first argument to `FunctionsWorkerReference.FromWorkload` identifies the **worker to install or resolve**, not the CLI stack. For example, a stack that uses the Go worker calls `FromWorkload("go", stack.Descriptor.WorkerRuntime)` even if its CLI identifier is `comet`. The host receives the runtime from the descriptor.
+
+Language descriptors are ordered. Give each a stable CLI ID, a display label, and explicit input aliases. `IsMatch` trims and matches the ID and aliases case-insensitively, not the label. For C#, declare `new("csharp", "C#", "c#")`; both `--language CSharp` and `--language c#` select the same descriptor. Commands emit `csharp`, not a lowercased display label. Shared languages are resolved within the selected stack.
 
 ## Step 3: Implement IProjectInitializer
 
@@ -235,23 +247,14 @@ For packages that declare a stack, `func workload list` uses the installed descr
 ```csharp
 // NodeProjectInitializer.cs
 using System.CommandLine;
-using System.CommandLine.Parsing;
-using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Node;
 
-internal sealed class NodeProjectInitializer : IProjectInitializer
+internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectInitializer
 {
-    public string Stack => "node";
-
-    public string DisplayName => "Node.js";
-
-    public IReadOnlyList<string> SupportedLanguages => ["JavaScript", "TypeScript"];
-
-    public bool CanHandle(string stack) =>
-        stack.Equals("node",       StringComparison.OrdinalIgnoreCase) ||
-        stack.Equals("javascript", StringComparison.OrdinalIgnoreCase) ||
-        stack.Equals("typescript", StringComparison.OrdinalIgnoreCase);
+    public IProjectStack Stack { get; } = stack;
 
     // Workload-specific options. Registered through the supplied IInitOptionRegistry,
     // which is what lets options like `--no-bundles` that multiple stacks contribute
@@ -277,7 +280,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         CancellationToken cancellationToken = default)
     {
         var packageManager = parseResult.GetValue(PackageManagerOption) ?? "npm";
-        var language       = context.Language ?? "JavaScript";
+        var languageId     = context.Language?.LanguageIdentifier;
         var projectPath    = context.WorkingDirectory.Info.FullName;
 
         await File.WriteAllTextAsync(
@@ -294,20 +297,16 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
 ### Contexts
 
-`func init` (and other built-in commands) pass the workload a context object. Common inputs live on the `WorkloadContext` base record; command-specific inputs live on the derived record.
-
-| Type | Provides |
-|------|----------|
-| `WorkloadContext` (base) | `WorkingDirectory` — the directory (`DirectoryInfo` + `WasExplicit` flag) the command is operating from. The CLI guarantees `WorkingDirectory.Info` exists before invoking your initializer, so you don't need to call `Directory.CreateDirectory`. Stack-specific concepts like dotnet's `.csproj` are not modelled here; workloads add their own options for those. |
-| `InitContext` | `ProjectName`, `Language`, `Force` |
+`InitContext` supplies `WorkingDirectory`, `ProjectName`, the resolved `LanguageDescriptor?`, and `Force`. Do not parse the original user input again. Persisted project settings use `StackDescriptor.Identifier` and, for stacks that distinguish languages, `LanguageDescriptor.LanguageIdentifier`.
 
 Workload-specific option values flow through the `ParseResult`, so the CLI never has to know about your options.
 
 ## Step 4 (optional): Contribute New Commands
 
-For "feature" workloads that aren't tied to a stack — say a Durable Functions workload — register top-level commands through `builder.RegisterCommand(...)`. Workload commands derive from `FuncCommand` (in `Azure.Functions.Cli.Workloads`), which is parser-independent: you describe the command's name, description, options, arguments, and subcommands using lightweight descriptors, and read parsed values through a `FuncCommandInvocationContext` at execution time. The CLI tracks which workload each command came from for diagnostics and collision reporting.
+For workloads that aren't tied to a stack, such as a Durable Functions command, omit `StackIdentifier` and register top-level commands through `builder.RegisterCommand(...)`. Workload commands derive from `FuncCommand` (in `Azure.Functions.Cli.Commands`), which is parser-independent: you describe the command's name, description, options, arguments, and subcommands using lightweight descriptors, and read parsed values through a `FuncCommandInvocationContext` at execution time. The CLI tracks which workload each command came from for diagnostics and collision reporting.
 
 ```csharp
+using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Workloads;
 
 internal sealed class DurableCommand : FuncCommand
@@ -359,12 +358,8 @@ internal sealed class DurableCommand : FuncCommand
     }
 }
 
-public sealed class DurableWorkload : Workloads.Workload
+public sealed class DurableWorkload : Workload
 {
-    public override string DisplayName => "Durable Functions";
-
-    public override string Description => "Durable Functions management commands.";
-
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -479,7 +474,7 @@ var packageManager = parseResult.GetValue(PackageManagerOption);
 
 This is how workloads read their own options without the CLI needing to know about them.
 
-`func init` groups stack-specific options under `IProjectInitializer.DisplayName`; `func run` / `func start` uses the matching `IProjectStack.DisplayName`. Stack headings follow the general `Options` section in ordinal, case-insensitive alphabetical order; options within each group retain their registration order. Stack IDs are matched case-insensitively, with the contributor's stack ID used when no descriptor is registered. Return the canonical options from the registry so shared options remain in the general `Options` section without duplicates. Built-in and bundle options also stay in that general section.
+`func init` and `func run` / `func start` group contributed options under `Stack.Descriptor.DisplayName`. Stack headings follow the general `Options` section in ordinal, case-insensitive alphabetical order; options within each group retain their registration order. Return the canonical options from the registry so shared options remain in the general `Options` section without duplicates. Built-in and bundle options also stay in that general section.
 
 ## Testing
 
@@ -492,13 +487,14 @@ public void Configure_RegistersInitializer()
     var services = new ServiceCollection();
     var builder = Substitute.For<FunctionsCliBuilder>();
     builder.Services.Returns(services);
+    var descriptor = new StackDescriptor("node", "node", "Node.js");
 
-    new NodeWorkload().Configure(builder);
+    new NodeWorkload(descriptor).Configure(builder);
 
     using var sp = services.BuildServiceProvider();
-    var initializers = sp.GetServices<IProjectInitializer>().ToList();
-    Assert.Single(initializers);
-    Assert.IsType<NodeProjectInitializer>(initializers[0]);
+    var initializer = Assert.Single(sp.GetServices<IProjectInitializer>());
+    Assert.IsType<NodeProjectInitializer>(initializer);
+    Assert.Same(descriptor, initializer.Stack.Descriptor);
 }
 ```
 
@@ -661,7 +657,7 @@ Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`)
 - [ ] `Directory.Version.props` and `release_notes.md` next to the csproj
 - [ ] `README.md` next to the csproj (auto-packed by `Release.props` as `<PackageReadmeFile>`)
 - [ ] Generated `workload.json` in the package, and stack metadata declared in the project if it provides a stack
-- [ ] Subclass of `Workload` with a parameterless constructor, overriding `DisplayName`, `Description`, and `Configure`
+- [ ] Subclass of `Workload` with a `CliWorkload` assembly attribute, a `Configure` implementation, and either a public parameterless constructor or a public `StackDescriptor` constructor for stack workloads
 - [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
 - [ ] `IProjectInitializer.GetInitOptions(IInitOptionRegistry registry)` registers any extra options the initializer needs via `registry.GetOrAdd(...)` and returns the canonical instances (return `[]` for stubs; only throw from `InitializeAsync`)
 - [ ] Test project `test/Workloads/<kind>/<Name>.Tests/Workloads.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workloads.<Name>.Tests` (matches the workload's `InternalsVisibleTo`)

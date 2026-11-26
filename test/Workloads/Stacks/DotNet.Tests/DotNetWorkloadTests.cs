@@ -9,25 +9,7 @@ namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
 public class DotNetWorkloadTests
 {
-    [Fact]
-    public void DisplayName_ReturnsDotNetStack()
-    {
-        // Arrange
-        var workload = new DotNetWorkload();
-
-        // Act & Assert
-        workload.DisplayName.Should().Be(".NET Stack");
-    }
-
-    [Fact]
-    public void Description_ReturnsCorrectValue()
-    {
-        // Arrange
-        var workload = new DotNetWorkload();
-
-        // Act & Assert
-        workload.Description.Should().Be("Azure Functions CLI tooling for .NET (C#) projects.");
-    }
+    internal static DotNetProjectStack Stack { get; } = new(new("dotnet", "dotnet-isolated", ".NET"));
 
     [Fact]
     public void Configure_RegistersProjectInitializer()
@@ -36,25 +18,15 @@ public class DotNetWorkloadTests
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
 
-        new DotNetWorkload().Configure(builder);
+        new DotNetWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        initializer.Should().BeOfType<DotNetProjectInitializer>();
-        initializer.Stack.Should().Be("dotnet");
-        initializer.SupportedLanguages.Should().Equal(["C#", "F#"]);
-
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
-        stack.Should().BeOfType<DotNetProjectStack>();
         stack.Should().BeSameAs(provider.GetRequiredService<DotNetProjectStack>());
-        stack.Should().NotBeAssignableTo<IProjectInitializer>();
-        stack.Stack.Should().Be(initializer.Stack);
-        stack.DisplayName.Should().Be(".NET").And.Be(initializer.DisplayName);
-        stack.WorkerRuntimeAliases.Should().Equal("dotnet-isolated").And.Equal(initializer.WorkerRuntimeAliases);
-        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
-        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
-        stack.SupportedLanguageAliases["C#"].Should().Equal("csharp");
-        stack.SupportedLanguageAliases["F#"].Should().Equal("fsharp");
+        initializer.Stack.Should().BeSameAs(stack);
+        stack.Descriptor.Should().BeSameAs(Stack.Descriptor);
+        stack.SupportedLanguages.Select(l => l.LanguageIdentifier).Should().Equal("csharp", "fsharp");
     }
 
     [Fact]
@@ -64,18 +36,18 @@ public class DotNetWorkloadTests
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
 
-        new DotNetWorkload().Configure(builder);
+        new DotNetWorkload(Stack.Descriptor).Configure(builder);
 
         ServiceProvider provider = services.BuildServiceProvider();
         IStartHostOptionContributor contributor = provider.GetRequiredService<IStartHostOptionContributor>();
         contributor.Should().BeOfType<DotNetStartOptionContributor>();
-        contributor.Stack.Should().Be("dotnet");
+        contributor.Stack.Should().BeSameAs(provider.GetRequiredService<IProjectStack>());
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        FluentActions.Invoking(() => new DotNetWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DotNetWorkload(Stack.Descriptor).Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -85,7 +57,7 @@ public class DotNetWorkloadTests
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
 
-        new DotNetWorkload().Configure(builder);
+        new DotNetWorkload(Stack.Descriptor).Configure(builder);
 
         builder.Received(1).AddProjectFactory<DotNetProjectFactory>();
     }

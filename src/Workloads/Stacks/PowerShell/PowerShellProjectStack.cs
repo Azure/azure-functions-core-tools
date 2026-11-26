@@ -5,18 +5,9 @@ using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.PowerShell;
 
-internal sealed class PowerShellProjectStack : IProjectStack
+internal sealed class PowerShellProjectStack(StackDescriptor descriptor) : IProjectStack
 {
-    public string Stack => "powershell";
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    public string DisplayName => "PowerShell";
-
-    public IReadOnlyList<string> WorkerRuntimeAliases => [];
-
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
-    {
-        { "PowerShell", ["pwsh", "ps"] }
-    };
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [new("powershell", "PowerShell", "pwsh", "ps")];
 }

@@ -28,20 +28,10 @@ internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack)
     private static readonly string[] _supportedRuntimeVersions = ["7.4", "7.6"];
 
     private static readonly Assembly _assembly = typeof(PowerShellProjectInitializer).Assembly;
-    private readonly PowerShellProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     // Internal seam so tests can stub the Az module version lookup.
     internal Func<CancellationToken, Task<string?>> GetLatestAzModuleMajorVersion { get; set; } = DefaultGetLatestAzModuleMajorVersion;
-
-    public string Stack => _stack.Stack;
-
-    public string DisplayName => _stack.DisplayName;
-
-    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
-
-    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> ManagedDependenciesOption { get; private set; } = default!;
 
@@ -117,7 +107,7 @@ internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack)
         // local.settings.json
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadTemplate(_assembly, "local.settings.json")
+            ProjectFiles.ReadLocalSettingsTemplate(_assembly, Stack.Descriptor)
                 .Replace(RuntimeVersionPlaceholder, runtimeVersion),
             force);
 

@@ -29,9 +29,9 @@ public class PromptCapabilityConsumerTests
         stderr.Enqueue(ConsoleKey.Enter);
         var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
         var initializer = Substitute.For<IProjectInitializer>();
-        initializer.Stack.Returns("node");
-        initializer.DisplayName.Returns("Node.js");
-        initializer.SupportedLanguages.Returns(["javascript", "typescript"]);
+        initializer.Stack.Descriptor.Returns(new StackDescriptor("node", "node", "Node.js"));
+
+        initializer.Stack.SupportedLanguages.Returns([new LanguageDescriptor("javascript", "JavaScript"), new LanguageDescriptor("typescript", "TypeScript")]);
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();
         localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);

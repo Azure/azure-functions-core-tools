@@ -71,7 +71,7 @@ internal sealed class StartInitializationState
             ?? throw new InvalidOperationException("Host run context was not prepared.");
         IHostEventStream eventStream = EventStream ?? throw new InvalidOperationException("Host event stream was not initialized.");
 
-        var runInfo = new DashboardRunInfo(context.CliVersion, ProfileName, project.StackDisplayName);
+        var runInfo = new DashboardRunInfo(context.CliVersion, ProfileName, project.Stack.Descriptor.DisplayName);
 
         return new StartInitializationResult(
             runInfo,

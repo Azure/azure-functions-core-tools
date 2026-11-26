@@ -11,8 +11,10 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Recognizes both source directories (containing a project file) and
 /// pre-built output directories (containing host.json, worker.config.json, and .azurefunctions).
 /// </summary>
-internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFunctionsProjectFactory
+internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli, DotNetProjectStack stack) : IFunctionsProjectFactory
 {
+    private readonly DotNetProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
@@ -39,14 +41,14 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
         if (projectFiles.Count == 1)
         {
             string projectFile = projectFiles[0].FullName;
-            FunctionsProject project = new DotNetSourceProject(context.WorkingDirectory, projectFile, _dotnetCli);
+            FunctionsProject project = new DotNetSourceProject(context.WorkingDirectory, projectFile, _dotnetCli, _stack);
             return Task.FromResult(Created(project, $"found {Path.GetFileName(projectFile)}"));
         }
 
         // No project file — check for pre-built output directory.
         if (IsOutputDirectory(workingDirectory))
         {
-            FunctionsProject project = new DotNetOutputProject(context.WorkingDirectory);
+            FunctionsProject project = new DotNetOutputProject(context.WorkingDirectory, _stack);
             return Task.FromResult(Created(project, "found .NET build output (host.json, worker.config.json, .azurefunctions)"));
         }
 

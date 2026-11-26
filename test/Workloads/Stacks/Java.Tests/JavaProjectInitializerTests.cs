@@ -45,14 +45,14 @@ public class JavaProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsJava()
     {
-        Assert.Equal("java", new JavaProjectInitializer(new JavaProjectStack()).Stack);
+        Assert.Equal("java", new JavaProjectInitializer(JavaWorkloadTests.Stack).Stack.Descriptor.Identifier);
     }
 
     [Fact]
     public void GetInitOptions_ContainsBundleOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new JavaProjectInitializer(new JavaProjectStack()).GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new JavaProjectInitializer(JavaWorkloadTests.Stack).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--no-bundles", names);
@@ -178,7 +178,7 @@ public class JavaProjectInitializerTests : IDisposable
 
     private Task RunAsync(string? projectName, bool force, string[]? args = null)
     {
-        var initializer = new JavaProjectInitializer(new JavaProjectStack());
+        var initializer = new JavaProjectInitializer(JavaWorkloadTests.Stack);
         var context = new InitContext(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: projectName,

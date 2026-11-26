@@ -37,7 +37,7 @@ public class PythonFunctionsProjectTests : IDisposable
         string? pipUsed = null;
         string? requirementsUsed = null;
 
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, _, _, _) =>
             {
@@ -70,7 +70,7 @@ public class PythonFunctionsProjectTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, PythonFunctionsProject.DefaultVenvFolderName));
         bool venvCreated = false;
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, _, _, _, _) =>
             {
@@ -91,7 +91,7 @@ public class PythonFunctionsProjectTests : IDisposable
     public async Task PrepareForHostRun_skips_pip_when_no_requirements()
     {
         bool pipRan = false;
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, _, _, _) =>
             {
@@ -115,7 +115,7 @@ public class PythonFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_streams_venv_output_to_reporter()
     {
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, onOut, onErr, _) =>
             {
@@ -141,7 +141,7 @@ public class PythonFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_throws_graceful_on_venv_failure()
     {
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, _, _, onErr, _) =>
             {
@@ -167,7 +167,7 @@ public class PythonFunctionsProjectTests : IDisposable
     public async Task PrepareForHostRun_throws_graceful_on_pip_failure()
     {
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "broken==");
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, _, _, _) =>
             {
@@ -200,7 +200,7 @@ public class PythonFunctionsProjectTests : IDisposable
     public async Task PrepareForHostRun_sets_worker_executable_path_and_runtime_version(string pythonVersion)
     {
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, _, _, _) =>
             {
@@ -228,7 +228,7 @@ public class PythonFunctionsProjectTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
         bool pipInvoked = false;
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, _, _, _) =>
             {
@@ -257,7 +257,7 @@ public class PythonFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_omits_runtime_version_when_python_version_unreadable()
     {
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, path, _, _, _) =>
             {
@@ -284,7 +284,7 @@ public class PythonFunctionsProjectTests : IDisposable
         bool venvCreated = false;
         string? pipUsed = null;
 
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, _, _, _, _) =>
             {
@@ -320,7 +320,7 @@ public class PythonFunctionsProjectTests : IDisposable
         bool venvCreated = false;
         string? pipUsed = null;
 
-        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), PythonWorkloadTests.Stack)
         {
             RunCreateVenv = (_, _, _, _, _) =>
             {

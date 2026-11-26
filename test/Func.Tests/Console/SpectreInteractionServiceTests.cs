@@ -302,6 +302,7 @@ public class SpectreInteractionServiceTests
     {
         return typeof(IInteractionService).GetMethods()
             .Where(method => method.Name.StartsWith("PromptFor", StringComparison.Ordinal) || method.Name == nameof(IInteractionService.ConfirmAsync))
+            .Select(method => method.IsGenericMethodDefinition ? method.MakeGenericMethod(typeof(string)) : method)
             .SelectMany(method => new[] { false, true }.Select(interactive => new object[] { method, interactive }));
     }
 
@@ -318,6 +319,7 @@ public class SpectreInteractionServiceTests
             Type t when t == typeof(bool) => parameter.Name == "whenInputUnavailable",
             Type t when t == typeof(CancellationToken) => CancellationToken.None,
             Type t when t == typeof(IEnumerable<string>) => new[] { "first", "second" },
+            Type t when t == typeof(Func<string, string>) => (Func<string, string>)(value => value),
             Type t when t == typeof(IEnumerable<MultiSelectionChoice>) => new[] { new MultiSelectionChoice("first") },
             _ => throw new InvalidOperationException($"Uncovered prompt parameter: {parameter}"),
         })];
@@ -342,6 +344,7 @@ public class SpectreInteractionServiceTests
             Type t when t == typeof(bool) => parameter.Name == "whenInputUnavailable",
             Type t when t == typeof(CancellationToken) => cancellation.Token,
             Type t when t == typeof(IEnumerable<string>) => Array.Empty<string>(),
+            Type t when t == typeof(Func<string, string>) => (Func<string, string>)(value => value),
             Type t when t == typeof(IEnumerable<MultiSelectionChoice>) => Array.Empty<MultiSelectionChoice>(),
             _ => throw new InvalidOperationException($"Uncovered prompt parameter: {parameter}"),
         })];

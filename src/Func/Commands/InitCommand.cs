@@ -43,10 +43,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "The name of the Function App project"
     };
 
-    public Option<string?> LanguageOption { get; } = new("--language", "-l")
-    {
-        Description = "The programming language (e.g., C#, F#, JavaScript, TypeScript, Python)"
-    };
+    public Option<string?> LanguageOption { get; } = new("--language", "-l");
 
     public Option<bool> ForceOption { get; } = new("--force")
     {
@@ -87,8 +84,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _bundleScanner = bundleScanner;
         _initializers = initializers.ToList();
 
-        StackOption.Description = BuildStackOptionDescription(_initializers);
-        LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
+        StackOption.Description = BuildOptionDescription("The stack to use", _initializers.Select(i => i.Stack.Descriptor.Identifier));
+        LanguageOption.Description = BuildOptionDescription("The programming language", _initializers.SelectMany(i => i.Stack.SupportedLanguages).Select(l => l.LanguageIdentifier));
 
         AddPathArgument();
         Options.Add(StackOption);
@@ -101,12 +98,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         var registry = new InitOptionRegistry(this);
         foreach (IProjectInitializer initializer in _initializers)
         {
-            registry.SetActiveStack(initializer.Stack);
+            StackDescriptor descriptor = initializer.Stack.Descriptor;
+            registry.SetActiveStack(descriptor.Identifier);
             IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
             // Bundle options stay general even when only one bundle-using stack is installed.
-            RegisterStackOptionHelp(initializer.Stack, initializer.DisplayName,
-                options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
-                    && option.Name != CommonInitOptions.BundlesChannelOptionName));
+            RegisterStackOptionHelp(descriptor, options.Where(option => option.Name != CommonInitOptions.NoBundleOptionName
+                && option.Name != CommonInitOptions.BundlesChannelOptionName));
         }
     }
 
@@ -118,9 +115,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // so an init-side conflict doesn't break unrelated commands like
         // `func start`.
         var dupes = _initializers
-            .GroupBy(i => i.Stack, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(i => i.Stack.Descriptor)
             .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
+            .Select(g => g.Key.Identifier)
             .ToList();
         if (dupes.Count > 0)
         {
@@ -132,11 +129,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         workingDirectory.CreateIfNotExists();
         bool force = parseResult.GetValue(ForceOption);
-        string? language = parseResult.GetValue(LanguageOption);
-        if (!string.IsNullOrWhiteSpace(language))
-        {
-            language = language.Trim().ToLowerInvariant();
-        }
+        string? requestedLanguage = parseResult.GetValue(LanguageOption);
         string? requestedStack = parseResult.GetValue(StackOption);
 
         InitializationState state = DetectInitializationState(workingDirectory.Info);
@@ -152,7 +145,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             && TryReadExistingStack(workingDirectory.Info) is { } snapshot
             && !string.IsNullOrWhiteSpace(snapshot.Runtime)
             && string.IsNullOrWhiteSpace(snapshot.Language)
-            && FindInitializerForCandidate(snapshot.Runtime) is { SupportedLanguages.Count: > 1 })
+            && FindInitializerForCandidate(snapshot.Runtime) is { Stack.SupportedLanguages.Count: > 1 })
         {
             state = InitializationState.PartiallyInitialized;
             existingRuntime = snapshot.Runtime;
@@ -207,7 +200,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             // is handled below by the "not installed" path.
             if (requested is not null
                 && declared is not null
-                && !string.Equals(requested.Stack, declared.Stack, StringComparison.OrdinalIgnoreCase))
+                && requested.Stack.Descriptor != declared.Stack.Descriptor)
             {
                 _interaction.WriteError(
                     $"--stack '{requestedStack}' conflicts with the project's runtime '{projectRuntime}'. " +
@@ -247,8 +240,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                     return 1;
                 }
             }
-
-            requestedStack = initializer.Stack;
         }
         else
         {
@@ -259,27 +250,28 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        // Reuse the runtime project resolver so adoption/heal doesn't need its
-        // own detection rules.
-        if ((adoptExisting || healExisting) && string.IsNullOrWhiteSpace(language))
+        IProjectStack stack = initializer.Stack;
+        LanguageDescriptor? language = null;
+        try
         {
-            language = await DetectAdoptedLanguageAsync(workingDirectory, cancellationToken);
-        }
-
-        // Adopt without a resolvable language: skip prompting, the user isn't
-        // changing existing code. Heal is multi-language by construction, so
-        // language must be resolved (either from --language or the detector
-        // above); fall through to ResolveLanguageAsync to surface the right
-        // error if it wasn't.
-        if (healExisting || !(adoptExisting && string.IsNullOrWhiteSpace(language)))
-        {
-            (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
-            if (errorCode is int code)
+            if (!string.IsNullOrWhiteSpace(requestedLanguage))
             {
-                return code;
+                language = InstalledProjectStackCatalog.ResolveLanguage(stack, requestedLanguage, "--language");
+            }
+            else if (adoptExisting || healExisting)
+            {
+                language = await DetectAdoptedLanguageAsync(workingDirectory, stack, cancellationToken);
             }
 
-            language = resolved;
+            if (language is null && !adoptExisting)
+            {
+                language = await SelectLanguageAsync(stack, cancellationToken);
+            }
+        }
+        catch (ProjectStackResolutionException ex)
+        {
+            _interaction.WriteError(ex.Message);
+            return 1;
         }
 
         if (force)
@@ -297,9 +289,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // Only persist 'language' when the stack actually offers a choice.
         // For stacks with a single supported language, the stack runtime
         // already implies the language and the duplicate entry is noise.
-        // For stacks with no declared language list, persist whatever the
-        // caller supplied so we don't silently drop their input.
-        string? persistedLanguage = initializer.SupportedLanguages.Count == 1 ? null : language;
+        string? persistedLanguage = stack.SupportedLanguages.Count == 1 ? null : language?.LanguageIdentifier;
 
         if (healExisting)
         {
@@ -308,12 +298,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             _interaction.WriteLine(l => l
                 .Success("✓ ")
                 .Muted("Existing project completed for ")
-                .Code(initializer.Stack)
+                .Code(stack.Descriptor.DisplayName)
                 .Muted("."));
             return 0;
         }
 
-        WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
+        WriteCliConfigurationFile(workingDirectory.Info, stack.Descriptor.Identifier, persistedLanguage, force);
         _interaction.WriteBlankLine();
 
         if (adoptExisting)
@@ -321,7 +311,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             _interaction.WriteLine(l => l
                 .Success("✓ ")
                 .Muted("Existing project adopted for ")
-                .Code(initializer.Stack)
+                .Code(stack.Descriptor.DisplayName)
                 .Muted("."));
 
             return 0;
@@ -338,7 +328,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _interaction.WriteLine(l => l
             .Success("✓ ")
             .Muted("Project initialized for ")
-            .Code(initializer.Stack)
+            .Code(stack.Descriptor.DisplayName)
             .Muted("."));
 
         await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
@@ -393,42 +383,11 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     protected override string HelpFooterHint =>
         "Looking for more stacks? Run `func workload search --stack` to list installable stack workloads.";
 
-    // Builds the help text for `--stack`. Stacks come from installed
-    // initializers' Stack ids, lowercased and sorted for a stable
-    // presentation. Matching in SelectInitializerAsync is already
-    // case-insensitive, so we surface the canonical lowercase form.
-    private static string BuildStackOptionDescription(IReadOnlyList<IProjectInitializer> initializers)
+    private static string BuildOptionDescription(string description, IEnumerable<string> values)
     {
-        var stacks = initializers
-            .Select(i => i.Stack)
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(s => s, StringComparer.Ordinal)
-            .ToList();
-
-        return stacks.Count == 0
-            ? "The stack to use. Set up a stack (`func setup --features <id>`) to see supported values."
-            : "The stack to use. Supported values: " + string.Join(", ", stacks) + ".";
-    }
-
-    // Builds the help text for `--language`. Languages are pulled from
-    // installed initializers' SupportedLanguages, lowercased and sorted for
-    // a stable, consistent presentation. The `--language` value itself is
-    // normalized to lower case in ExecuteAsync, so matching is case-insensitive.
-    private static string BuildLanguageOptionDescription(IReadOnlyList<IProjectInitializer> initializers)
-    {
-        var languages = initializers
-            .SelectMany(i => i.SupportedLanguages)
-            .Where(l => !string.IsNullOrWhiteSpace(l))
-            .Select(l => l.Trim().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(l => l, StringComparer.Ordinal)
-            .ToList();
-
-        return languages.Count == 0
-            ? "The programming language. Set up a stack (`func setup --features <id>`) to see supported values."
-            : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
+        string supported = string.Join(", ", values.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase));
+        return supported.Length == 0 ? $"{description}. Set up a stack (`func setup --features <id>`) to see supported values."
+            : $"{description}. Supported values: {supported}.";
     }
 
     // --force authorizes deletion when input is unavailable, but a prompt
@@ -517,24 +476,27 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     // Returns null when the resolver can't classify the directory or the
     // resolved project doesn't surface a Language; adoption then writes the
     // stack runtime without a language entry.
-    private async Task<string?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    private async Task<LanguageDescriptor?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, IProjectStack stack, CancellationToken cancellationToken)
     {
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
             new ProjectResolutionContext(workingDirectory),
             cancellationToken);
 
-        return resolution is ProjectResolutionResult.Resolved resolved ? resolved.Project.Language : null;
+        if (resolution is not ProjectResolutionResult.Resolved { Project.Language: { } language })
+        {
+            return null;
+        }
+
+        return stack.SupportedLanguages.SingleOrDefault(l => l == language) ?? throw new ProjectStackResolutionException(
+            $"Detected project language '{language.LanguageIdentifier}' is not supported by stack '{stack.Descriptor.Identifier}'.");
     }
 
-    // Resolves a candidate string (from --stack or local.settings.json) to
-    // an installed initializer. Matches against each initializer's canonical
-    // Stack id first, then its WorkerRuntimeAliases (e.g. "dotnet-isolated"
-    // → dotnet, "native" → go). Case-insensitive.
+    // Both --stack and an existing project can supply the CLI ID or the host runtime (e.g. "native" for Go).
     private IProjectInitializer? FindInitializerForCandidate(string candidate)
     {
         return _initializers.FirstOrDefault(i =>
-            string.Equals(i.Stack, candidate, StringComparison.OrdinalIgnoreCase)
-            || i.WorkerRuntimeAliases.Any(a => string.Equals(a, candidate, StringComparison.OrdinalIgnoreCase)));
+            string.Equals(i.Stack.Descriptor.Identifier, candidate, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(i.Stack.Descriptor.WorkerRuntime, candidate, StringComparison.OrdinalIgnoreCase));
     }
 
     // Adoption-mode stack picker for the "no project signal" case. We never
@@ -543,7 +505,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     // to a human, refuse with an actionable error otherwise.
     private async Task<IProjectInitializer?> PromptForAdoptionStackAsync(CancellationToken cancellationToken)
     {
-        string[] installed = [.. _initializers.Select(i => i.Stack)];
+        string[] installed = [.. _initializers.Select(i => i.Stack.Descriptor.Identifier)];
 
         if (_initializers.Count == 0)
         {
@@ -560,16 +522,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return null;
         }
 
-        var displayToInitializer = _initializers.ToDictionary(
-            i => i.DisplayName,
-            i => i,
-            StringComparer.Ordinal);
-        string picked = await _interaction.PromptForSelectionAsync(
-            "Adopting an existing project. Which stack is it?",
-            displayToInitializer.Keys,
-            cancellationToken);
-
-        return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
+        return await PromptForInitializerAsync("Adopting an existing project. Which stack is it?", cancellationToken);
     }
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
@@ -664,76 +617,30 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
     }
 
-    private async Task<(string? Language, int? ErrorCode)> ResolveLanguageAsync(
-        string? requested,
-        IProjectInitializer initializer,
-        CancellationToken cancellationToken)
+    private async Task<LanguageDescriptor> SelectLanguageAsync(IProjectStack stack, CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> supported = initializer.SupportedLanguages;
-        if (supported.Count == 0)
+        IReadOnlyList<LanguageDescriptor> choices = stack.SupportedLanguages;
+        if (choices.Count == 0)
         {
-            return (requested, null);
+            throw new ProjectStackResolutionException($"Stack '{stack.Descriptor.Identifier}' must declare at least one supported language.");
         }
-
-        if (!string.IsNullOrWhiteSpace(requested))
+        if (choices is [var only])
         {
-            // First try direct match against canonical language names.
-            string? match = supported.FirstOrDefault(l =>
-                string.Equals(l, requested, StringComparison.OrdinalIgnoreCase));
-
-            // If no direct match, try resolving as an alias.
-            if (match is null)
-            {
-                match = ResolveAlias(requested, initializer.SupportedLanguageAliases);
-            }
-
-            if (match is null)
-            {
-                IEnumerable<string> allAliases = initializer.SupportedLanguageAliases.Values.SelectMany(v => v);
-                _interaction.WriteError(
-                    $"Language '{requested}' is not supported by the '{initializer.Stack}' stack. " +
-                    $"Supported values: {string.Join(", ", supported)}. " +
-                    $"Also accepted: {string.Join(", ", allAliases)}.");
-                return (null, 1);
-            }
-
-            return (match.ToLowerInvariant(), null);
+            return only;
         }
-
-        if (supported.Count == 1)
-        {
-            return (supported[0].ToLowerInvariant(), null);
-        }
-
         if (!_interaction.IsInteractive)
         {
-            _interaction.WriteError(
-                $"The '{initializer.Stack}' stack supports multiple languages. " +
-                $"Re-run with --language <{string.Join("|", supported.Select(l => l.ToLowerInvariant()))}>.");
-            return (null, 1);
+            throw new ProjectStackResolutionException($"The '{stack.Descriptor.Identifier}' stack supports multiple languages. Re-run with --language <{string.Join("|", choices.Select(l => l.LanguageIdentifier))}>.");
         }
 
-        string picked = await _interaction.PromptForSelectionAsync("Select a language:", supported, cancellationToken);
-
-        return (picked.ToLowerInvariant(), null);
-    }
-
-    private static string? ResolveAlias(string requested, IReadOnlyDictionary<string, IReadOnlyList<string>> aliases)
-    {
-        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in aliases)
-        {
-            if (entry.Value.Contains(requested, StringComparer.OrdinalIgnoreCase))
-            {
-                return entry.Key;
-            }
-        }
-
-        return null;
+        return await _interaction.PromptForSelectionAsync("Select a language:", choices,
+            l => choices.Count(c => c.DisplayName.Equals(l.DisplayName, StringComparison.OrdinalIgnoreCase)) > 1 ? $"{l.DisplayName} ({l.LanguageIdentifier})" : l.DisplayName,
+            cancellationToken);
     }
 
     private async Task<IProjectInitializer?> SelectInitializerAsync(string? requestedStack, CancellationToken cancellationToken)
     {
-        string[] installed = [.. _initializers.Select(i => i.Stack)];
+        string[] installed = [.. _initializers.Select(i => i.Stack.Descriptor.Identifier)];
 
         if (_initializers.Count == 0)
         {
@@ -760,7 +667,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             IProjectInitializer sole = _initializers[0];
             _hintRenderer.Render(new WorkloadHint(
-                WorkloadHintKind.AutoSelectedSoleWorkload, "initialize a project", sole.Stack, installed));
+                WorkloadHintKind.AutoSelectedSoleWorkload, "initialize a project", sole.Stack.Descriptor.Identifier, installed));
             return sole;
         }
 
@@ -772,14 +679,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return null;
         }
 
-        // Multiple initializers, interactive: prompt using display names,
-        // then map the selection back to its initializer.
-        var displayToInitializer = _initializers.ToDictionary(
-            i => i.DisplayName,
-            i => i,
-            StringComparer.Ordinal);
-        string picked = await _interaction.PromptForSelectionAsync("Select a stack:", displayToInitializer.Keys, cancellationToken);
+        return await PromptForInitializerAsync("Select a stack:", cancellationToken);
+    }
 
-        return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
+    private async Task<IProjectInitializer> PromptForInitializerAsync(string title, CancellationToken cancellationToken)
+    {
+        List<StackDescriptor> choices = [.. _initializers.Select(i => i.Stack.Descriptor)];
+        StackDescriptor picked = await _interaction.PromptForSelectionAsync(title, choices,
+            d => choices.Count(c => c.DisplayName.Equals(d.DisplayName, StringComparison.OrdinalIgnoreCase)) > 1 ? $"{d.DisplayName} ({d.Identifier})" : d.DisplayName,
+            cancellationToken);
+        return _initializers.Single(i => i.Stack.Descriptor == picked);
     }
 }

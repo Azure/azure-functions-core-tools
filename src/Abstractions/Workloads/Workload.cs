@@ -9,8 +9,9 @@ namespace Azure.Functions.Cli.Workloads;
 /// package root), then invokes <see cref="Configure"/> so the workload can
 /// register its services with <see cref="FunctionsCliBuilder"/>.
 ///
-/// Mirrors the shape of WebJobs' <c>IWebJobsStartup</c>. Implementations must
-/// have a parameterless constructor.
+/// Entry points normally have a public parameterless constructor. A stack
+/// workload can instead take its installed <see cref="Projects.StackDescriptor"/>
+/// as its sole public constructor parameter.
 ///
 /// Abstract class (rather than an interface) so we can grow the surface with
 /// new properties or virtual members without breaking existing workloads.
@@ -18,21 +19,11 @@ namespace Azure.Functions.Cli.Workloads;
 /// <remarks>
 /// The workload's identity (package id, version, aliases) is supplied by the
 /// NuGet package's nuspec at install time and persisted in the global
-/// registry, so the type itself only needs to describe its CLI presentation
-/// and wire up its services.
+/// registry. Its presentation and optional stack descriptor come from the
+/// package manifest, not from executing the workload.
 /// </remarks>
 public abstract class Workload
 {
-    /// <summary>
-    /// Human-readable name shown in <c>func workload list</c>.
-    /// </summary>
-    public abstract string DisplayName { get; }
-
-    /// <summary>
-    /// One-line description of what the workload provides.
-    /// </summary>
-    public abstract string Description { get; }
-
     /// <summary>
     /// Registers the workload's services with the host. Called once during
     /// CLI bootstrap, before the root command tree is built.

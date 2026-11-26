@@ -157,7 +157,7 @@ public class JavaFunctionsProjectTests : IDisposable
     }
 
     private JavaFunctionsProject CreateProject(Func<string, string, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), JavaWorkloadTests.Stack)
         {
             ResolveMavenCommand = (_, _) => Task.FromResult<string?>("mvn"),
             RunMavenPackage = runner,

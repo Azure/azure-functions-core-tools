@@ -27,17 +27,7 @@ internal sealed class DotNetProjectInitializer(
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
     private readonly ITemplateHivePathProvider _hivePathProvider = hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider));
-    private readonly DotNetProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
-
-    public string Stack => _stack.Stack;
-
-    public string DisplayName => _stack.DisplayName;
-
-    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
-
-    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
+    public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));
 
     public Option<string> FrameworkOption { get; private set; } = default!;
 
@@ -59,13 +49,12 @@ internal sealed class DotNetProjectInitializer(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);
 
-        string projectPath = context.WorkingDirectory.Info.FullName;
-
-        string language = NormalizeLanguage(context.Language);
-        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+        if (context.Language is { } language && !Stack.SupportedLanguages.Contains(language))
         {
-            throw new ArgumentException($"Language '{context.Language}' is not supported. Supported languages: {string.Join(", ", SupportedLanguages)}.", nameof(context));
+            throw new ArgumentException($"Language '{language.LanguageIdentifier}' is not supported by this initializer.", nameof(context));
         }
+
+        string projectPath = context.WorkingDirectory.Info.FullName;
 
         string projectName = context.ProjectName ?? Path.GetFileName(projectPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(projectName, nameof(context.ProjectName));
@@ -76,7 +65,7 @@ internal sealed class DotNetProjectInitializer(
             throw new ArgumentException($"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", SupportedFrameworks)}.", nameof(framework));
         }
 
-        if (framework.Equals("net11.0", StringComparison.OrdinalIgnoreCase) && language == "F#")
+        if (framework.Equals("net11.0", StringComparison.OrdinalIgnoreCase) && context.Language == DotNetProjectStack.FSharp)
         {
             throw new GracefulException(
                 ".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.",
@@ -101,7 +90,7 @@ internal sealed class DotNetProjectInitializer(
             "new", TemplateShortName,
             "--name", projectName,
             "--output", projectPath,
-            "--language", language,
+            "--language", context.Language == DotNetProjectStack.FSharp ? "F#" : "C#",
             "--Framework", framework,
             "--debug:custom-hive", _hivePathProvider.HivePath,
         ];
@@ -203,29 +192,4 @@ internal sealed class DotNetProjectInitializer(
             // Non-fatal; next run will simply reinstall.
         }
     }
-
-    internal string NormalizeLanguage(string? language)
-    {
-        if (string.IsNullOrWhiteSpace(language))
-        {
-            return "C#";
-        }
-
-        // Check if it matches a canonical language name (case-insensitive).
-        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in SupportedLanguageAliases)
-        {
-            if (string.Equals(entry.Key, language, StringComparison.OrdinalIgnoreCase))
-            {
-                return entry.Key;
-            }
-
-            if (entry.Value.Contains(language, StringComparer.OrdinalIgnoreCase))
-            {
-                return entry.Key;
-            }
-        }
-
-        return language;
-    }
-
 }

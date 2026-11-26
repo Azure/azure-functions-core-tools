@@ -155,6 +155,11 @@ internal interface IInteractionService
     public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Selects one of the supplied values without using its presentation label as its identity.
+    /// </summary>
+    public Task<T> PromptForSelectionAsync<T>(string title, IEnumerable<T> choices, Func<T, string> display, CancellationToken cancellationToken = default) where T : notnull;
+
+    /// <summary>
     /// Prompts on stderr to select one or more values, using SPACE to toggle and ENTER
     /// to confirm. Requires a selection. Returns an empty list for no choices or when
     /// stderr lacks input or ANSI support. Throws <see cref="OperationCanceledException"/> on cancellation.

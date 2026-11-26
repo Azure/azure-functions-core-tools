@@ -5,19 +5,12 @@ using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
-internal sealed class DotNetProjectStack : IProjectStack
+internal sealed class DotNetProjectStack(StackDescriptor descriptor) : IProjectStack
 {
-    public string Stack => "dotnet";
+    internal static LanguageDescriptor CSharp { get; } = new("csharp", "C#", "c#");
+    internal static LanguageDescriptor FSharp { get; } = new("fsharp", "F#", "f#");
 
-    public string DisplayName => ".NET";
+    public StackDescriptor Descriptor { get; } = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
-    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["dotnet-isolated"];
-
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
-
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
-    {
-        { "C#", ["csharp"] },
-        { "F#", ["fsharp"] }
-    };
+    public IReadOnlyList<LanguageDescriptor> SupportedLanguages { get; } = [CSharp, FSharp];
 }

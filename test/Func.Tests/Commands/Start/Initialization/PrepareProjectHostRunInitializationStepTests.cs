@@ -65,9 +65,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         File.SetLastWriteTimeUtc(settingsPath, originalWriteTime);
         var project = new FakeProject(_projectDir);
         var renderer = new RecordingRenderer();
-        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            ["node"] = new StartHostConfiguration { StartupNotice = "Startup notice must not run." },
+            [FakeProject.NodeStack] = new StartHostConfiguration { StartupNotice = "Startup notice must not run." },
         };
         StartInitializationStepContext context = NewContext(project, renderer, stackConfigurations: stackConfigurations);
 
@@ -102,9 +102,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         });
         _processEnv.Get("ProcessKey").Returns("fromShell");
         var project = new FakeProject(_projectDir);
-        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            ["node"] = new StartHostConfiguration
+            [FakeProject.NodeStack] = new StartHostConfiguration
             {
                 EnvironmentVariables = new Dictionary<string, string> { ["StackKey"] = "fromStack" },
             },
@@ -281,9 +281,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     public async Task StackHostConfiguration_ForMatchingStack_IsMergedWithHighestPriority()
     {
         SetLocalSettings(new() { ["SharedKey"] = "fromFile" });
-        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            ["node"] = new StartHostConfiguration
+            [FakeProject.NodeStack] = new StartHostConfiguration
             {
                 EnvironmentVariables = new Dictionary<string, string>
                 {
@@ -305,9 +305,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     public async Task StackHostConfiguration_ForNonMatchingStack_IsIgnored()
     {
         SetLocalSettings([]);
-        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        var stackConfigurations = new Dictionary<IProjectStack, StartHostConfiguration>
         {
-            ["dotnet"] = new StartHostConfiguration
+            [new TestProjectStack("dotnet", ".NET")] = new StartHostConfiguration
             {
                 EnvironmentVariables = new Dictionary<string, string> { ["FUNCTIONS_ENABLE_DEBUGGER_WAIT"] = "True" },
             },
@@ -341,7 +341,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         FunctionsProject? project = null,
         IStartInitializationRenderer? renderer = null,
         string? stepId = null,
-        IReadOnlyDictionary<string, StartHostConfiguration>? stackConfigurations = null,
+        IReadOnlyDictionary<IProjectStack, StartHostConfiguration>? stackConfigurations = null,
         bool demoMode = true)
     {
         var options = new StartCommandOptions(
@@ -379,9 +379,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         public override WorkingDirectory WorkingDirectory { get; } = WorkingDirectory.FromExplicit(directory);
 
-        public override string StackName => "node";
+        internal static IProjectStack NodeStack { get; } = new TestProjectStack("node", "Node.js");
 
-        public override string StackDisplayName => "Node.js";
+        public override IProjectStack Stack => NodeStack;
 
         public override bool SupportsExtensionBundles => true;
 
