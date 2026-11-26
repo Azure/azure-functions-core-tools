@@ -182,7 +182,7 @@ See [workload authoring](../building-a-workload.md#template-post-actions) for re
 
 ## `func init`
 
-`func init` uses the Template Engine when applicable project templates are discovered. The existing Stack initializer continues to serve when no applicable template exists. `InitCommand` parses and routes the request; `NewInitCommand` owns template creation and the adoption and repair of existing projects; `LegacyInitCommand` owns the existing Stack scaffolding. Initialization fails when candidates exist but no unique `func-{stack}` default is available.
+`func init` uses the Template Engine when applicable project templates are discovered. The existing Stack initializer continues to serve when no applicable template exists. `InitCommand` parses and routes the request; `TemplatedInitHandler` owns template creation and the adoption and repair of existing projects; `LegacyInitCommand` owns the existing Stack scaffolding. Initialization fails when candidates exist but no unique `func-{stack}` default is available.
 
 The transitional grammar is `func init <path> [template options]`: an explicit path precedes template and Stack options, based on the original token order. A path after any such option is rejected, whether the option is template-only, Stack-registered, Boolean, or value-taking.
 

@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Commands.Init;
 /// selected stack contributes only non-scaffolding setup through
 /// <see cref="IProjectInitializer.ConfigureProjectAsync"/>, and stack init options are never parsed in this flow.
 /// </remarks>
-internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory templaterFactory)
+internal sealed class TemplatedInitHandler(InitWorkflow workflow, ITemplaterFactory templaterFactory)
 {
     private readonly InitWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
     private readonly ITemplaterFactory _templaterFactory = templaterFactory
@@ -31,6 +31,13 @@ internal sealed class NewInitCommand(InitWorkflow workflow, ITemplaterFactory te
     /// Adopts a project that predates <c>.func/config.json</c>, or completes a config missing its language, without
     /// creating project content.
     /// </summary>
+    /// <remarks>
+    /// The stack comes from <c>--stack</c>, otherwise from the project: <c>FUNCTIONS_WORKER_RUNTIME</c> in
+    /// <c>local.settings.json</c> when adopting, or <c>.func/config.json</c> when repairing. A stack that isn't
+    /// installed is refused with a pointer to <c>func setup</c>. When neither signal is available, the user is
+    /// prompted interactively, or the command refuses non-interactively. Repair adds only the missing language and
+    /// preserves every other key in the config.
+    /// </remarks>
     public async Task<int> ReconcileExistingAsync(
         InitRequest request,
         InitializationState state,
