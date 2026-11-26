@@ -23,7 +23,11 @@
     No-op for non-workload projects so it's safe to invoke from a solution-wide
     build target.
   -->
-  <Target Name="DeployForDebug" DependsOnTargets="Build">
+  <Target Name="_ValidateWorkloadDebugRid" Condition="'$(PackAsWorkload)' == 'true' AND '$(WorkloadKind)' == 'rid-pointer'">
+    <Error Text="DeployForDebug: '$(PackageId)' is a RID pointer. Pass -r &lt;rid&gt; to deploy its implementation for a specific runtime. Supported RIDs: $(RuntimeIdentifiers)." />
+  </Target>
+
+  <Target Name="DeployForDebug" DependsOnTargets="_ValidateWorkloadDebugRid;Build">
 
     <Message Condition="'$(PackAsWorkload)' != 'true'"
              Importance="High"
@@ -56,36 +60,32 @@
     <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' != 'true'"
            Text="DeployForDebug: '$(PackageId)' $(PackageVersion) is not installed at '$(_DeployForDebugInstallVersionDir)'. Either rerun with -p:FuncCliEnsureWorkloadInstalled=true to auto-install (the &quot;auto-install&quot; VS Code launch config does this), or run `func workload install &lt;nupkg-or-id&gt;` against the same home first." />
 
-    <!-- A label or runtime edit must go through the installer: the active descriptor lives in the registry. -->
-    <GetFileHash Files="$(_WorkloadJsonFile)">
+    <!-- The installer loads active workload DLLs. Do not replace an installed version to refresh its registry metadata. -->
+    <GetFileHash Files="$(_WorkloadJsonFile)" Condition="'$(_DeployForDebugNeedsInstall)' != 'true'">
       <Output TaskParameter="Hash" PropertyName="_DeployForDebugBuiltHash" />
     </GetFileHash>
     <GetFileHash Files="$(_DeployForDebugInstalledManifest)" Condition="Exists('$(_DeployForDebugInstalledManifest)')">
       <Output TaskParameter="Hash" PropertyName="_DeployForDebugInstalledHash" />
     </GetFileHash>
-    <PropertyGroup>
-      <_DeployForDebugRefresh Condition="'$(_DeployForDebugBuiltHash)' != '$(_DeployForDebugInstalledHash)'">true</_DeployForDebugRefresh>
-    </PropertyGroup>
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' != 'true' AND '$(_DeployForDebugBuiltHash)' != '$(_DeployForDebugInstalledHash)'"
+           Text="DeployForDebug: the installed manifest for '$(PackageId)' $(PackageVersion) is missing or differs from the build. Use a new package version or set FuncCliWorkloadsHome to a fresh debug home. The existing installation was not changed." />
 
-    <Error Condition="'$(_DeployForDebugRefresh)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' != 'true'"
-           Text="DeployForDebug: the manifest of '$(PackageId)' has changed. Pack and reinstall it in '$(_DeployForDebugHome)' to refresh its registry metadata before deploying code, or pass -p:FuncCliEnsureWorkloadInstalled=true." />
-
-    <Error Condition="'$(_DeployForDebugRefresh)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
            Text="DeployForDebug: func.dll wasn't found at '$(_DeployForDebugFuncDll)'. Build Func.csproj first." />
 
-    <MSBuild Condition="'$(_DeployForDebugRefresh)' == 'true'"
+    <MSBuild Condition="'$(_DeployForDebugNeedsInstall)' == 'true'"
              Projects="$(MSBuildProjectFullPath)"
              Targets="Pack"
              Properties="Configuration=$(Configuration);PackageOutputPath=$(_DeployForDebugPackOutput)" />
 
-    <Exec Condition="'$(_DeployForDebugRefresh)' == 'true'"
-          Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)" --force'
+    <Exec Condition="'$(_DeployForDebugNeedsInstall)' == 'true'"
+          Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)"'
           EnvironmentVariables="FUNC_CLI_WORKLOADS_HOME=$(_DeployForDebugHome)" />
 
     <Error Condition="!Exists('$(_DeployForDebugInstalledManifest)')"
            Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugInstallVersionDir)'. Check the func workload install output above." />
 
-    <Message Condition="'$(_DeployForDebugRefresh)' != 'true'"
+    <Message Condition="'$(_DeployForDebugNeedsInstall)' != 'true'"
              Importance="High"
              Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugInstallVersionDir)." />
 

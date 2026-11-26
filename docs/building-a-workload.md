@@ -105,6 +105,8 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
 
 The SDK projects this declaration into NuGet (`stack:<id>`, `alias:<id>`, `worker-runtime:<runtime>`, title and description) and into the package's `workload.json`. The CLI associates it with the **evaluated NuGet package ID**, not a naming convention. For example, a project may declare `<StackIdentifier>comet</StackIdentifier>` and `<PackageId>Contoso.DevKit</PackageId>`. It appears in `func workload search --stack` and installs with `func workload install Contoso.DevKit --exact`. Declaring a stack does not create a `func setup` dependency recipe.
 
+Search uses the `FuncCliWorkload` package type, not the optional `func-workload` tag. For searches over 1,000 results, the feed needs to confirm the package type in its results. Otherwise the CLI reports an error rather than scanning the whole feed or returning a partial inventory. Narrow the search or install a known package ID with `--exact`.
+
 Search reads metadata for the exact version and source. Installation captures the actual package manifest in that version's registry entry. A preview can change its title while an installed stable version continues to show its own title.
 
 ### Runtime-specific workload packages
@@ -524,6 +526,9 @@ dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
 
 The home is resolved as `$(FuncCliWorkloadsHome)` property, then
 `FUNC_CLI_WORKLOADS_HOME` env var, then `$(RepoRoot).debug-workloads`.
+For a multi-RID workload such as the Functions host, pass `-r <rid>` (for
+example, `-r win-x64`). Only the selected implementation is installed, not
+the outer pointer package.
 
 ### Two modes
 
@@ -534,18 +539,18 @@ install state of the home is part of what you're debugging (e.g. "what does
 so the target won't silently mutate it.
 
 Pass `-p:FuncCliEnsureWorkloadInstalled=true` to opt into a one-time pack +
-`func workload install --force` when the install is missing. Subsequent runs
+`func workload install` when the install is missing. Subsequent runs
 detect the install and skip straight to the copy.
 
 Publisher verification also applies to that install step. For unsigned local
 builds, explicitly preinstall the package with
-`func workload install <path-to-nupkg> --allow-untrusted --force` in the same
+`func workload install <path-to-nupkg> --allow-untrusted` in the same
 `FUNC_CLI_WORKLOADS_HOME` first. The debug target does not bypass publisher trust.
 
-The copy-only path requires the generated `workload.json` to match the installed
-manifest. After changing a stack ID, worker runtime, title or description, repack
-and reinstall the workload so the registry reflects the new declaration. Auto-install
-mode can refresh changed manifests for packages that pass publisher verification.
+If the installed `workload.json` is missing or differs from the build, both
+modes stop without changing the installation. After changing a stack ID,
+worker runtime, title or description, use a new package version or point
+`FuncCliWorkloadsHome` at a fresh debug home.
 
 ### VS Code launch configs
 
@@ -577,7 +582,7 @@ installed, since workload installs are not transitive today. Three recipes:
   drives `DeployForDebug` for workloads in the repo, using
   `.debug-workloads/` so VS Code F5 finds them. For unsigned local builds,
   first pack and explicitly install every workload you intend to deploy with
-  `func workload install <path-to-nupkg> --allow-untrusted --force`, using
+  `func workload install <path-to-nupkg> --allow-untrusted`, using
   `FUNC_CLI_WORKLOADS_HOME` set to that same directory. Use the file-based
   recipe below as a starting point.
   ```bash

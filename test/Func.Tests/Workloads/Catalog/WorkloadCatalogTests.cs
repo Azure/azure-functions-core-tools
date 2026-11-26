@@ -56,6 +56,83 @@ public sealed class WorkloadCatalogTests
         results.Should().ContainSingle().Subject.PackageId.Should().Be("override-pkg");
     }
 
+    [Fact]
+    public async Task ResolveAlias_FindsUntaggedWorkloadOnNuGetOrg()
+    {
+        var nuget = new PackageSource(PackageSourceProvider.DefaultSourceUrl);
+        var index = new ServiceIndexResourceV3(JObject.Parse("""
+            {"version":"3.0.0","resources":[
+                {"@id":"https://legacy.test/query","@type":"SearchQueryService"},
+                {"@id":"https://typed.test/query","@type":"SearchQueryService/3.5.0"}
+            ]}
+            """), DateTime.UtcNow);
+        var client = new FakeClient(TestRepository.Build(nuget, index), null, uri =>
+        {
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            uri.Host.Should().Be("typed.test");
+            query["packageType"].Should().Be("FuncCliWorkload");
+            return string.IsNullOrEmpty(query["q"])
+                ? JObject.Parse("""
+                    {"totalHits":2,"data":[
+                        {"id":"Unrelated","version":"2.0.0","packageTypes":["Dependency"],"tags":"alias:comet"},
+                        {"id":"Contoso.DevKit","version":"1.0.0","packageTypes":["FuncCliWorkload"],"tags":"stack:comet worker-runtime:native alias:comet","title":"Comet"}
+                    ]}
+                    """)
+                : SearchResponse();
+        });
+        var packages = new WorkloadPackageSource(NewCatalog((nuget, client)), Substitute.For<IWorkloadPackageInspector>(), Options.Create(new WorkloadCatalogOptions()));
+
+        var result = await packages.ResolveAsync("comet", null, nuget.Source, false, false, TestContext.Current.CancellationToken);
+
+        result.PackageId.Should().Be("Contoso.DevKit");
+        result.Version.Should().Be(V("1.0.0"));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task SearchAsync_BoundsOnlyUnverifiedInventories(bool reportsTotal, bool allWorkloads)
+    {
+        const int pageSize = 500;
+        const int hitCount = 1001;
+        var requests = 0;
+        var client = new FakeClient(TestRepository.Build(_defaultSource, NewServiceIndex()), null, uri =>
+        {
+            requests++;
+            int skip = int.Parse(System.Web.HttpUtility.ParseQueryString(uri.Query)["skip"]!);
+            var hits = new JArray();
+            foreach (int i in Enumerable.Range(skip, Math.Min(pageSize, hitCount - skip)))
+            {
+                var hit = new JObject { ["id"] = $"Package.{i}", ["version"] = "1.0.0" };
+                if (allWorkloads || i == 0)
+                {
+                    hit["packageTypes"] = new JArray("FuncCliWorkload");
+                }
+                else if (reportsTotal)
+                {
+                    hit["packageTypes"] = new JArray("Dependency");
+                }
+                hits.Add(hit);
+            }
+
+            return reportsTotal ? new JObject { ["totalHits"] = hitCount, ["data"] = hits } : new JObject { ["data"] = hits };
+        });
+        var catalog = NewCatalog((_defaultSource, client));
+
+        var act = () => catalog.SearchAsync(new CatalogSearchQuery { Take = pageSize }, TestContext.Current.CancellationToken);
+
+        if (allWorkloads)
+        {
+            (await act()).Should().HaveCount(hitCount);
+        }
+        else
+        {
+            await act.Should().ThrowExactlyAsync<WorkloadCatalogException>().WithMessage("*FuncCliWorkload*--exact*");
+            requests.Should().Be(reportsTotal ? 1 : 3);
+        }
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

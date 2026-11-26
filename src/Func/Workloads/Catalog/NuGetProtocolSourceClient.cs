@@ -28,6 +28,9 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     // Wiki: https://github.com/NuGet/Home/wiki/Search-by-Package-Type-and-Query-Language-Surfacing
     private const string PackageTypeQueryParam = "packageType";
 
+    // Limit unverified inventory to the size of one maximum-size nuget.org search page.
+    private const int MaxClientFilteredHits = 1000;
+
     private readonly SourceRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
     public PackageSource Source => _repository.PackageSource;
@@ -36,9 +39,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        // A non-empty query keeps nuget.org from ignoring packageType and paging the entire public feed.
-        CatalogSearchQuery page = string.IsNullOrWhiteSpace(query.Filter) && Source.SourceUri.Host.Equals("api.nuget.org", StringComparison.OrdinalIgnoreCase)
-            ? query with { Filter = "tags:func-workload" } : query;
+        CatalogSearchQuery page = query;
         bool includePrerelease = query.IncludePrerelease == true;
         HashSet<string> visited = [with(StringComparer.OrdinalIgnoreCase)];
         List<CatalogSearchResult> rows = [];
@@ -51,6 +52,16 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             if (raw?["data"] is not JArray hits)
             {
                 throw new WorkloadCatalogException($"Source '{Source.Source}' returned an invalid workload search page.");
+            }
+
+            // Bound client-side filtering when a feed ignores packageType or doesn't echo the type.
+            // A source returning confirmed workload packages can be paged to completion.
+            int next = page.Skip + hits.Count;
+            int? total = (int?)raw["totalHits"];
+            if (Math.Max(next, total.GetValueOrDefault()) - query.Skip > MaxClientFilteredHits
+                && hits.Any(hit => DeclaresWorkloadPackageType(hit["packageTypes"]) is not true))
+            {
+                throw new WorkloadCatalogException($"Source '{Source.Source}' returned a broad search without confirming the '{WorkloadPackageTypes.Workload}' package type. Refine the search or install a known package ID with --exact.");
             }
 
             foreach (CatalogSearchResult hit in ParseV3Hits(raw, Source))
@@ -85,8 +96,6 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             }
 
             // Advance by raw hits, not client-filtered workloads or expanded version rows.
-            int next = page.Skip + hits.Count;
-            int? total = (int?)raw["totalHits"];
             if (hits.Count == 0 || (total.HasValue ? next >= total : hits.Count < (page.Take ?? CatalogSearchQuery.DefaultTake)))
             {
                 return rows;
@@ -201,11 +210,10 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             return null;
         }
 
-        // GetServiceEntryUri picks the best match in priority order across
-        // the V3 service index versions; pass the unversioned key first.
+        // Version 3.5.0 introduced packageType filtering.
         string? baseUrl = serviceIndex.GetServiceEntryUri(
-            "SearchQueryService",
             "SearchQueryService/3.5.0",
+            "SearchQueryService",
             "SearchQueryService/3.0.0-rc",
             "SearchQueryService/3.0.0-beta")?.AbsoluteUri;
 
@@ -228,13 +236,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     }
 
     /// <summary>
-    /// Parses the V3 search response and applies a defensive client-side
-    /// filter on each hit's <c>packageTypes</c> array. nuget.org honours
-    /// <c>packageType=</c> only when the query string is non-empty; an
-    /// unfiltered <c>func workload search</c> otherwise leaks arbitrary
-    /// matches like <c>Azure.Functions.Cli.Abstractions</c> (see
-    /// azure-functions-core-tools#5198). Hits that omit <c>packageTypes</c>
-    /// are kept, since some V3 feeds don't surface the field.
+    /// Parses the V3 search response, excluding packages that explicitly declare only other types.
     /// </summary>
     internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
     {
@@ -254,7 +256,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
                 continue;
             }
 
-            if (!HitMatchesWorkloadPackageType(hit["packageTypes"]))
+            if (DeclaresWorkloadPackageType(hit["packageTypes"]) is false)
             {
                 continue;
             }
@@ -292,17 +294,12 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return null;
     }
 
-    // Hits without a `packageTypes` array fall through (kept): V3 search
-    // responses don't guarantee the field, and dropping silent hits would
-    // empty out compliant feeds. When the array is present, require the
-    // FuncCliWorkload entry so arbitrary nuget.org packages don't leak
-    // through when the server-side `packageType=` filter is ignored (e.g.
-    // for empty queries).
-    private static bool HitMatchesWorkloadPackageType(JToken? packageTypes)
+    // Some V3 feeds honor the filter without echoing packageTypes in their results.
+    private static bool? DeclaresWorkloadPackageType(JToken? packageTypes)
     {
         if (packageTypes is not JArray array || array.Count == 0)
         {
-            return true;
+            return null;
         }
 
         foreach (JToken entry in array)
