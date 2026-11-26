@@ -16,6 +16,8 @@ using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.DotNet;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Components;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -1178,6 +1180,88 @@ public class InitCommandTests
             initializer.WasInvoked.Should().BeFalse();
             File.ReadAllText(generatedFile).Should().Be("user content");
             File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateCreation_FileAddedAfterPreflightIsNotOverwritten()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(
+                root, binding: $"{SentinelBindSymbolSource.Prefix}:value");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            Directory.CreateDirectory(output);
+            string sentinel = Path.Combine(output, "Http.txt");
+            byte[] sentinelContent = "user content"u8.ToArray();
+            SentinelBindSymbolSource source = new(sentinel, sentinelContent);
+            ICoreTemplateComponent component = Substitute.For<ICoreTemplateComponent>();
+            component.InterfaceType.Returns(typeof(IBindSymbolSource));
+            component.Instance.Returns(source);
+            FakeProjectInitializer initializer = new("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home, [component]));
+
+            exitCode.Should().Be(1);
+            Directory.GetFileSystemEntries(output).Should().Equal(sentinel);
+            File.ReadAllBytes(sentinel).Should().Equal(sentinelContent);
+            File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeFalse();
+            _interaction.Lines.Should().Contain(
+                "ERROR: Cannot initialize the project because these files already exist: ./Http.txt. "
+                + "Use --force to replace the directory contents.");
+            initializer.WasInvoked.Should().BeFalse();
+            initializer.ConfigureCount.Should().Be(0);
+            // Call 1 is the preflight dry run; the sentinel appears during call 2, before creation writes files.
+            source.CallCount.Should().Be(2);
+        }
+        finally
+        {
+            CleanupDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_TemplateCreation_ForceReplacesExistingFiles()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string home = Path.Combine(root, "home");
+        string output = Path.Combine(root, "App");
+        try
+        {
+            string package = TemplateFixtures.WriteInitProjectPackage(root);
+            await TemplateFixtures.InstallAsync(package, Path.Combine(home, "templates"));
+            Directory.CreateDirectory(output);
+            File.WriteAllText(Path.Combine(output, "Http.txt"), "user content");
+            File.WriteAllText(Path.Combine(output, "leftover.txt"), "user content");
+            FakeProjectInitializer initializer = new("python", ["python"]);
+
+            int exitCode = await RunInitAsync(
+                output,
+                initializer,
+                language: "python",
+                stack: "python",
+                force: true,
+                templaterFactory: TemplateFixtures.CreateTemplaterFactory(home));
+
+            exitCode.Should().Be(0);
+            File.ReadAllText(Path.Combine(output, "Http.txt")).Should().Be("HTTP function");
+            File.ReadAllText(Path.Combine(output, "App.txt")).Should().Be("net10.0");
+            File.Exists(Path.Combine(output, "leftover.txt")).Should().BeFalse();
+            File.Exists(Path.Combine(output, ".func", "config.json")).Should().BeTrue();
+            initializer.WasInvoked.Should().BeFalse();
+            initializer.ConfigureCount.Should().Be(1);
         }
         finally
         {
@@ -2760,5 +2844,37 @@ public class InitCommandTests
     private sealed class InteractiveTestInteractionService : TestInteractionService
     {
         public override bool IsInteractive => true;
+    }
+
+    /// <summary>
+    /// Bind symbol source that writes a sentinel file on its second evaluation, which is the real creation's
+    /// effects pass after the preflight dry run has passed.
+    /// </summary>
+    private sealed class SentinelBindSymbolSource(string path, byte[] content) : IBindSymbolSource
+    {
+        public const string Prefix = "funcTestsSentinel";
+
+        public int CallCount { get; private set; }
+
+        public string DisplayName => "Func tests sentinel";
+
+        public string? SourcePrefix => Prefix;
+
+        public bool RequiresPrefixMatch => true;
+
+        public int Priority => 0;
+
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public Task<string?> GetBoundValueAsync(
+            IEngineEnvironmentSettings settings, string bindName, CancellationToken cancellationToken)
+        {
+            if (++CallCount == 2)
+            {
+                File.WriteAllBytes(path, content);
+            }
+
+            return Task.FromResult<string?>("value");
+        }
     }
 }

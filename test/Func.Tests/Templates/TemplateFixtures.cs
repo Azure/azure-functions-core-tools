@@ -31,10 +31,11 @@ internal static class TemplateFixtures
         => CreateTemplaterFactory(
             Path.Combine(Path.GetTempPath(), "func-init-template-tests", Guid.NewGuid().ToString("N")));
 
-    public static ITemplaterFactory CreateTemplaterFactory(string home)
+    public static ITemplaterFactory CreateTemplaterFactory(
+        string home, IEnumerable<ICoreTemplateComponent>? components = null)
         => new TemplaterFactory(
             new CliConfigurationPathsOptions(home),
-            new FuncTemplateComponentsProvider([], [], Substitute.For<IInteractionService>()));
+            new FuncTemplateComponentsProvider(components ?? [], [], Substitute.For<IInteractionService>()));
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -137,9 +138,13 @@ internal static class TemplateFixtures
         string alternateIdentity = $"{InitProjectTemplateIdentity}.Alternative",
         string targetFrameworkAlias = "target-framework",
         string targetFrameworkShortName = "tfm",
-        bool alternateFirst = false)
+        bool alternateFirst = false,
+        string? binding = null)
     {
         string packageDirectory = Path.Combine(parentDirectory, "init-templates");
+        string bindingSymbol = binding is null
+            ? string.Empty
+            : $$""", "Binding": { "type": "bind", "binding": "{{binding}}" }""";
         string templateDirectory = Path.Combine(packageDirectory, alternateFirst ? "z-project" : "project");
         void WriteAlternativeTemplate() => WriteTemplate(
             Path.Combine(packageDirectory, alternateFirst ? "a-project-alternative" : "project-alternative"),
@@ -185,7 +190,7 @@ internal static class TemplateFixtures
                   "type": "parameter",
                   "datatype": "bool",
                   "defaultValue": "false"
-                }
+                }{{bindingSymbol}}
               },
               "sources": [
                 {
