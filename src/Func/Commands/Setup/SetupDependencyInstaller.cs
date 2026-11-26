@@ -142,6 +142,7 @@ internal sealed class SetupDependencyInstaller(
 
         try
         {
+            WorkloadStackRequirement? requiredStack = dependency.Kind == SetupDependencyKind.Stack ? new(dependency.Name, _runtimeIdentifierProvider.Current) : null;
             WorkloadInstallResult installResult = options.OutputMode == SetupOutputMode.Json
                 ? await _workloadInstaller.InstallFromCatalogAsync(
                     package.PackageId,
@@ -151,6 +152,7 @@ internal sealed class SetupDependencyInstaller(
                     exact: true,
                     force: false,
                     progress: null,
+                    requiredStack: requiredStack,
                     cancellationToken: cancellationToken)
                 : await _interaction.RunWithProgressAsync(
                     $"Installing {dependency.DisplayName} {targetVersion}",
@@ -162,18 +164,12 @@ internal sealed class SetupDependencyInstaller(
                         exact: true,
                         force: false,
                         new WorkloadInstallProgressAdapter(ctx),
+                        requiredStack: requiredStack,
                         cancellationToken: ct),
                     cancellationToken,
                     writeCompletion: false);
 
             string installedVersion = installResult.Entry.PackageVersion;
-            if (dependency.Kind == SetupDependencyKind.Stack
-                && (installResult.Entry.Kind != WorkloadKind.Workload || !WorkloadActivation.IsCompatible(installResult.Entry.RuntimeIdentifier, _runtimeIdentifierProvider.Current)
-                    || !string.Equals(installResult.Entry.Stack?.Identifier, dependency.Name, StringComparison.OrdinalIgnoreCase)))
-            {
-                return SetupDependencyResult.Failed(dependency, $"The installed workload {package.PackageId} {installedVersion} does not provide stack '{dependency.Name}' for {_runtimeIdentifierProvider.Current}.");
-            }
-
             return installResult.AlreadyInstalled
                 ? SetupDependencyResult.Satisfied(
                     dependency,

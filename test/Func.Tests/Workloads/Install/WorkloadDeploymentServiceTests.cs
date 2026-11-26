@@ -40,7 +40,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         Directory.CreateDirectory(entry.PackageRoot);
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseExplicitAsync(
-            entry.PackageId, entry.PackageVersion, TestContext.Current.CancellationToken);
+            entry.PackageId, entry.PackageVersion, cancellationToken: TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.AlreadyInstalled.Should().BeTrue();
@@ -105,7 +105,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseImplementationAsync(
             existing.PackageId, existing.PackageVersion, existing.RuntimeIdentifier!, logicalPackage,
-            TestContext.Current.CancellationToken);
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.Entry.Should().BeEquivalentTo(CompleteEntry(logicalPackage));
@@ -192,7 +192,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseImplementationAsync(
             reusable.PackageId, reusable.PackageVersion, "win-x64", Logical("example.pointer", "1.0.0"),
-            TestContext.Current.CancellationToken);
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.Should().BeNull();
     }

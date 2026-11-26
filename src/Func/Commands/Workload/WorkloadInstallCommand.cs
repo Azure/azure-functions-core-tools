@@ -141,7 +141,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             force,
                             progress,
                             allowUntrusted,
-                            ct);
+                            cancellationToken: ct);
                 },
                 cancellationToken,
                 writeCompletion: false);

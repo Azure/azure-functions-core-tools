@@ -420,7 +420,9 @@ a version of its owning package that still declares that stack for the current
 platform and prerelease policy. `--check` uses the same target without installing
 it. `--install-policy if-needed` keeps a usable installed stack without querying
 the feed for it; if discovery is offline, `latest-compatible` can also keep that
-stack and reports why.
+stack and reports why. Before installing a selected version or attaching a RID
+implementation to its owner, setup verifies the stack against the package
+manifest. A catalog declaration alone cannot replace the active stack.
 
 If a stack has no setup recipe, setup fails before installing any dependencies and
 suggests `func workload install <package-id> --exact`. Use `func workload search

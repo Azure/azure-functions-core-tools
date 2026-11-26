@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -108,6 +109,108 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
             cancellationToken: TestContext.Current.CancellationToken);
 
         result.Entry.PackageVersion.Should().Be("1.0.0");
+    }
+
+    [Theory]
+    [InlineData("comet")]
+    [InlineData(null)]
+    public async Task InstallFromCatalog_WrongStackInManifest_LeavesCurrentVersionActive(string? declaredStack)
+    {
+        const string id = "Contoso.DevKit";
+        var token = TestContext.Current.CancellationToken;
+        var store = new WorkloadStore(_paths);
+        var installer = NewInstaller(metadataReader: new WorkloadMetadataReader(), store: store);
+        await installer.InstallFromPackageAsync(BuildStackPackage(id, "1.0.0", "node"), cancellationToken: token);
+        byte[] registry = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath, token);
+        string activeManifest = Path.Combine(_paths.GetInstallDirectory(id, "1.0.0"), "workload.json");
+        byte[] manifest = await File.ReadAllBytesAsync(activeManifest, token);
+        var next = ServePackage(id, BuildStackPackage(id, "2.0.0", declaredStack));
+
+        Func<Task> install = () => installer.InstallFromCatalogAsync(id, next.Version, null, false, true, false, requiredStack: new("node", "win-x64"), cancellationToken: token);
+
+        await install.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*does not provide stack 'node'*");
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath, token)).Should().Equal(registry);
+        (await File.ReadAllBytesAsync(activeManifest, token)).Should().Equal(manifest);
+        Directory.Exists(_paths.GetInstallDirectory(id, "2.0.0")).Should().BeFalse();
+        WorkloadActivation.SelectLiveRuntimeEntries(await store.GetWorkloadsAsync(token)).Should().ContainSingle().Which.PackageVersion.Should().Be("1.0.0");
+        await _catalog.Received(1).DownloadAsync(next, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("comet", "node", false)]
+    [InlineData("node", "comet", false)]
+    [InlineData("node", "comet", true)]
+    public async Task InstallFromCatalog_WrongPointerOrImplementationStack_DoesNotAttachOwnership(string pointerStack, string implementationStack, bool alreadyOnDisk)
+    {
+        const string id = "Contoso.DevKit";
+        const string impl = "Contoso.DevKit.win-x64";
+        var token = TestContext.Current.CancellationToken;
+        var store = new WorkloadStore(_paths);
+        var installer = NewInstaller(metadataReader: new WorkloadMetadataReader(), store: store);
+        await installer.InstallFromPackageAsync(BuildStackPackage(id, "1.0.0", "node"), cancellationToken: token);
+        string physicalPackage = BuildStackPackage(impl, "2.0.0", implementationStack, rid: "win-x64");
+        if (alreadyOnDisk)
+        {
+            await installer.InstallFromPackageAsync(physicalPackage, cancellationToken: token);
+        }
+        byte[] registry = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath, token);
+        var pointer = ServePackage(id, BuildStackPackage(id, "2.0.0", pointerStack, implementation: impl));
+        var physical = ServePackage(impl, physicalPackage, pointer.Source.Source);
+
+        Func<Task> install = () => installer.InstallFromCatalogAsync(id, pointer.Version, null, false, true, false, requiredStack: new("node", "win-x64"), cancellationToken: token);
+
+        await install.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*does not provide stack 'node'*");
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath, token)).Should().Equal(registry);
+        Directory.Exists(_paths.GetInstallDirectory(impl, "2.0.0")).Should().Be(alreadyOnDisk);
+        (await store.GetWorkloadsAsync(token)).Should().OnlyContain(e => e.LogicalPackage == null);
+        await _catalog.Received(1).DownloadAsync(pointer, Arg.Any<CancellationToken>());
+        await _catalog.Received(pointerStack == "node" && !alreadyOnDisk ? 1 : 0).DownloadAsync(physical, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_RequiredStack_RechecksInstalledManifestBeforeExplicitReuse()
+    {
+        const string id = "Contoso.DevKit";
+        var token = TestContext.Current.CancellationToken;
+        var installer = NewInstaller(metadataReader: new WorkloadMetadataReader(), store: new WorkloadStore(_paths));
+        var target = ServePackage(id, BuildStackPackage(id, "2.0.0", "node"));
+        var required = new WorkloadStackRequirement("NODE", "win-x64");
+        var installed = await installer.InstallFromCatalogAsync(id, target.Version, null, false, true, false, requiredStack: required, cancellationToken: token);
+        installed.Entry.Stack!.Identifier.Should().Be("node");
+        string manifest = Path.Combine(_paths.GetInstallDirectory(id, "2.0.0"), "workload.json");
+        string original = await File.ReadAllTextAsync(manifest, token);
+        await File.WriteAllTextAsync(manifest, original.Replace("\"node\"", "\"comet\"", StringComparison.Ordinal), token);
+        byte[] registry = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath, token);
+
+        Func<Task> reuse = () => installer.InstallFromCatalogAsync(id, target.Version, null, false, true, false, requiredStack: required, cancellationToken: token);
+
+        await reuse.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*does not provide stack 'NODE'*");
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath, token)).Should().Equal(registry);
+        await _catalog.Received(1).DownloadAsync(target, Arg.Any<CancellationToken>());
+    }
+
+    private ResolvedPackage ServePackage(string id, string archive, string? source = null)
+    {
+        var resolved = NewResolved(id, "2.0.0");
+        _catalog.ResolveVersionAsync(Arg.Is<string>(candidate => candidate.Equals(id, StringComparison.OrdinalIgnoreCase)), resolved.Version, source, Arg.Any<CancellationToken>()).Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>()).Returns(_ => File.OpenRead(archive));
+        return resolved;
+    }
+
+    private string BuildStackPackage(string id, string version, string? stack, string? rid = null, string? implementation = null)
+    {
+        WorkloadMetadata metadata = new()
+        {
+            Schema = WorkloadManifestSchema.PackageManifestV1Schema,
+            Kind = implementation is null ? WorkloadKind.Workload : WorkloadKind.RidPointer,
+            EntryPoint = implementation is null ? new() { AssemblyPath = "Test.dll", Type = "Fixture.Stub" } : null,
+            Stack = stack is null ? null : new(stack, stack, stack),
+            RuntimeIdentifier = rid,
+            Packages = implementation is null ? null : new Dictionary<string, string> { ["win-x64"] = implementation },
+        };
+        string manifest = WriteTempFile("workload.json", JsonSerializer.Serialize(metadata, WorkloadJsonContext.Default.WorkloadMetadata));
+        return BuildNupkg(id: id, version: version, tags: rid is null ? "stack:node" : $"stack:node rid:{rid}", includePayload: implementation is null,
+            packageType: rid is null ? WorkloadPackageTypes.Workload : WorkloadPackageTypes.RuntimeIdentifierPackage, extraFiles: [(manifest, "workload.json")]);
     }
 
     [Fact]

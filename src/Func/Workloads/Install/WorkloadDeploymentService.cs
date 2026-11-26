@@ -49,7 +49,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         return ResolveUpdateTarget(packageId, targetInstalledVersion, explicitMatches);
     }
 
-    public async Task<WorkloadInstallResult?> TryReuseExplicitAsync(string packageId, string version, CancellationToken cancellationToken = default)
+    public async Task<WorkloadInstallResult?> TryReuseExplicitAsync(string packageId, string version, WorkloadStackRequirement? requiredStack = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -69,17 +69,19 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
+        requiredStack?.ValidateInstalled(existing, _metadataReader.Read(packageRoot));
         return new WorkloadInstallResult(existing, true);
     }
 
-    public Task<WorkloadInstallResult?> TryReuseImplementationAsync(string packageId, string version, string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken = default)
-        => TryReuseImplementationCoreAsync(packageId, version, runtimeIdentifier, logicalPackage, currentLogicalOwner: null, cancellationToken);
+    public Task<WorkloadInstallResult?> TryReuseImplementationAsync(string packageId, string version, string runtimeIdentifier, LogicalPackage logicalPackage,
+        WorkloadStackRequirement? requiredStack = null, CancellationToken cancellationToken = default)
+        => TryReuseImplementationCoreAsync(packageId, version, runtimeIdentifier, logicalPackage, currentLogicalOwner: null, requiredStack, cancellationToken);
 
     public Task<WorkloadInstallResult?> TryReuseImplementationForUpdateAsync(WorkloadEntry currentEntry, string packageId, string version,
         string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(currentEntry);
-        return TryReuseImplementationCoreAsync(packageId, version, runtimeIdentifier, logicalPackage, currentEntry, cancellationToken);
+        return TryReuseImplementationCoreAsync(packageId, version, runtimeIdentifier, logicalPackage, currentEntry, requiredStack: null, cancellationToken);
     }
 
     public async Task<WorkloadInstallResult> InstallAsync(InspectedWorkloadPackage package, string source, WorkloadOwnershipKind ownership,
@@ -260,7 +262,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     }
 
     private async Task<WorkloadInstallResult?> TryReuseImplementationCoreAsync(string packageId, string version, string runtimeIdentifier,
-        LogicalPackage logicalPackage, WorkloadEntry? currentLogicalOwner, CancellationToken cancellationToken)
+        LogicalPackage logicalPackage, WorkloadEntry? currentLogicalOwner, WorkloadStackRequirement? requiredStack, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -268,7 +270,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         ArgumentNullException.ThrowIfNull(logicalPackage);
 
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
-        WorkloadEntry? existing = FindReusableImplementation(installed, packageId, version, runtimeIdentifier);
+        WorkloadEntry? existing = FindReusableImplementation(installed, packageId, version, runtimeIdentifier, requiredStack);
         if (existing is null)
         {
             return null;
@@ -332,7 +334,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 || !string.Equals(currentLogicalOwner.PackageVersion, version, StringComparison.Ordinal));
 
     private WorkloadEntry? FindReusableImplementation(IReadOnlyList<WorkloadEntry> installed, string packageId, string version,
-        string runtimeIdentifier)
+        string runtimeIdentifier, WorkloadStackRequirement? requiredStack)
     {
         WorkloadEntry? existing = installed.FirstOrDefault(entry =>
             string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
@@ -349,18 +351,21 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
+        WorkloadMetadata metadata;
         try
         {
-            WorkloadMetadata metadata = _metadataReader.Read(installPath);
-            return metadata.Kind is WorkloadKind.Workload or WorkloadKind.Content
-                && string.Equals(metadata.RuntimeIdentifier, runtimeIdentifier, StringComparison.Ordinal)
-                ? existing
-                : null;
+            metadata = _metadataReader.Read(installPath);
         }
         catch (InvalidWorkloadException)
         {
             return null;
         }
+
+        requiredStack?.ValidateInstalled(existing, metadata);
+        return metadata.Kind is WorkloadKind.Workload or WorkloadKind.Content
+            && string.Equals(metadata.RuntimeIdentifier, runtimeIdentifier, StringComparison.Ordinal)
+            ? existing
+            : null;
     }
 
     private static WorkloadEntry CreateEntry(InspectedWorkloadPackage package, string source, WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage)
@@ -438,6 +443,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             WorkloadMetadata actual = _metadataReader.Read(installPath);
             return actual.Kind == expectedMetadata.Kind
+                && (expectedMetadata.Stack is null || (entry.Kind == WorkloadKind.Workload && string.Equals(actual.RuntimeIdentifier, entry.RuntimeIdentifier, StringComparison.Ordinal)))
                 && SameStackDeclaration(actual.Stack, expectedMetadata.Stack)
                 && SameStackDeclaration(actual.Stack, entry.Stack)
                 && string.Equals(actual.TemplateRoot, expectedMetadata.TemplateRoot, StringComparison.Ordinal)

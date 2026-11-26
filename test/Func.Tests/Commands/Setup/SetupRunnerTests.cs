@@ -47,6 +47,7 @@ public sealed class SetupRunnerTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                requiredStack: Arg.Any<WorkloadStackRequirement?>(),
                 cancellationToken: Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -126,6 +127,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            requiredStack: new WorkloadStackRequirement("dotnet", "win-x64"),
             cancellationToken: Arg.Any<CancellationToken>());
 
         await _installer.DidNotReceive().InstallFromCatalogAsync(
@@ -277,6 +279,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             allowUntrusted: Arg.Any<bool>(),
+            requiredStack: Arg.Any<WorkloadStackRequirement?>(),
             cancellationToken: Arg.Any<CancellationToken>());
     }
 
@@ -330,6 +333,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            requiredStack: new WorkloadStackRequirement("dotnet", "win-x64"),
             cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains(".Workers.", StringComparison.OrdinalIgnoreCase)),
@@ -673,6 +677,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            requiredStack: new WorkloadStackRequirement("node", "win-x64"),
             cancellationToken: Arg.Any<CancellationToken>());
     }
 
@@ -940,6 +945,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            requiredStack: Arg.Any<WorkloadStackRequirement?>(),
             cancellationToken: Arg.Any<CancellationToken>());
     }
 
@@ -1035,7 +1041,7 @@ public sealed class SetupRunnerTests : IDisposable
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Equals("Contoso.DevKit", StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "2.0.0"), Arg.Any<string?>(),
-            Arg.Any<bool?>(), true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
+            Arg.Any<bool?>(), true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), requiredStack: new WorkloadStackRequirement("node", "win-x64"), cancellationToken: Arg.Any<CancellationToken>());
         _interaction.AllOutput.Should().Contain("Installed Custom node stack");
     }
 
@@ -1089,7 +1095,7 @@ public sealed class SetupRunnerTests : IDisposable
         else
         {
             await _installer.Received(1).InstallFromCatalogAsync(Arg.Is<string>(id => id.Equals(node.PackageId, StringComparison.OrdinalIgnoreCase)), NuGetVersion.Parse(expected), source, prerelease,
-                exact: true, force: false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>());
+                exact: true, force: false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), requiredStack: new WorkloadStackRequirement("node", "win-x64"), cancellationToken: Arg.Any<CancellationToken>());
         }
     }
 
@@ -1128,20 +1134,6 @@ public sealed class SetupRunnerTests : IDisposable
         result.ExitCode.Should().Be(1);
         _interaction.AllOutput.Should().Contain("would not activate stack 'node'").And.Contain("2.0.0 is active");
         _installer.ReceivedCalls().Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task RunAsync_StackUpgrade_InstalledManifestDisagreesWithCatalog_DoesNotReportSuccess()
-    {
-        var node = SetupTestInventory.Row("Contoso.DevKit", "node", "node", "Node");
-        var upgrade = node with { LatestVersion = NuGetVersion.Parse("2.0.0") };
-        SeedNodeDependencies(StackEntry(node));
-        ReturnStackInstallation(upgrade with { Stack = null });
-
-        SetupRunResult result = await CreateRunner(Catalog().WithStack(upgrade)).RunAsync(Options(features: ["node"]), TestContext.Current.CancellationToken);
-
-        result.ExitCode.Should().Be(1);
-        _interaction.AllOutput.Should().Contain("does not provide stack 'node' for win-x64");
     }
 
     [Theory]
@@ -1288,6 +1280,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            requiredStack: new WorkloadStackRequirement("node", "win-x64"),
             cancellationToken: Arg.Any<CancellationToken>());
     }
 
@@ -1311,6 +1304,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            requiredStack: Arg.Any<WorkloadStackRequirement?>(),
             cancellationToken: Arg.Any<CancellationToken>());
     }
 
@@ -1430,7 +1424,7 @@ public sealed class SetupRunnerTests : IDisposable
 
     private void ReturnStackInstallation(CatalogSearchResult row) =>
         _installer.InstallFromCatalogAsync(Arg.Is<string>(id => id.Equals(row.PackageId, StringComparison.OrdinalIgnoreCase)), row.LatestVersion, Arg.Any<string?>(), Arg.Any<bool?>(), true, false,
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>())
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), requiredStack: new WorkloadStackRequirement(row.Stack!.Identifier, "win-x64"), cancellationToken: Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(StackEntry(row), AlreadyInstalled: false));
 
     private static string WorkerPackage(string runtime) => $"Azure.Functions.Cli.Workloads.Workers.{runtime}";
