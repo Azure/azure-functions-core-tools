@@ -26,7 +26,11 @@ namespace Azure.Functions.Cli
         private readonly TelemetryEvent _telemetryEvent;
 
         // Global options that should be filtered out during action parsing
-        private static readonly HashSet<string> _globalFlags = new(StringComparer.OrdinalIgnoreCase) { "--version", "--verbose" };
+        private static readonly HashSet<string> _globalFlags = new(StringComparer.OrdinalIgnoreCase) { "--verbose" };
+
+        // Global flags that are only global before the command; after it they belong to the action
+        // (e.g. `func extensions install --version 5.0.1`).
+        private static readonly HashSet<string> _leadingGlobalFlags = new(StringComparer.OrdinalIgnoreCase) { "--version" };
         private static readonly HashSet<string> _globalOptionsWithValues = new(StringComparer.OrdinalIgnoreCase) { "--script-root", "--prefix" };
 
         internal ConsoleApp(string[] args, Assembly assembly, IContainer container)
@@ -420,16 +424,17 @@ namespace Azure.Functions.Cli
 
         /// <summary>
         /// Filters out global options and their values from the argument list.
-        /// Global flags: --version, --verbose
+        /// Global flags: --verbose, and --version when it appears before the command
         /// Global options with values: --script-root, --prefix.
         /// </summary>
         private static IEnumerable<string> FilterOutGlobalOptions(string[] args)
         {
+            var seenCommand = false;
             for (int i = 0; i < args.Length; i++)
             {
                 var arg = args[i];
 
-                if (_globalFlags.Contains(arg))
+                if (_globalFlags.Contains(arg) || (!seenCommand && _leadingGlobalFlags.Contains(arg)))
                 {
                     continue;
                 }
@@ -440,6 +445,7 @@ namespace Azure.Functions.Cli
                     continue;
                 }
 
+                seenCommand |= !arg.StartsWith('-');
                 yield return arg;
             }
         }

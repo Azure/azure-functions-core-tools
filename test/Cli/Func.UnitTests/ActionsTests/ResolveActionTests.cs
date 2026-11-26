@@ -109,6 +109,54 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
+        [InlineData("extensions install --package Microsoft.Azure.WebJobs.Extensions.EventHubs --version 5.0.1")]
+        [InlineData("extensions install --package Microsoft.Azure.WebJobs.Extensions.EventHubs -v 5.0.1")]
+        [InlineData("extensions install --version 5.0.1 --package Microsoft.Azure.WebJobs.Extensions.EventHubs --verbose")]
+        [InlineData("--verbose extensions install --package Microsoft.Azure.WebJobs.Extensions.EventHubs --version 5.0.1")]
+        public void ExtensionsInstallKeepsItsVersionOption(string args)
+        {
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                var container = InitializeContainerForTests();
+                var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
+                var result = app.Parse();
+
+                var action = result.Should().BeOfType<InstallExtensionAction>().Subject;
+                action.Package.Should().Be("Microsoft.Azure.WebJobs.Extensions.EventHubs");
+                action.Version.Should().Be("5.0.1");
+            }
+        }
+
+        [Theory]
+        [InlineData("--version --verbose")]
+        [InlineData("--verbose --version")]
+        public void GlobalVersionFlagBeforeCommandShowsHelp(string args)
+        {
+            try
+            {
+                var fileSystem = Substitute.For<IFileSystem>();
+                fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    var container = InitializeContainerForTests();
+                    var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
+                    var result = app.Parse();
+
+                    result.Should().BeOfType<HelpAction>();
+                }
+            }
+            finally
+            {
+                // HelpAction sets this; reset it so later tests are not affected
+                GlobalCoreToolsSettings.SetIsHelpRunning(false);
+            }
+        }
+
+        [Theory]
         [InlineData("azure functionapp publish -g resource-group app-name-not-the-first-arg")]
         public void ThrowErrorOnIncorrectCommandLine(string args)
         {
