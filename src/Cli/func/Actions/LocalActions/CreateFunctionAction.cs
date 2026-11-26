@@ -282,9 +282,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         ConfigureAuthorizationLevel(template);
                     }
 
-                    ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
+                    // When no name was passed, avoid proposing a default that would collide with an existing function folder.
+                    var defaultFunctionName = FunctionName is null
+                        ? GetAvailableFunctionName(template.Metadata.DefaultFunctionName, Environment.CurrentDirectory)
+                        : template.Metadata.DefaultFunctionName;
+                    ColoredConsole.Write($"Function name: [{defaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
-                    FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
+                    FunctionName = string.IsNullOrEmpty(FunctionName) ? defaultFunctionName : FunctionName;
                     await _templatesManager.Deploy(FunctionName, FileName, template);
                     PerformPostDeployTasks(FunctionName, Language);
                 }
@@ -437,6 +441,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
                 Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
             }
+        }
+
+        /// <summary>
+        /// Returns <paramref name="defaultName"/>, or the first of <paramref name="defaultName"/>1, <paramref name="defaultName"/>2, ...
+        /// that does not already exist as a directory under <paramref name="baseDirectory"/>.
+        /// </summary>
+        internal static string GetAvailableFunctionName(string defaultName, string baseDirectory)
+        {
+            if (string.IsNullOrEmpty(defaultName) || !FileSystemHelpers.DirectoryExists(Path.Combine(baseDirectory, defaultName)))
+            {
+                return defaultName;
+            }
+
+            var suffix = 1;
+            while (FileSystemHelpers.DirectoryExists(Path.Combine(baseDirectory, $"{defaultName}{suffix}")))
+            {
+                suffix++;
+            }
+
+            return $"{defaultName}{suffix}";
         }
 
         private IEnumerable<string> GetTriggerNames(string templateLanguage, bool forNewModelHelp = false)
