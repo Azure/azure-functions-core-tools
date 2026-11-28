@@ -419,6 +419,35 @@ the action ID, selects `files` or falls back to primary outputs, and attempts
 each target. Implement `CanProcess` for the supported template tags and
 `RestoreAsync` for one target; return false for expected restore failures.
 
+For the standard add-reference action (`B17581D1-C5C9-4489-8F0A-004BE667B814`),
+derive from `AddReferencePostAction<TReference>`, where `TReference` is the
+workload's `PostActionReference` subtype. It validates the required `reference` and
+`referenceType` arguments and the optional `version`, then selects targets from
+`targetFiles`. When nothing matches, it calls the virtual `TryFindTargets`,
+which finds nothing by default. Targets are processed in order, stopping at the
+first failure. In the workload processor's constructor, declare supported
+reference types and their methods:
+
+```csharp
+RegisterReferenceHandlers(
+    ("package", AddPackageReferenceAsync),
+    ("project", AddProjectReferenceAsync));
+```
+
+Each method takes `(PostActionContext context, string targetPath,
+PostActionReference reference, CancellationToken cancellationToken)` and returns
+`Task<bool>`. Type names are matched case-insensitively; blank names, null
+handlers, and duplicate names are rejected. The base class defines no reference
+types. Unregistered types report an unsupported-reference error. Handlers own
+type-specific reporting and interpretation of reference properties, including
+any path resolution or template rename handling. The default `TryGetReference`
+implementation populates the subtype's properties from matching post-action
+arguments; override it when a workload needs custom creation or conversion.
+Subtypes can add properties for ecosystem-specific values such as registries
+or classifiers.
+`context.GetConfiguredPaths(name)` resolves an argument's paths against the
+output directory without source matching.
+
 Use `context.Reporter.ReportStatus(message)` for status and
 `context.Reporter.WriteLog(line, FunctionsReportSeverity.Info)` for subprocess
 output. `Warning` and `Error` severities are also available. This uses the same
@@ -462,7 +491,9 @@ public bool CanProcess(PostActionSelectionContext context)
 ```
 
 Processors choose accepted values and aliases explicitly; the CLI does not
-resolve them through installed stacks. `CanProcess` must be synchronous and
+resolve them through installed stacks. A workload that owns an `IProjectStack`
+can instead return `context.IsCompatibleWith(stack)`, which matches the stack ID
+and its supported languages or aliases case-insensitively. `CanProcess` must be synchronous and
 side-effect-free. For example, the predicate above accepts this template:
 
 ```json
