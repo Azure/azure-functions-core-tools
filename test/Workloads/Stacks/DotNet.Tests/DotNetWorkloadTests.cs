@@ -73,4 +73,18 @@ public class DotNetWorkloadTests
 
         builder.Received(1).AddTemplateComponent<DotNetRestorePostActionProcessor>();
     }
+
+    [Fact]
+    public void Configure_AddsAddReferencePostActionProcessor()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new DotNetWorkload().Configure(builder);
+
+        builder.Received(1).AddTemplateComponent<DotNetAddReferencePostActionProcessor>();
+        services.BuildServiceProvider().GetRequiredService<IProjectFileLocator>()
+            .Should().BeOfType<ProjectFileLocator>();
+    }
 }
