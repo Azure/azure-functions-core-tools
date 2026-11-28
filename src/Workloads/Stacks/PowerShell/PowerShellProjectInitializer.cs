@@ -23,9 +23,9 @@ internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack)
     private const int GalleryTimeoutSeconds = 10;
     private const string MajorVersionPlaceholder = "MAJOR_VERSION";
     private const string RuntimeVersionPlaceholder = "{RuntimeVersion}";
-    private const string DefaultRuntimeVersion = "7.4";
+    private const string DefaultRuntimeVersion = "7.6";
 
-    private static readonly string[] _supportedRuntimeVersions = ["7.4", "7.6"];
+    private static readonly string[] _supportedRuntimeVersions = ["7.6"];
 
     private static readonly Assembly _assembly = typeof(PowerShellProjectInitializer).Assembly;
     public IProjectStack Stack { get; } = stack ?? throw new ArgumentNullException(nameof(stack));

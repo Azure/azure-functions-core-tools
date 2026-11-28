@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Cloud" ],
+  "identity": "Azure.Functions.Cli.PowerShell.Project",
+  "name": "Azure Functions PowerShell project",
+  "description": "A PowerShell Functions project with an optional HTTP function.",
+  "shortName": "func-powershell",
+  "tags": {
+    "language": "PowerShell",
+    "stack": "powershell",
+    "type": "project"
+  },
+  "preferNameDirectory": true,
+  "symbols": {
+    "NoHttp": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the sample HTTP function."
+    },
+    "RuntimeVersion": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "7.6",
+      "description": "The PowerShell runtime version.",
+      "replaces": "7.6",
+      "onlyIf": [
+        { "after": "FUNCTIONS_WORKER_RUNTIME_VERSION\": \"" }
+      ],
+      "choices": [
+        { "choice": "7.6", "description": "PowerShell 7.6." }
+      ]
+    },
+    "ManagedDependencies": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Enable managed dependencies and include requirements.psd1."
+    },
+    "NoBundle": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the extension bundle from host.json."
+    },
+    "BundlesChannel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "Stable",
+      "description": "The extension bundle release channel.",
+      "choices": [
+        { "choice": "Stable", "description": "Generally available extension bundle." },
+        { "choice": "Preview", "description": "Preview extension bundle." },
+        { "choice": "Experimental", "description": "Experimental extension bundle." }
+      ]
+    },
+    "BundleId": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "Microsoft.Azure.Functions.ExtensionBundle",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          { "condition": "(BundlesChannel == \"Preview\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Preview" },
+          { "condition": "(BundlesChannel == \"Experimental\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Experimental" },
+          { "condition": "", "value": "Microsoft.Azure.Functions.ExtensionBundle" }
+        ]
+      }
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "rename": {
+        "funcignore.txt": ".funcignore",
+        "profile.ps1.txt": "profile.ps1",
+        "HelloWorld/run.ps1.txt": "HelloWorld/run.ps1"
+      },
+      "modifiers": [
+        {
+          "condition": "NoHttp",
+          "exclude": [ "HelloWorld/**" ]
+        },
+        {
+          "condition": "(!ManagedDependencies)",
+          "exclude": [ "requirements.psd1" ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "host.json" }
+  ]
+}
