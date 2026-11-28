@@ -22,22 +22,27 @@ public class PostActionWorkload : Workload
         }
     }
 
-    private sealed class Processor : IPostActionProcessor
+    private sealed class Processor : RestorePostAction
     {
-        public Guid Id { get; } = new("A99565D8-BED2-45DB-8322-B048A0D27464");
-
-        public bool CanProcess(PostActionSelectionContext context)
+        public override bool CanProcess(PostActionSelectionContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
             return string.Equals(context.Stack, "fixture", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(context.Language, "Fixture", StringComparison.OrdinalIgnoreCase);
         }
 
-        public Task<bool> ProcessAsync(PostActionContext context, CancellationToken cancellationToken = default)
+        protected override Task<bool> RestoreAsync(PostActionContext context, string targetPath, CancellationToken cancellationToken)
         {
-            ArgumentNullException.ThrowIfNull(context);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(context.Arguments.TryGetValue("fixture", out string? value) && value == "run");
+            if (!context.Arguments.TryGetValue("fixture", out string? value)
+                || value != "run"
+                || !context.Arguments.TryGetValue("expectedTarget", out string? target))
+            {
+                return Task.FromResult(false);
+            }
+
+            string expectedPath = Path.GetFullPath(target, Path.GetFullPath(context.OutputBasePath));
+            return Task.FromResult(string.Equals(targetPath, expectedPath, StringComparison.Ordinal));
         }
     }
 }

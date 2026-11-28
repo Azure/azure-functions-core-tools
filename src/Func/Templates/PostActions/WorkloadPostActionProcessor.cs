@@ -47,6 +47,10 @@ internal sealed class WorkloadPostActionProcessor(
         }
 
         IPostAction action = context.Action;
+        IPostActionFileMatcher? fileMatcher = context.CreationEffects is ICreationEffects2 effects
+            ? new PostActionFileMatcher(effects.FileChanges)
+            : null;
+        // TODO: Implement a reporter that displays workload post-action output.
         PostActionContext snapshot = new(
             action.ActionId,
             action.Args ?? new Dictionary<string, string>(),
@@ -55,7 +59,7 @@ internal sealed class WorkloadPostActionProcessor(
             action.ContinueOnError,
             context.OutputBasePath,
             context.CreationResult.PrimaryOutputs.Select(output => output.Path.Replace(Path.DirectorySeparatorChar, '/')).ToArray(),
-            context.CreationEffects.FileChanges.Select(change =>
+            context.CreationEffects.FileChanges?.Select(change =>
             {
                 string targetRelativePath = change.TargetRelativePath.Replace(Path.DirectorySeparatorChar, '/');
                 if (targetRelativePath.StartsWith("./", StringComparison.Ordinal))
@@ -66,14 +70,15 @@ internal sealed class WorkloadPostActionProcessor(
                 return new PostActionFileChange(
                     targetRelativePath,
                     change.ChangeKind switch
-                {
-                    ChangeKind.Create => PostActionFileChangeKind.Create,
-                    ChangeKind.Delete => PostActionFileChangeKind.Delete,
-                    ChangeKind.Overwrite => PostActionFileChangeKind.Overwrite,
-                    ChangeKind.Change => PostActionFileChangeKind.Change,
-                    _ => throw new InvalidOperationException($"Unknown template file change kind '{change.ChangeKind}'."),
-                });
-            }).ToArray());
+                    {
+                        ChangeKind.Create => PostActionFileChangeKind.Create,
+                        ChangeKind.Delete => PostActionFileChangeKind.Delete,
+                        ChangeKind.Overwrite => PostActionFileChangeKind.Overwrite,
+                        ChangeKind.Change => PostActionFileChangeKind.Change,
+                        _ => throw new InvalidOperationException($"Unknown template file change kind '{change.ChangeKind}'."),
+                    });
+            }).ToArray() ?? [],
+            fileMatcher: fileMatcher);
         return matches[0].Processor.ProcessAsync(snapshot, cancellationToken);
     }
 }

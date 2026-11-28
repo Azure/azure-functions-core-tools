@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections.ObjectModel;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Templates.PostActions;
 
@@ -32,6 +33,36 @@ public sealed class PostActionContext
         string outputBasePath,
         IReadOnlyList<string> primaryOutputs,
         IReadOnlyList<PostActionFileChange> fileChanges)
+        : this(actionId, arguments, description, manualInstructions, continueOnError, outputBasePath, primaryOutputs, fileChanges, null, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a snapshot of a template post action and its evaluated outputs.
+    /// </summary>
+    /// <param name="actionId">The post-action identifier.</param>
+    /// <param name="arguments">The action arguments, copied with case-sensitive keys.</param>
+    /// <param name="description">The template author's description, if provided.</param>
+    /// <param name="manualInstructions">The fallback instructions, if provided.</param>
+    /// <param name="continueOnError">Whether execution continues after failure.</param>
+    /// <param name="outputBasePath">The template output directory.</param>
+    /// <param name="primaryOutputs">The primary output paths relative to the output directory.</param>
+    /// <param name="fileChanges">The file changes evaluated by the template engine.</param>
+    /// <param name="reporter">The output sink, or null to discard reports.</param>
+    /// <param name="fileMatcher">The source-file matcher, or null if source paths are unavailable.</param>
+    /// <exception cref="ArgumentNullException">A required collection, output path, or file change is null.</exception>
+    /// <exception cref="ArgumentException">The output path or a primary output path is empty or whitespace.</exception>
+    public PostActionContext(
+        Guid actionId,
+        IReadOnlyDictionary<string, string> arguments,
+        string? description,
+        string? manualInstructions,
+        bool continueOnError,
+        string outputBasePath,
+        IReadOnlyList<string> primaryOutputs,
+        IReadOnlyList<PostActionFileChange> fileChanges,
+        IFunctionsReporter? reporter = null,
+        IPostActionFileMatcher? fileMatcher = null)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputBasePath);
@@ -55,6 +86,8 @@ public sealed class PostActionContext
         OutputBasePath = outputBasePath;
         PrimaryOutputs = Array.AsReadOnly(primaryOutputs.ToArray());
         FileChanges = Array.AsReadOnly(fileChanges.ToArray());
+        Reporter = reporter ?? NullFunctionsReporter.Instance;
+        FileMatcher = fileMatcher;
     }
 
     /// <summary>
@@ -96,4 +129,14 @@ public sealed class PostActionContext
     /// Gets the file changes evaluated by the template engine, not a filesystem audit.
     /// </summary>
     public IReadOnlyList<PostActionFileChange> FileChanges { get; }
+
+    /// <summary>
+    /// Gets the sink for status and subprocess output. The CLI currently supplies a no-op reporter.
+    /// </summary>
+    public IFunctionsReporter Reporter { get; }
+
+    /// <summary>
+    /// Gets the source-file matcher, or null if source paths are unavailable.
+    /// </summary>
+    public IPostActionFileMatcher? FileMatcher { get; }
 }
