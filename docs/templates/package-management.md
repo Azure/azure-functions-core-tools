@@ -1,13 +1,12 @@
 # Template Package Management
 
-**Status:** Proposed commands; not yet available. The catalog layer adds no CLI
-commands. The NuGet acquisition, package lifecycle, and CLI integration
-layers must ship before install and uninstall are available. Search additionally
-requires the CDN-backed template index and its client. The behavior and
-acceptance criteria below describe that proposed implementation, not completed
-commands or release qualification.
+**Status:** Install and uninstall are implemented in CLI v5. The NuGet
+acquisition, package lifecycle, and CLI integration layers are shipped.
+Search is not yet available; it requires the CDN-backed template index and its
+client. Acceptance criteria describe behavior to validate, not a claim of
+release qualification on every platform.
 
-`func templates` would manage template NuGet packages independently of function
+`func templates` manages template NuGet packages independently of function
 generation. `func new` remains the command for adding a function, and `func init`
 remains the command for initializing a project. Package management does not
 require an initialized project, resolve project compatibility, or acquire
@@ -16,7 +15,6 @@ workloads automatically.
 ## Command surface
 
 ```text
-func templates search [query]
 func templates install <package-id> [--version <version>] [--source <feed>] [--prerelease]
 func templates uninstall <package-id>
 ```
@@ -25,8 +23,8 @@ The initial surface excludes update, folder and local archive installation,
 batch operations, package aliases, and advanced search. Package IDs identify
 NuGet packages, not individual template identities or short names.
 
-Search options and output contracts will be defined with the CDN manifest;
-the search line above reserves the command, not a finalized interface.
+The future `func templates search [query]` command's options and output contracts
+will be defined with the CDN manifest; it is not enabled yet.
 
 ## Feed configuration
 
@@ -40,7 +38,7 @@ The first configured value wins:
 Version resolution and download use that single feed. They do not read
 `NuGet.Config`, apply package source mappings, or aggregate several feeds.
 A broader func CLI configuration story, including whether to honor user or machine NuGet
-configuration, is out of scope for this proposal and would apply to workloads and
+configuration, is out of scope for this feature and would apply to workloads and
 templates together. Credentials stored only in `NuGet.Config` are not loaded.
 
 An explicit source must be an absolute HTTP(S) V3 feed URL, matching workload

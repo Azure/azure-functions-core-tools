@@ -79,14 +79,13 @@ Workloads can add their own subcommands by calling `builder.RegisterCommand(...)
 to show the same command help as `func workload install --help` without executing the command.
 Paths can include nested subcommands and aliases; an unknown path reports an error and exits with code 1.
 
-### Planned template package commands
+### Template package commands
 
-The proposed [template package management design](templates/package-management.md)
-would add a top-level group separate from function generation:
+[Template package management](templates/package-management.md)
+adds a top-level group separate from function generation:
 
 ```text
 func templates
-├── search [query]        Search templates in the published CDN index
 ├── install <package-id>  Install a template NuGet package
 └── uninstall <package-id>  Uninstall a managed template package
 ```
@@ -104,12 +103,13 @@ package identity/version, the `FuncTemplate` package type with no workload type,
 valid `func.host.json` metadata, and at least one template identity; NuGet and
 Microsoft.TemplateEngine handle archive path safety and template-format
 validation. On replacement, the CLI keeps a temporary backup to restore through
-that provider if installation or discovery fails. The engine would record a
+that provider if installation or discovery fails. The engine records a
 local NuGet package without `NuGetSource`; matching ID/version is a no-op
-regardless of feed. These commands would not require an initialized Functions
-project. They are not yet available; the NuGet acquisition, package lifecycle,
-and CLI integration layers must ship first, with the CDN search implementation
-also required before enabling search.
+regardless of feed. Install and uninstall do not require an initialized Functions
+project and skip first-run workload setup. The NuGet acquisition, package
+lifecycle, and CLI integration layers are shipped. The future
+`func templates search [query]` command remains disabled until the CDN search
+implementation is available.
 
 ## In-place CLI updates
 
