@@ -7,6 +7,24 @@ from `Workloads.Templates.DotNet` under `content/templates`. Its generated
 `workload.json` declares that directory as `templateRoot` so the CLI template engine
 can discover the templates after workload installation.
 
+The project template declares the standard NuGet restore post action
+(`210D431B-A78B-4D2F-B762-4ED3E3EA9025`). The workload registers a processor
+for `dotnet` templates tagged with C# or F# (including `csharp`/`fsharp`
+aliases, case-insensitively). The optional `files` argument accepts source-file
+glob patterns as a semicolon-delimited string or JSON array, following
+`dotnet new`. Unique matched targets restore in pattern and file-change order;
+otherwise primary outputs are used. Targets resolving outside the output directory
+are rejected before any restore. No targets is a success.
+Every target is attempted even after a restore failure; cancellation propagates.
+The post-action reporter is currently a no-op, so restore output and detailed
+errors are discarded; the dispatcher still displays the template's manual
+instructions on failure.
+
+The post-action dispatcher is not yet wired into `func init` or `func new`.
+This registration and template declaration do not change their current behavior.
+Item-template package-reference actions are separate and are not implemented by
+the restore processor.
+
 ## Target frameworks
 
 `func init` supports C# and F# projects targeting `net10.0` (the default).

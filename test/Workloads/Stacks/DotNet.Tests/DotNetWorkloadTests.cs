@@ -61,4 +61,16 @@ public class DotNetWorkloadTests
 
         builder.Received(1).AddProjectFactory<DotNetProjectFactory>();
     }
+
+    [Fact]
+    public void Configure_AddsRestorePostActionProcessor()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new DotNetWorkload().Configure(builder);
+
+        builder.Received(1).AddTemplateComponent<DotNetRestorePostActionProcessor>();
+    }
 }

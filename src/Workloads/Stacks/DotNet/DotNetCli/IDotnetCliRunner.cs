@@ -14,6 +14,7 @@ internal interface IDotnetCliRunner
     /// <param name="arguments">The arguments to pass to <c>dotnet</c>.</param>
     /// <param name="workingDirectory">Optional working directory for the process.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="Azure.Functions.Cli.Common.GracefulException">The dotnet host could not be located.</exception>
     /// <exception cref="InvalidOperationException">The process could not be started.</exception>
     /// <exception cref="DotnetCliException">The process exited with a non-zero exit code.</exception>
     public Task RunAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken);
@@ -31,6 +32,7 @@ internal interface IDotnetCliRunner
     /// standard error are serialized with respect to one another but may run concurrently with
     /// <paramref name="onOutputLine"/>; the callback must be safe to call from a thread-pool thread.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="Azure.Functions.Cli.Common.GracefulException">The dotnet host could not be located.</exception>
     /// <exception cref="InvalidOperationException">The process could not be started.</exception>
     /// <exception cref="DotnetCliException">The process exited with a non-zero exit code.</exception>
     public Task RunStreamingAsync(
