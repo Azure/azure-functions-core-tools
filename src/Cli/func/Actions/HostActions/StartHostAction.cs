@@ -4,6 +4,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using Azure.Functions.Cli.Common;
@@ -849,6 +850,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return isPrecompiled;
         }
 
+        private static bool IsAzuriteBlobEndpointListening()
+        {
+            try
+            {
+                using var client = new TcpClient();
+                var connect = client.ConnectAsync(IPAddress.Loopback, 10000);
+                return connect.Wait(TimeSpan.FromSeconds(1)) && client.Connected;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool skipAzureWebJobsStorageCheck = false)
         {
             string storageConnectionKey = "AzureWebJobsStorage";
@@ -881,6 +896,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
                         + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>', specify a connection string in {SecretsManager.AppSettingsFileName}, or use managed identity to authenticate.");
+                }
+
+                if (!skipAzureWebJobsStorageCheck &&
+                    string.Equals(azureWebJobsStorage?.Trim(), Constants.StorageEmulatorConnectionString, StringComparison.OrdinalIgnoreCase) &&
+                    !IsAzuriteBlobEndpointListening())
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Warning: {storageConnectionKey} is set to '{Constants.StorageEmulatorConnectionString}' in {SecretsManager.AppSettingsFileName}, " +
+                        "but Azurite does not appear to be running on 127.0.0.1:10000. Make sure you have Azurite running (for example: 'azurite --silent --skipApiVersionCheck')."));
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
