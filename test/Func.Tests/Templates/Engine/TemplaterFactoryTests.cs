@@ -6,6 +6,8 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Installer;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
@@ -66,6 +68,29 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateIsolated_ExcludesExternalPackagesButSupportsManagedInstallation()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        var source = Substitute.For<IWorkloadTemplateSource>();
+        source.GetRootsAsync(Arg.Any<CancellationToken>()).Returns(
+            [new WorkloadTemplateRoot(packageDirectory, "workload.templates", "1.0.0", DateTime.UtcNow)]);
+        ICoreTemplateComponent component = Substitute.For<ICoreTemplateComponent>();
+        component.InterfaceType.Returns(typeof(ITemplatePackageProviderFactory));
+        component.Instance.Returns(new WorkloadTemplatePackageProviderFactory(source));
+        var components = new FuncTemplateComponentsProvider([component], [], Substitute.For<IInteractionService>());
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), components);
+        using Templater normal = factory.Create(Context("command"));
+        using Templater isolated = factory.CreateIsolated(Context("command"), Path.Combine(_root, "isolated"));
+
+        (await normal.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().NotBeEmpty();
+        (await isolated.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().BeEmpty();
+        var result = await isolated.InstallAsync(new InstallRequest(packageDirectory), TestContext.Current.CancellationToken);
+
+        result.Success.Should().BeTrue(result.ErrorMessage ?? string.Empty);
+        (await isolated.ListAsync(TestContext.Current.CancellationToken)).Templates.Should().HaveCount(4);
+    }
+
+    [Fact]
     public void Create_NullContext_Throws()
     {
         TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), Components());
@@ -73,6 +98,18 @@ public sealed class TemplaterFactoryTests : IDisposable
         Action act = () => factory.Create(null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Fact]
+    public void CreateIsolated_InvalidArguments_Throw()
+    {
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), Components());
+
+        Action nullContext = () => factory.CreateIsolated(null!, _root);
+        Action emptySettings = () => factory.CreateIsolated(Context("command"), " ");
+
+        nullContext.Should().Throw<ArgumentNullException>().WithParameterName("context");
+        emptySettings.Should().Throw<ArgumentException>().WithParameterName("settingsLocation");
     }
 
     [Fact]
