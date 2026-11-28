@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Functions", "Cloud" ],
+  "identity": "Azure.Functions.Cli.Java.Project",
+  "name": "Azure Functions Java project",
+  "description": "A Maven-based Java Functions project with an optional HTTP function.",
+  "shortName": "func-java",
+  "tags": {
+    "language": "Java",
+    "stack": "java",
+    "type": "project"
+  },
+  "preferNameDirectory": true,
+  "symbols": {
+    "PackageName": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "com.function",
+      "description": "The Java package and Maven group ID for generated functions."
+    },
+    "NoHttp": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the sample HTTP function."
+    },
+    "NoBundle": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Omit the extension bundle from host.json."
+    },
+    "BundlesChannel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "Stable",
+      "description": "The extension bundle release channel.",
+      "choices": [
+        { "choice": "Stable", "description": "Generally available extension bundle." },
+        { "choice": "Preview", "description": "Preview extension bundle." },
+        { "choice": "Experimental", "description": "Experimental extension bundle." }
+      ]
+    },
+    "BundleId": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "Microsoft.Azure.Functions.ExtensionBundle",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          { "condition": "(BundlesChannel == \"Preview\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Preview" },
+          { "condition": "(BundlesChannel == \"Experimental\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Experimental" },
+          { "condition": "", "value": "Microsoft.Azure.Functions.ExtensionBundle" }
+        ]
+      }
+    },
+    "LowerProjectName": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "name",
+        "toLower": true
+      }
+    },
+    "ArtifactName": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "functions-app",
+      "parameters": {
+        "source": "LowerProjectName",
+        "steps": [
+          { "regex": "[^a-z0-9]+", "replacement": "-" },
+          { "regex": "^-+|-+$", "replacement": "" },
+          { "regex": "^(.{60}).*$", "replacement": "$1" },
+          { "regex": "-+$", "replacement": "" },
+          { "regex": "^$", "replacement": "functions-app" },
+          { "regex": "^([a-z0-9])$", "replacement": "$1-app" },
+          { "regex": "^(con|prn|aux|nul|com[1-9]|lpt[1-9])$", "replacement": "$1-app" }
+        ]
+      }
+    },
+    "NormalizedPackageName": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "com.function",
+      "parameters": {
+        "source": "PackageName",
+        "steps": [
+          { "regex": "[^a-zA-Z0-9_.]", "replacement": "_" },
+          { "regex": "\\.+", "replacement": "." },
+          { "regex": "^\\.|\\.$", "replacement": "" },
+          { "regex": "(^|\\.)(?=[0-9])", "replacement": "$1pkg" },
+          { "regex": "(?<![a-zA-Z0-9_])(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|true|false|null|_)(?![a-zA-Z0-9_])", "replacement": "pkg_$&" },
+          { "regex": "(?i)(?<![a-zA-Z0-9_])(con|prn|aux|nul|com[1-9]|lpt[1-9])(?![a-zA-Z0-9_])", "replacement": "pkg_$&" },
+          { "regex": "^java(?=\\.|$)", "replacement": "pkg_java" },
+          { "regex": "^$", "replacement": "com.function" }
+        ]
+      }
+    },
+    "PackagePath": {
+      "type": "generated",
+      "generator": "regex",
+      "fileRename": "TemplatePackagePath",
+      "parameters": {
+        "source": "NormalizedPackageName",
+        "steps": [
+          { "regex": "\\.", "replacement": "/" }
+        ]
+      }
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "rename": {
+        "funcignore.txt": ".funcignore"
+      },
+      "modifiers": [
+        {
+          "condition": "NoHttp",
+          "exclude": [ "src/main/java/TemplatePackagePath/FunctionHelloWorldSample.java" ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "pom.xml" }
+  ]
+}

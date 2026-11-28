@@ -1,0 +1,11 @@
+.git*
+.vscode
+.idea
+local.settings.json
+__blobstorage__/
+__queuestorage__/
+__azurite_db*__.json
+src
+pom.xml
+target/*.jar
+!target/azure-functions

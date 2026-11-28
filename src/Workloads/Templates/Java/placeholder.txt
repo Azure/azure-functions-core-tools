@@ -1,1 +1,0 @@
-Remove when adding templates to this workload
